@@ -1,0 +1,26 @@
+# Weekly dependency-freshness check: bump everything, tidy, and run the suite.
+# Catches drift even when there is no known CVE. A failure here means a
+# dependency bump needs a human look — it does not auto-merge anything.
+name: dependency-freshness
+
+on:
+  schedule:
+    - cron: "23 6 * * 1" # Mondays 06:23 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: false
+
+      - name: Update, tidy, test
+        run: bash scripts/test.sh freshness

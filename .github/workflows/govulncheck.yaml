@@ -1,0 +1,29 @@
+# Vulnerability scanning with govulncheck (reachability-aware: only flags
+# advisories your code actually reaches). Runs on changes and weekly, because
+# new advisories are published after code ships. Thin caller of scripts/test.sh.
+name: govulncheck
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: false
+
+      - name: govulncheck
+        run: bash scripts/test.sh vuln

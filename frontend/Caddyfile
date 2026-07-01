@@ -1,0 +1,52 @@
+# GoTunnels frontend — Caddy static file server.
+#
+# Caddy serves the plain HTML/CSS/JS from /srv. TLS is terminated by the
+# Cloudflare tunnel in front of this container, so automatic HTTPS is disabled
+# and Caddy listens on plain :8080 inside the Compose network (never published
+# to the host).
+#
+# The Content-Security-Policy is injected here and is centrally configured via
+# environment variables (set in .env, passed through compose):
+#
+#   GOTUNNELS_CSP_HEADER_NAME  -> "Content-Security-Policy-Report-Only" (default)
+#                                 or "Content-Security-Policy" to enforce.
+#   GOTUNNELS_CSP_POLICY       -> the policy string. Defaults to a strict
+#                                 self-only policy (no third-party anything).
+#
+# There is deliberately no report-uri/report-to directive: the API tunnel URL
+# is discovered at runtime, so violation reporting is done from the page via a
+# `securitypolicyviolation` listener (see js/csp.js) that POSTs to the API. The
+# violation event fires for both report-only and enforcing modes regardless.
+
+{
+	admin off
+	auto_https off
+	# Keep Caddy's own logs as structured JSON on stdout.
+	log {
+		output stdout
+		format json
+	}
+}
+
+:8080 {
+	root * /srv
+	encode gzip
+
+	header {
+		# Central CSP. Header name and policy both come from the environment.
+		{$GOTUNNELS_CSP_HEADER_NAME:Content-Security-Policy-Report-Only} "{$GOTUNNELS_CSP_POLICY:default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'}"
+
+		# Sensible always-on hardening headers.
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Cross-Origin-Opener-Policy "same-origin"
+		# Do not leak the server version.
+		-Server
+	}
+
+	# Pretty routes: /login -> login.html, etc. config.json is a real file and
+	# is served as-is by file_server.
+	try_files {path} {path}.html {path}/ /index.html
+	file_server
+}

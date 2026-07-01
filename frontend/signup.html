@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign up · GoTunnels</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="brand"><span class="dot"></span> GoTunnels</span>
+        <nav class="mainnav">
+          <a href="/">Home</a>
+          <a href="/activity" data-auth="in" class="hidden">Activity</a>
+          <a href="/settings" data-auth="in" class="hidden">Settings</a>
+          <a href="/login" data-auth="out">Log in</a>
+          <a href="/signup" data-auth="out">Sign up</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="narrow">
+      <h1>Create an account</h1>
+      <p class="lead">Signup is one step — no email or SMS verification (this is a demo).</p>
+
+      <div class="card">
+        <div id="msg" class="msg"></div>
+        <form id="signup-form" novalidate>
+          <label for="username">Username</label>
+          <input id="username" type="text" autocomplete="username" required
+                 placeholder="3–32 chars: letters, digits, . - _" />
+
+          <label for="display_name">Display name (optional)</label>
+          <input id="display_name" type="text" autocomplete="nickname" placeholder="Shown to you" />
+
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="new-password" required
+                 placeholder="at least 8 characters" />
+          <p class="hint">A password is always set as a fallback. You can add a passkey afterwards.</p>
+
+          <div class="btn-row">
+            <button id="submit" class="primary" type="submit">Create account</button>
+            <a href="/login"><button class="ghost" type="button">I already have an account</button></a>
+          </div>
+        </form>
+      </div>
+    </main>
+
+    <footer class="foot">
+      GoTunnels · built with LLM assistance (see the README)
+    </footer>
+
+    <script type="module" src="/js/page-signup.js"></script>
+  </body>
+</html>

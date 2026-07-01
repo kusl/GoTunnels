@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Settings · GoTunnels</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="brand"><span class="dot"></span> GoTunnels</span>
+        <nav class="mainnav">
+          <a href="/">Home</a>
+          <a href="/activity" data-auth="in" class="hidden">Activity</a>
+          <a href="/settings" data-auth="in" class="hidden">Settings</a>
+          <a href="/login" data-auth="out">Log in</a>
+          <a href="/signup" data-auth="out">Sign up</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <h1>Settings</h1>
+      <div id="msg" class="msg"></div>
+
+      <div class="card">
+        <h2>Profile</h2>
+        <dl class="kv">
+          <dt>Username</dt><dd id="p-username">—</dd>
+          <dt>Display name</dt><dd id="p-display">—</dd>
+          <dt>Roles</dt><dd id="p-roles">—</dd>
+          <dt>Passkeys</dt><dd id="p-passkeys">0</dd>
+          <dt>TOTP</dt><dd id="p-totp">disabled</dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <h2>Passkeys</h2>
+        <p class="lead">Add a passkey for passwordless, phishing-resistant login.</p>
+        <div class="btn-row">
+          <button id="register-passkey" class="primary" type="button">Register a passkey</button>
+        </div>
+      </div>
+
+      <div class="card" id="totp-enroll-section">
+        <h2>Two-factor (TOTP)</h2>
+        <p class="lead">Use Aegis, Google Authenticator, or any RFC 6238 app.</p>
+        <div class="btn-row">
+          <button id="totp-enroll" class="primary" type="button">Begin TOTP enrollment</button>
+        </div>
+
+        <div id="totp-enroll-result" class="hidden">
+          <h3>1 · Add this secret to your app</h3>
+          <dl class="kv">
+            <dt>Secret</dt><dd id="totp-secret">—</dd>
+            <dt>otpauth URL</dt><dd id="totp-url">—</dd>
+          </dl>
+
+          <h3>2 · Save your recovery codes</h3>
+          <p class="hint">Each code works once. Store them somewhere safe — they are shown only now.</p>
+          <pre class="codes" id="totp-recovery">—</pre>
+
+          <h3>3 · Confirm a code</h3>
+          <form id="totp-confirm-form" novalidate>
+            <label for="totp-confirm-code">Current 6-digit code</label>
+            <input id="totp-confirm-code" type="text" inputmode="numeric"
+                   autocomplete="one-time-code" placeholder="123456" />
+            <div class="btn-row">
+              <button class="primary" type="submit">Confirm &amp; enable</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card hidden" id="totp-disable-section">
+        <h2>Two-factor (TOTP)</h2>
+        <p class="lead">TOTP is enabled on your account.</p>
+        <form id="totp-disable-form" novalidate>
+          <label for="totp-disable-code">Enter a current code or a recovery code to disable</label>
+          <input id="totp-disable-code" type="text" inputmode="numeric"
+                 autocomplete="one-time-code" placeholder="123456 or recovery code" />
+          <div class="btn-row">
+            <button class="danger" type="submit">Disable TOTP</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="btn-row">
+          <button id="logout" class="ghost" type="button">Log out</button>
+        </div>
+      </div>
+    </main>
+
+    <footer class="foot">
+      GoTunnels · built with LLM assistance (see the README)
+    </footer>
+
+    <script type="module" src="/js/page-settings.js"></script>
+  </body>
+</html>

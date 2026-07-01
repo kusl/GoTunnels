@@ -1,0 +1,17 @@
+# Keep build context small and free of secrets/artifacts.
+.git
+.github
+docs/llm/dump.txt
+.env
+.env.*
+!.env.example
+frontend/config.json
+bin/
+out/
+dist/
+*.test
+coverage*.txt
+coverage*.html
+.gotunnels/
+tunnel-urls.txt
+README.md

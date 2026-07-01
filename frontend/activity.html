@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Activity · GoTunnels</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="brand"><span class="dot"></span> GoTunnels</span>
+        <nav class="mainnav">
+          <a href="/">Home</a>
+          <a href="/activity" data-auth="in" class="hidden">Activity</a>
+          <a href="/settings" data-auth="in" class="hidden">Settings</a>
+          <a href="/login" data-auth="out">Log in</a>
+          <a href="/signup" data-auth="out">Sign up</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <h1>Your activity</h1>
+      <p class="lead">
+        Every sign-up and login is recorded. Your IP address is never stored —
+        only a salted SHA-256 hash of it, shown here exactly as stored.
+      </p>
+
+      <div id="msg" class="msg"></div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Event</th>
+              <th>Method</th>
+              <th>Outcome</th>
+              <th>IP hash</th>
+            </tr>
+          </thead>
+          <tbody id="activity-body"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <footer class="foot">
+      GoTunnels · built with LLM assistance (see the README)
+    </footer>
+
+    <script type="module" src="/js/page-activity.js"></script>
+  </body>
+</html>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Log in · GoTunnels</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="brand"><span class="dot"></span> GoTunnels</span>
+        <nav class="mainnav">
+          <a href="/">Home</a>
+          <a href="/activity" data-auth="in" class="hidden">Activity</a>
+          <a href="/settings" data-auth="in" class="hidden">Settings</a>
+          <a href="/login" data-auth="out">Log in</a>
+          <a href="/signup" data-auth="out">Sign up</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="narrow">
+      <h1>Log in</h1>
+
+      <div class="card">
+        <div id="msg" class="msg"></div>
+        <form id="login-form" novalidate>
+          <label for="username">Username</label>
+          <input id="username" type="text" autocomplete="username" required />
+
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" required />
+
+          <label for="totp">Two-factor code (if enabled)</label>
+          <input id="totp" type="text" inputmode="numeric" autocomplete="one-time-code"
+                 placeholder="6-digit code or recovery code" />
+
+          <div class="btn-row">
+            <button id="submit" class="primary" type="submit">Log in</button>
+          </div>
+        </form>
+
+        <div class="divider">or</div>
+
+        <div class="btn-row">
+          <button id="passkey-login" class="ghost" type="button">Log in with a passkey</button>
+        </div>
+        <p class="hint">Enter your username above, then use your passkey.</p>
+      </div>
+    </main>
+
+    <footer class="foot">
+      GoTunnels · built with LLM assistance (see the README)
+    </footer>
+
+    <script type="module" src="/js/page-login.js"></script>
+  </body>
+</html>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GoTunnels</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="brand"><span class="dot"></span> GoTunnels</span>
+        <nav class="mainnav">
+          <a href="/">Home</a>
+          <a href="/activity" data-auth="in" class="hidden">Activity</a>
+          <a href="/settings" data-auth="in" class="hidden">Settings</a>
+          <a href="/login" data-auth="out">Log in</a>
+          <a href="/signup" data-auth="out">Sign up</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <h1>GoTunnels</h1>
+      <p class="lead">
+        A fully self-contained demo stack: a Go API and a plain HTML/CSS/JS web
+        app, each reachable only through its own Cloudflare Quick Tunnel, with
+        Postgres and telemetry behind them. Nothing binds to a host port.
+      </p>
+
+      <div class="card">
+        <p class="status-pill" id="auth-status">Checking session…</p>
+        <p class="status-pill" id="instance-info">Loading instance info…</p>
+      </div>
+
+      <h2>What this demonstrates</h2>
+      <div class="card">
+        <ul>
+          <li>Passkey (WebAuthn) login, password fallback, and optional TOTP two-factor.</li>
+          <li>Server-side sessions with a Bearer token that works cross-origin.</li>
+          <li>Privacy-preserving audit log: IPs are hashed with a per-instance pepper, never stored raw.</li>
+          <li>OpenTelemetry traces, metrics, and logs over OTLP — vendor-neutral.</li>
+          <li>Content-Security-Policy in report-only mode, reported back to the API.</li>
+          <li>No exposed host ports; every service talks over the internal Compose network.</li>
+        </ul>
+      </div>
+
+      <h2>Get started</h2>
+      <div class="card">
+        <p>Create an account, then add a passkey or enable TOTP from settings.</p>
+        <div class="btn-row">
+          <a href="/signup"><button class="primary" type="button">Sign up</button></a>
+          <a href="/login"><button class="ghost" type="button">Log in</button></a>
+        </div>
+      </div>
+    </main>
+
+    <footer class="foot">
+      GoTunnels · built with LLM assistance (see the README) ·
+      <code>github.com/kusl/GoTunnels</code>
+    </footer>
+
+    <script type="module" src="/js/page-index.js"></script>
+  </body>
+</html>

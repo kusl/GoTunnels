@@ -1,0 +1,18 @@
+# Containerfile.frontend — Caddy serving the static web app.
+#
+# The web assets are copied into /srv (Caddy's root). The Caddyfile lives at
+# the conventional /etc/caddy/Caddyfile. The per-instance config.json (holding
+# the API's runtime tunnel URL) is NOT baked in — the startup script copies it
+# into /srv at run time, so this image is identical for every instance.
+
+FROM caddy:2-alpine
+
+# Copy the web app, then place the Caddyfile where Caddy expects it and remove
+# the copy that landed under the web root so it is never served.
+COPY frontend/ /srv/
+COPY frontend/Caddyfile /etc/caddy/Caddyfile
+RUN rm -f /srv/Caddyfile
+
+EXPOSE 8080
+# The base image's default entrypoint runs:
+#   caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
