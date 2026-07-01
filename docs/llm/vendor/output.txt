@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-01T19:06:14-04:00
+  Generated at   : 2026-07-01T19:20:04-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : e764b11a387bb96b6f940c0b1d830896035bb328
-  Commit (short) : e764b11
-  Commit date    : 2026-07-01 18:54:44 -0400
-  Commit message : run dump
+  Commit (full)  : 2ec80a418cee9fcf7cc9930362ac4de31f97346a
+  Commit (short) : 2ec80a4
+  Commit date    : 2026-07-01 19:19:57 -0400
+  Commit message : remove dead link from readme
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 77
   Excluded path  : docs/llm/
@@ -9169,15 +9169,15 @@ var FS embed.FS
   File name:             README.md
   Relative path:         README.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/README.md
-  Size:                  10.5 KiB (10837 bytes)
-  Last modified:         2026-07-01 16:50:48.400060533 -0400
+  Size:                  10.5 KiB (10780 bytes)
+  Last modified:         2026-07-01 19:19:41.699088976 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805957
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               8fec7c1ff4df03dab6f10f87d37a2e25766feace8dcb05899111e78093f788fe
-  Last git commit:       55db7b6 2026-07-01 16:50:54 -0400 clean up
+  SHA-256:               213209db9ea0fdf0a185f1ac578e2dd2add4bda17c4da83fafb5a6e1a2c7cf09
+  Last git commit:       2ec80a4 2026-07-01 19:19:57 -0400 remove dead link from readme
 
 --- CONTENT ---
 # GoTunnels
@@ -9193,8 +9193,8 @@ ten independent instances side by side without configuring anything.
 > This project — its code, migrations, container and Compose files, shell
 > scripts, tests, CI, and this documentation — was generated with substantial
 > help from a large language model (Anthropic's Claude), working from a design
-> conversation preserved in [`docs/llm/scratch.md`](docs/llm/scratch.md). It is
-> a demonstration project. Read it, run it, learn from it — but review it
+> conversation. It is a demonstration project. 
+> Read it, run it, learn from it — but review it
 > yourself before trusting it with anything that matters. See
 > [Security & demo caveats](#security--demo-caveats).
 
@@ -10034,9 +10034,9 @@ done
 # DUMP SUMMARY
 ################################################################################
   Files dumped   : 77
-  Total size     : 284.4 KiB (291309 bytes)
+  Total size     : 284.4 KiB (291252 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-01T19:06:16-04:00
+  Completed at   : 2026-07-01T19:20:06-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
