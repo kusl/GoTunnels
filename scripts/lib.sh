@@ -151,8 +151,21 @@ resolve_project() {
 # ---------------------------------------------------------------------------
 # health + tunnel discovery
 # ---------------------------------------------------------------------------
+# cid_of project service — first matching container id, or "" if none.
+#
+# BEST-EFFORT / MUST NEVER FAIL. Callers run under `set -euo pipefail` and
+# capture this with a bare assignment, e.g. `cid="$(cid_of …)"`, whose exit
+# status is that of this pipeline. Two things would otherwise make the pipeline
+# non-zero and abort the whole caller via errexit:
+#   1. `head -1` closes the pipe after one line, SIGPIPE-ing the producer
+#      (`{podman,docker} compose ps`, exit 141), which `pipefail` then surfaces
+#      as failure; and/or
+#   2. `podman compose ps -q` sometimes exits non-zero even when it has already
+#      printed the id.
+# So we read the whole stream with `sed -n '1p'` (no early close → no SIGPIPE)
+# and swallow any producer failure with `|| true`.
 cid_of() { # project service
-  dc -p "$1" ps -q "$2" 2>/dev/null | head -1
+  dc -p "$1" ps -q "$2" 2>/dev/null | sed -n '1p' || true
 }
 
 wait_healthy() { # project service timeout_seconds
@@ -175,7 +188,11 @@ poll_tunnel_url() { # project service timeout_seconds
   for i in $(seq 1 "$timeout"); do
     cid="$(cid_of "$project" "$svc")"
     if [ -n "$cid" ]; then
-      url="$($CR logs "$cid" 2>&1 | grep -Eo 'https://[a-z0-9._-]+\.trycloudflare\.com' | head -1)"
+      # `|| true` is required: before the URL is logged, `grep` matches nothing
+      # and exits 1; once it matches, `head -n1` SIGPIPE-s `grep`. Under
+      # `pipefail` either would make this bare assignment abort the caller via
+      # errexit — so neutralize the pipeline's exit status here.
+      url="$($CR logs "$cid" 2>&1 | grep -Eo 'https://[a-z0-9._-]+\.trycloudflare\.com' | head -n1 || true)"
       if [ -n "$url" ]; then echo "$url"; return 0; fi
     fi
     sleep 1
