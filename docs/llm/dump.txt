@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-01T16:59:16-04:00
+  Generated at   : 2026-07-01T17:03:28-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : 55db7b6881bf36cc7a6eafee6da484e970b9888d
-  Commit (short) : 55db7b6
-  Commit date    : 2026-07-01 16:50:54 -0400
-  Commit message : clean up
+  Commit (full)  : 270924b6b7eb4bde2efb490e9af8bec20a2e21c0
+  Commit (short) : 270924b
+  Commit date    : 2026-07-01 17:02:15 -0400
+  Commit message : move file
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 77
   Excluded path  : docs/llm/
@@ -28,7 +28,7 @@ REPOSITORY METADATA
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
- M .env.example
+ M docs/llm/vendor/claude-conversations.md
 
 ################################################################################
 # FILE: export.sh  [THIS SCRIPT — included for full context]
@@ -1247,7 +1247,7 @@ naming and the test toolchain:
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               a3eb187551b31c16a492c085eeb3f83ead12fa20d3a6f9dbd408b72579faa49e
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  Last git commit:       f7e07e5 2026-07-01 16:59:41 -0400 run dump
 
 --- CONTENT ---
 # .env.example — shape of the environment file.
@@ -9958,7 +9958,7 @@ log "tear down with: scripts/down.sh $PROJECT"
   Files dumped   : 77
   Total size     : 280.2 KiB (286980 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-01T16:59:19-04:00
+  Completed at   : 2026-07-01T17:03:31-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
