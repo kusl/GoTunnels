@@ -11,8 +11,8 @@ ten independent instances side by side without configuring anything.
 > This project — its code, migrations, container and Compose files, shell
 > scripts, tests, CI, and this documentation — was generated with substantial
 > help from a large language model (Anthropic's Claude), working from a design
-> conversation preserved in [`docs/llm/scratch.md`](docs/llm/scratch.md). It is
-> a demonstration project. Read it, run it, learn from it — but review it
+> conversation. It is a demonstration project. 
+> Read it, run it, learn from it — but review it
 > yourself before trusting it with anything that matters. See
 > [Security & demo caveats](#security--demo-caveats).
 
