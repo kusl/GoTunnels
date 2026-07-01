@@ -550,3 +550,4 @@ but try to keep the github actions as lean as possible
 keep as much of the logic in bash shell scripts or whatever 
 as much as possible and the github actions should run functions from the scripts 
 please read the full `scratch.md` for context 
+also in the readme be sure to indicate that we are using LLM so it is easy to see  
