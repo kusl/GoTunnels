@@ -532,3 +532,21 @@ nothing added to commit but untracked files present (use "git add" to track)
 kushal@fedora:~/src/golang/GoTunnels$ git branch -m main
 kushal@fedora:~/src/golang/GoTunnels$ 
 ```
+
+I have added an export.sh script to export all code. 
+Edit it if necessary, 
+this is how I will share the current status of the code with you 
+we should only include files that are tracked by git in this `dump.txt`
+please generate all the code necessary 
+remember to generate everything including the code, the migrations, 
+podman, podman compose, and a shell script that runs the `export.sh` 
+and then starts podman compose 
+which in turn builds everything and runs all the tests 
+so all I need to do is run that one script and everything is ready 
+oh tht reminds me we need unit tests, lots and lots of unit tests 
+to cover as much as possible 
+oh and we also need to build and test on github actions 
+but try to keep the github actions as lean as possible 
+keep as much of the logic in bash shell scripts or whatever 
+as much as possible and the github actions should run functions from the scripts 
+please read the full `scratch.md` for context 
