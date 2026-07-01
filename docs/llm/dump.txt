@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-01T17:58:42-04:00
+  Generated at   : 2026-07-01T18:11:40-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : e18dbad761ba0106279f42c85b20fd4768419fb1
-  Commit (short) : e18dbad
-  Commit date    : 2026-07-01 17:49:39 -0400
-  Commit message : add prompt
+  Commit (full)  : 995655c6be58b011a36a4d094b6bb31ed376dbc8
+  Commit (short) : 995655c
+  Commit date    : 2026-07-01 18:11:28 -0400
+  Commit message : add claude response
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 77
   Excluded path  : docs/llm/
@@ -867,15 +867,15 @@ ENTRYPOINT ["/api"]
   File name:             Containerfile.frontend
   Relative path:         Containerfile.frontend
   Absolute path:         /home/kushal/src/golang/GoTunnels/Containerfile.frontend
-  Size:                  752 B (752 bytes)
-  Last modified:         2026-07-01 14:38:10.000000000 -0400
+  Size:                  1.2 KiB (1309 bytes)
+  Last modified:         2026-07-01 18:10:36.355264271 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805928
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               7a94119f5db62a9493bd5926a7132c61c3ed849994beb77b9c7868936b5e3190
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               1faa4dd9b33c03d28e943852f4ab4a39dd7c6d2f720adf18cdf0841491d2c0ca
+  Last git commit:       995655c 2026-07-01 18:11:28 -0400 add claude response
 
 --- CONTENT ---
 # Containerfile.frontend — Caddy serving the static web app.
@@ -885,7 +885,14 @@ ENTRYPOINT ["/api"]
 # the API's runtime tunnel URL) is NOT baked in — the startup script copies it
 # into /srv at run time, so this image is identical for every instance.
 
-FROM caddy:2-alpine
+# Fully-qualified on purpose. Podman on Fedora resolves an unqualified name
+# (e.g. `caddy:2-alpine`) against unqualified-search-registries, which tries
+# registry.fedoraproject.org first — that registry has no `caddy` image, so the
+# build fails with "manifest unknown". Naming the Docker Hub source explicitly
+# (docker.io/library/… is the canonical form for official images) skips the
+# search and pulls the real image. This matches how compose.yaml pins its
+# images (docker.io/library/postgres, docker.io/cloudflare/cloudflared).
+FROM docker.io/library/caddy:2-alpine
 
 # Copy the web app, then place the Caddyfile where Caddy expects it and remove
 # the copy that landed under the web root so it is never served.
@@ -3500,15 +3507,15 @@ docs/llm/dump.txt
   File name:             go.mod
   Relative path:         go.mod
   Absolute path:         /home/kushal/src/golang/GoTunnels/go.mod
-  Size:                  1.1 KiB (1152 bytes)
-  Last modified:         2026-07-01 17:33:15.919335045 -0400
+  Size:                  1.6 KiB (1690 bytes)
+  Last modified:         2026-07-01 18:10:14.362721541 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805927
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               29280c7d8b7c8698dde3403861b40cf34b698e85984fd45551e4f76cba4f9432
-  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
+  SHA-256:               2e7f00bbee5a68d0b67f92a293a0df5da0a5689e603d00677cda688d196bb373
+  Last git commit:       995655c 2026-07-01 18:11:28 -0400 add claude response
 
 --- CONTENT ---
 module github.com/kusl/GoTunnels
@@ -3522,22 +3529,31 @@ go 1.26.0
 // first `./run.sh` works without a pre-existing go.sum.
 require (
 	github.com/go-webauthn/webauthn v0.11.2
-	github.com/jackc/pgx/v5 v5.6.0
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pquerna/otp v1.4.0
-	go.opentelemetry.io/contrib/bridges/otelslog v0.4.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0
-	go.opentelemetry.io/otel v1.28.0
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.4.0
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.28.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.28.0
-	go.opentelemetry.io/otel/log v0.4.0
-	go.opentelemetry.io/otel/metric v1.28.0
-	go.opentelemetry.io/otel/sdk v1.28.0
-	go.opentelemetry.io/otel/sdk/log v0.4.0
-	go.opentelemetry.io/otel/sdk/metric v1.28.0
-	go.opentelemetry.io/otel/trace v1.28.0
-	golang.org/x/crypto v0.25.0
+	go.opentelemetry.io/contrib/bridges/otelslog v0.19.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
+	go.opentelemetry.io/otel v1.44.0
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.20.0
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.44.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.44.0
+	go.opentelemetry.io/otel/log v0.20.0
+	go.opentelemetry.io/otel/metric v1.44.0
+	go.opentelemetry.io/otel/sdk v1.44.0
+	go.opentelemetry.io/otel/sdk/log v0.20.0
+	go.opentelemetry.io/otel/sdk/metric v1.44.0
+	go.opentelemetry.io/otel/trace v1.44.0
+	golang.org/x/crypto v0.53.0
 )
+
+// Security floor for GO-2025-3553 (excessive memory allocation during JWT
+// header parsing). jwt/v5 is not imported directly by our code; it is pulled
+// in transitively by go-webauthn, which currently requires the vulnerable
+// v5.2.1. This explicit require raises the minimum to the patched v5.2.2 —
+// `go mod tidy` will keep it as the selected version and will not downgrade
+// below an explicit require. Once go-webauthn requires v5.2.2+ this line can
+// be removed.
+require github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 
 
 ################################################################################
@@ -9857,15 +9873,15 @@ main "$@"
   File name:             up.sh
   Relative path:         scripts/up.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/up.sh
-  Size:                  3.1 KiB (3208 bytes)
-  Last modified:         2026-07-01 14:40:52.000000000 -0400
+  Size:                  4.9 KiB (5100 bytes)
+  Last modified:         2026-07-01 18:10:59.308795591 -0400
   Permissions:           -rwxr-xr-x
   Owner:                 kushal:kushal
   Inode:                 17805978
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               2f053b9d40bcbaf746059a7aedf01b0cec995964b83ff0421a9e40f42c44a959
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               b2bbd6bc9e01dd6a8b89b7770c7de1524904ae1a1a76e867f3a8c17f263acacb
+  Last git commit:       995655c 2026-07-01 18:11:28 -0400 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -9881,6 +9897,8 @@ main "$@"
 # Environment:
 #   GOTUNNELS_PROJECT / GOTUNNELS_INSTANCE_ID  alternative ways to name the run
 #   UPTRACE_DSN                                optional telemetry DSN
+#   GOTUNNELS_TUNNEL_LOG_WAIT                  seconds to wait before printing
+#                                              the tunnel URL log lines (def 60)
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -9955,14 +9973,53 @@ printf '  %sInstance:%s %s (urls saved to tunnel-urls.txt)\n' "$_c_dim" "$_c_res
 echo >&2
 log "tear down with: scripts/down.sh $PROJECT"
 
+# 10) Final check. Cloudflare Quick Tunnels can take a little while after the
+#     containers start to finish registering and become reachable. Give them a
+#     moment, then re-read the cloudflared container logs with the runtime
+#     ($CR, e.g. podman) and print the raw log line(s) that announce each
+#     https://<subdomain>.trycloudflare.com URL. That line is the signal the
+#     tunnel is live — and it is the exact line to copy/paste.
+#
+#     Override the pause with GOTUNNELS_TUNNEL_LOG_WAIT (seconds); set it to 0
+#     to skip waiting entirely.
+FINAL_WAIT="${GOTUNNELS_TUNNEL_LOG_WAIT:-60}"
+if [ "$FINAL_WAIT" -gt 0 ] 2>/dev/null; then
+  log "waiting ${FINAL_WAIT}s for the Quick Tunnels to settle, then printing their URL log lines…"
+  sleep "$FINAL_WAIT"
+fi
+
+echo >&2
+# "service|human label" pairs. An explicit for-loop list is not subject to IFS
+# word splitting, and the ${var%%|*} / ${var##*|} expansions do not use IFS
+# either, so this is safe under IFS=$'\n\t'.
+for _pair in "cloudflared-frontend|Web app" "cloudflared-api|API"; do
+  _svc="${_pair%%|*}"
+  _label="${_pair##*|}"
+  _cid="$(cid_of "$PROJECT" "$_svc")"
+  if [ -z "$_cid" ]; then
+    warn "$_label: container '$_svc' not found; cannot read its logs"
+    continue
+  fi
+  # grep exits non-zero when it matches nothing; '|| true' keeps that from
+  # tripping 'set -e' on this final, informational step.
+  _lines="$("$CR" logs "$_cid" 2>&1 | grep -E 'https://[a-z0-9._-]+\.trycloudflare\.com' || true)"
+  if [ -n "$_lines" ]; then
+    ok "$_label — tunnel URL (from: $CR logs $_svc):"
+    printf '%s\n' "$_lines" >&2
+  else
+    warn "$_label: no trycloudflare.com URL in '$_svc' logs yet (check: dc -p $PROJECT logs $_svc)"
+  fi
+  echo >&2
+done
+
 
 ################################################################################
 # DUMP SUMMARY
 ################################################################################
   Files dumped   : 77
-  Total size     : 280.4 KiB (287228 bytes)
+  Total size     : 283.4 KiB (290215 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-01T17:58:44-04:00
+  Completed at   : 2026-07-01T18:11:42-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
