@@ -36,10 +36,10 @@ ten independent instances side by side without configuring anything.
 ## Architecture
 
 ```
-                    ┌─────────────────────── your machine ───────────────────────┐
+                    ┌─────────────────────── your machine ────────────────────────┐
    browser ─┐       │                                                             │
             │ https │   ┌───────────┐        ┌───────────┐       ┌────────────┐   │
-            ├──────────▶│ frontend  │        │    api    │──────▶│     db     │   │
+            ├─────────▶│ frontend  │        │    api    │─────▶│     db     │   │
             │       │   │  (Caddy)  │        │   (Go)    │       │ (Postgres) │   │
             │       │   └───────────┘        └───────────┘       └────────────┘   │
             │       │        ▲                     ▲                              │
