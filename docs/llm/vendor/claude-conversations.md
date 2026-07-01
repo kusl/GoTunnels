@@ -82,3 +82,59 @@ podman version 5.8.2
 kushal@fedora:~/src/golang/GoTunnels$ 
 then next it looks like some github actions were not up to date 
 I fixed those by updating the action versions
+but yeah the podman compose problem is still here. 
+Can you please review the complete `dump.txt` and fix all outstanding errors and defects? 
+```bash
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh
+[gotunnels] using runtime: podman / compose: podman compose
+[gotunnels] using existing /home/kushal/src/golang/GoTunnels/.env
+[gotunnels] project (instance): gotunnels-o9qbxq
+[gotunnels] building images…
+/home/kushal/src/golang/GoTunnels/scripts/lib.sh: line 59: podman compose: command not found
+
+real	0m0.189s
+user	0m0.093s
+sys	0m0.085s
+kushal@fedora:~/src/golang/GoTunnels$ podman compose --version
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+podman-compose version 1.5.0
+podman version 5.8.2
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash export.sh > docs/llm/vendor/output.txt
+
+real	0m2.286s
+user	0m1.127s
+sys	0m1.434s
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh
+[gotunnels] using runtime: podman / compose: podman compose
+[gotunnels] using existing /home/kushal/src/golang/GoTunnels/.env
+[gotunnels] project (instance): gotunnels-q8ol5a
+[gotunnels] building images…
+/home/kushal/src/golang/GoTunnels/scripts/lib.sh: line 59: podman compose: command not found
+
+real	0m0.134s
+user	0m0.094s
+sys	0m0.061s
+kushal@fedora:~/src/golang/GoTunnels$ podman compose --version
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+podman-compose version 1.5.0
+podman version 5.8.2
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash export.sh > docs/llm/vendor/output.txt
+
+real	0m2.284s
+user	0m1.157s
+sys	0m1.438s
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh
+[gotunnels] using runtime: podman / compose: podman compose
+[gotunnels] using existing /home/kushal/src/golang/GoTunnels/.env
+[gotunnels] project (instance): gotunnels-3noova
+[gotunnels] building images…
+/home/kushal/src/golang/GoTunnels/scripts/lib.sh: line 59: podman compose: command not found
+
+real	0m0.136s
+user	0m0.088s
+sys	0m0.072s
+kushal@fedora:~/src/golang/GoTunnels$ 
+
+```
