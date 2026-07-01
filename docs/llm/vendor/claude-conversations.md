@@ -81,3 +81,4 @@ podman-compose version 1.5.0
 podman version 5.8.2
 kushal@fedora:~/src/golang/GoTunnels$ 
 then next it looks like some github actions were not up to date 
+I fixed those by updating the action versions
