@@ -138,3 +138,18 @@ sys	0m0.072s
 kushal@fedora:~/src/golang/GoTunnels$ 
 
 ```
+also another problem in github actions
+```bash
+Run bash scripts/test.sh vuln
+  bash scripts/test.sh vuln
+  shell: /usr/bin/bash -e {0}
+  env:
+    GOTOOLCHAIN: local
+[gotunnels] running govulncheck (reachability-aware)…
+go: downloading golang.org/x/vuln v1.5.0
+go: golang.org/x/vuln/cmd/govulncheck@latest: golang.org/x/vuln@v1.5.0 requires go >= 1.25.0 (running go 1.23.12; GOTOOLCHAIN=local)
+Error: Process completed with exit code 1.
+```
+we should use the latest version of golang. 
+please remember to return full file and also file file path of all files that need to change 
+for easy copy pasting 
