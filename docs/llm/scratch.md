@@ -491,3 +491,44 @@ Want to start on any specific piece next — the SQL schema for all these tables
 
 When such a report comes in we should not only put it in postgresql but also log it from the api layer to uptrace 
 all of the configuration should be central in one location 
+
+please generate the full project for `GoTunnels`
+so I can easily copy paste into this folder 
+also please add best in class documentation as well 
+
+public github repository will be at `https://github.com/kusl/GoTunnels`
+
+```bash
+kushal@fedora:~/src/golang/GoTunnels$ pwd; git init; git status; git add .; git commit --message "add scratch.md";
+/home/kushal/src/golang/GoTunnels
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint:   git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint:   git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Initialized empty Git repository in /home/kushal/src/golang/GoTunnels/.git/
+On branch master
+
+No commits yet
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        docs/
+        export.sh
+
+nothing added to commit but untracked files present (use "git add" to track)
+[master (root-commit) b09faf4] add scratch.md
+ 2 files changed, 493 insertions(+)
+ create mode 100644 docs/llm/scratch.md
+ create mode 100644 export.sh
+kushal@fedora:~/src/golang/GoTunnels$ git branch -m main
+kushal@fedora:~/src/golang/GoTunnels$ 
+```
