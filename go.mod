@@ -1,6 +1,6 @@
 module github.com/kusl/GoTunnels
 
-go 1.23.0
+go 1.26.0
 
 // NOTE: go.sum is intentionally not committed on first import. Run
 // `go mod tidy` once (the local network can reach the Go module proxy) to

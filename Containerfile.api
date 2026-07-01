@@ -6,7 +6,7 @@
 # graph, then produces a static binary. The final image is distroless: no
 # shell, no package manager, minimal attack surface, runs as nonroot.
 
-FROM golang:1.23-bookworm AS build
+FROM golang:1.26-bookworm AS build
 WORKDIR /src
 
 # Keep the bundled toolchain (no surprise network toolchain downloads) and

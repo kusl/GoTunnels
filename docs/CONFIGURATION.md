@@ -109,5 +109,5 @@ naming and the test toolchain:
 | Variable | Meaning |
 | --- | --- |
 | `GOTUNNELS_PROJECT` | Explicit Compose project name (else derived from the instance id or generated). |
-| `GO_IMAGE` | Go image used by `scripts/test.sh` when no host Go toolchain is present (default `golang:1.23-bookworm`). |
+| `GO_IMAGE` | Go image used by `scripts/test.sh` when no host Go toolchain is present (default `golang:1.26-bookworm`). |
 | `CR` / `COMPOSE` | Override the detected container runtime / compose command. |

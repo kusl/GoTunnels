@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 . "$SCRIPT_DIR/lib.sh"
 
-GO_IMAGE="${GO_IMAGE:-docker.io/library/golang:1.23-bookworm}"
+GO_IMAGE="${GO_IMAGE:-docker.io/library/golang:1.26-bookworm}"
 
 # run_go "<go shell snippet>" — execute a snippet with a Go toolchain, on host
 # if available else in a container mounting the repo.

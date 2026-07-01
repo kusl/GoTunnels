@@ -52,9 +52,13 @@ detect_runtime() {
   log "using runtime: $CR / compose: $COMPOSE"
 }
 
-# dc: run a compose command against the repo compose file. COMPOSE is expanded
-# unquoted on purpose so a two-word value ("podman compose") splits correctly.
+# dc: run a compose command against the repo compose file. COMPOSE may be two
+# words ("podman compose" / "docker compose"); it is expanded unquoted so it
+# splits into separate arguments. These scripts run under a strict
+# IFS=$'\n\t' (no space), which would otherwise keep "podman compose" as one
+# nonexistent command — so restore a normal IFS locally just for the split.
 dc() {
+  local IFS=$' \t\n'
   # shellcheck disable=SC2086
   $COMPOSE -f "$REPO_ROOT/compose.yaml" "$@"
 }
@@ -103,7 +107,7 @@ GOTUNNELS_RP_ORIGINS=http://localhost:8080
 GOTUNNELS_CORS_ALLOWED_ORIGINS=*
 GOTUNNELS_CSP_HEADER_NAME=Content-Security-Policy-Report-Only
 GOTUNNELS_CSP_MODE=report-only
-GOTUNNELS_CSP_POLICY=default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+GOTUNNELS_CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 UPTRACE_DSN=${UPTRACE_DSN:-}
 OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
 OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS:-}
