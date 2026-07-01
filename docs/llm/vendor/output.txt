@@ -1,86 +1,3 @@
-################################################################################
-#                                                                              #
-#   REPOSITORY CONTEXT DUMP                                                    #
-#   Generated for LLM consumption — do not edit manually                       #
-#                                                                              #
-################################################################################
-
-DUMP METADATA
-═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-01T16:59:16-04:00
-  Generator      : export.sh
-  Host           : fedora
-  User           : kushal
-  OS             : Linux 7.0.13-100.fc43.x86_64 x86_64
-
-REPOSITORY METADATA
-═════════════════════════════════════════════════════════════════════════════════
-  Repository root: /home/kushal/src/golang/GoTunnels
-  Branch         : main
-  Commit (full)  : 55db7b6881bf36cc7a6eafee6da484e970b9888d
-  Commit (short) : 55db7b6
-  Commit date    : 2026-07-01 16:50:54 -0400
-  Commit message : clean up
-  Remote origin  : git@github.com:kusl/GoTunnels.git
-  Files included : 77
-  Excluded path  : docs/llm/
-  Excluded files : yarn.lock
-
-GIT WORKING TREE STATUS (first 20 lines)
-═════════════════════════════════════════════════════════════════════════════════
- M .env.example
-
-################################################################################
-# FILE: export.sh  [THIS SCRIPT — included for full context]
-################################################################################
-
---- METADATA ---
-  File name:             export.sh
-  Relative path:         export.sh
-  Size:                  16.6 KiB (17022 bytes)
-  Last modified:         2026-07-01 14:42:09.000000000 -0400
-  Permissions:           -rwxr-xr-x
-  SHA-256:               542323f8128dfce4873eee0c14719b64363244b398ee99c4ad780a82ab240739
-  MIME type:             text/x-shellscript
-
---- CONTENT ---
-#!/usr/bin/env bash
-# =============================================================================
-# export.sh — Repository context dump for LLM consumption
-#
-# Location: <repo root>/export.sh
-#
-# Usage:  bash export.sh
-#         time bash export.sh
-#
-# Behaviour:
-#   • Resolves its own location; works regardless of CWD.
-#   • Silently exits if no Git repository is found at that location.
-#   • Dumps only Git-tracked files (excluding docs/llm/** and yarn.lock) to
-#     docs/llm/dump.txt.
-#   • Prepends its own source to the dump (self-documentation).
-#   • Emits rich per-file metadata (name, path, size, permissions, mtime, SHA-256).
-#   • Includes a file-tree view of all included files.
-#   • Prints the complete dump to stdout before writing the file.
-# =============================================================================
-
-set -euo pipefail
-IFS=$'\n\t'
-
-# ---------------------------------------------------------------------------
-# 0. Resolve script's own directory — immune to CWD
-# ---------------------------------------------------------------------------
-SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
-SCRIPT_NAME="$(basename "$SCRIPT_PATH")"
-
-# ---------------------------------------------------------------------------
-# 1. Validate: must be inside a working Git repository
-# ---------------------------------------------------------------------------
-if ! git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
-    exit 0
-fi
-
 # Ensure git is usable (index readable, not a bare repo, etc.)
 if ! git -C "$SCRIPT_DIR" status --porcelain &>/dev/null 2>&1; then
     exit 0
@@ -9962,3 +9879,8 @@ log "tear down with: scripts/down.sh $PROJECT"
 ################################################################################
 # END OF DUMP
 ################################################################################
+
+real	0m2.468s
+user	0m1.181s
+sys	0m1.444s
+kushal@fedora:~/src/golang/GoTunnels$ 
