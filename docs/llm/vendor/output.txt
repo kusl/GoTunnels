@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-01T17:15:53-04:00
+  Generated at   : 2026-07-01T17:34:43-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : a2d9e251a431e87c95ba20713a1e7a5728141c50
-  Commit (short) : a2d9e25
-  Commit date    : 2026-07-01 17:11:50 -0400
-  Commit message : run dump
+  Commit (full)  : 0a9400c7649b702d6476697accf802b7a9c0ae24
+  Commit (short) : 0a9400c
+  Commit date    : 2026-07-01 17:34:37 -0400
+  Commit message : add response by claude
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 77
   Excluded path  : docs/llm/
@@ -28,7 +28,6 @@ REPOSITORY METADATA
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
- M docs/llm/vendor/claude-conversations.md
  M docs/llm/vendor/output.txt
 
 ################################################################################
@@ -819,14 +818,14 @@ volumes:
   Relative path:         Containerfile.api
   Absolute path:         /home/kushal/src/golang/GoTunnels/Containerfile.api
   Size:                  979 B (979 bytes)
-  Last modified:         2026-07-01 14:38:03.000000000 -0400
+  Last modified:         2026-07-01 17:33:27.472441212 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805971
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               aaefee7eaa0b1bb780212c9254fcc312a2c550bc32b622d431c3f44556689e4e
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               14bd260997a957b541f8139b5f269d02fc23dff51bd2421795c5535d80accead
+  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
 
 --- CONTENT ---
 # Containerfile.api — multi-stage build for the GoTunnels API.
@@ -837,7 +836,7 @@ volumes:
 # graph, then produces a static binary. The final image is distroless: no
 # shell, no package manager, minimal attack surface, runs as nonroot.
 
-FROM golang:1.23-bookworm AS build
+FROM golang:1.26-bookworm AS build
 WORKDIR /src
 
 # Keep the bundled toolchain (no surprise network toolchain downloads) and
@@ -1107,14 +1106,14 @@ than a third-party migration tool.
   Relative path:         docs/CONFIGURATION.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/docs/CONFIGURATION.md
   Size:                  5.2 KiB (5347 bytes)
-  Last modified:         2026-07-01 14:45:24.000000000 -0400
+  Last modified:         2026-07-01 17:34:19.384032849 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805987
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               4df04bd7428d56d658a8689d18a18ffe6695eaf7448876cdd91e1edd45c41e2b
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               4aacaa56656ce4dbecb3f1a15b69060a0e6c0a4ed453b0c9850d3ceaf0e6e377
+  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
 
 --- CONTENT ---
 # Configuration
@@ -1228,7 +1227,7 @@ naming and the test toolchain:
 | Variable | Meaning |
 | --- | --- |
 | `GOTUNNELS_PROJECT` | Explicit Compose project name (else derived from the instance id or generated). |
-| `GO_IMAGE` | Go image used by `scripts/test.sh` when no host Go toolchain is present (default `golang:1.23-bookworm`). |
+| `GO_IMAGE` | Go image used by `scripts/test.sh` when no host Go toolchain is present (default `golang:1.26-bookworm`). |
 | `CR` / `COMPOSE` | Override the detected container runtime / compose command. |
 
 
@@ -3303,15 +3302,15 @@ updates:
   File name:             ci.yaml
   Relative path:         .github/workflows/ci.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/workflows/ci.yaml
-  Size:                  648 B (648 bytes)
-  Last modified:         2026-07-01 17:08:59.728119526 -0400
+  Size:                  650 B (650 bytes)
+  Last modified:         2026-07-01 17:33:46.998370833 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805935
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               dac16a4600a1a4d47a196615c6e78593ee24c35beb42b14bd541845bac3ca9cc
-  Last git commit:       36d9e31 2026-07-01 17:09:09 -0400 update github actions
+  SHA-256:               d83dad2a3795a355638f99887d9d058a821de75edce08e81dab97f55b81735af
+  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
 
 --- CONTENT ---
 # Build and test. Deliberately thin: all logic lives in scripts/test.sh so the
@@ -3339,7 +3338,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.23"
+          go-version: "stable"
           # go.sum is intentionally absent on first import; do not fail on it.
           cache: false
 
@@ -3355,15 +3354,15 @@ jobs:
   File name:             dependency-freshness.yaml
   Relative path:         .github/workflows/dependency-freshness.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/workflows/dependency-freshness.yaml
-  Size:                  640 B (640 bytes)
-  Last modified:         2026-07-01 17:08:59.728119526 -0400
+  Size:                  642 B (642 bytes)
+  Last modified:         2026-07-01 17:34:09.975397280 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805936
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               c0368e7f48320dea4515588d2ff71cbebe7d8a43066bb11e40269d7040d56884
-  Last git commit:       36d9e31 2026-07-01 17:09:09 -0400 update github actions
+  SHA-256:               9b63bdb447006cb1b87f1dbd9d7f14922e1420797c81d5fdf74578d77df26fa4
+  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
 
 --- CONTENT ---
 # Weekly dependency-freshness check: bump everything, tidy, and run the suite.
@@ -3387,7 +3386,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.23"
+          go-version: "stable"
           cache: false
 
       - name: Update, tidy, test
@@ -3402,15 +3401,15 @@ jobs:
   File name:             govulncheck.yaml
   Relative path:         .github/workflows/govulncheck.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/workflows/govulncheck.yaml
-  Size:                  671 B (671 bytes)
-  Last modified:         2026-07-01 17:08:59.728119526 -0400
+  Size:                  673 B (673 bytes)
+  Last modified:         2026-07-01 17:33:59.777385543 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805934
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               e1ef7c8ef47e9e2f28cc50d759f0856bda5c1cbff08c150f386b069d9222a1ea
-  Last git commit:       36d9e31 2026-07-01 17:09:09 -0400 update github actions
+  SHA-256:               5b4756ce888ad1af1664221d74b68e441d57cc7d31937ccfada753d19251dbe6
+  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
 
 --- CONTENT ---
 # Vulnerability scanning with govulncheck (reachability-aware: only flags
@@ -3437,7 +3436,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.23"
+          go-version: "stable"
           cache: false
 
       - name: govulncheck
@@ -3502,19 +3501,19 @@ docs/llm/dump.txt
   Relative path:         go.mod
   Absolute path:         /home/kushal/src/golang/GoTunnels/go.mod
   Size:                  1.1 KiB (1152 bytes)
-  Last modified:         2026-07-01 08:49:08.000000000 -0400
+  Last modified:         2026-07-01 17:33:15.919335045 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805927
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               0c7d19dbbd5804cf8e6d17e2a21cee97d4b79ce28943485d95cddcc0ce982284
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               29280c7d8b7c8698dde3403861b40cf34b698e85984fd45551e4f76cba4f9432
+  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
 
 --- CONTENT ---
 module github.com/kusl/GoTunnels
 
-go 1.23.0
+go 1.26.0
 
 // NOTE: go.sum is intentionally not committed on first import. Run
 // `go mod tidy` once (the local network can reach the Go module proxy) to
@@ -9442,15 +9441,15 @@ ok "instance '$PROJECT' removed (containers + volumes)."
   File name:             lib.sh
   Relative path:         scripts/lib.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/lib.sh
-  Size:                  7.7 KiB (7886 bytes)
-  Last modified:         2026-07-01 14:40:31.000000000 -0400
+  Size:                  7.9 KiB (8128 bytes)
+  Last modified:         2026-07-01 17:33:07.351546311 -0400
   Permissions:           -rwxr-xr-x
   Owner:                 kushal:kushal
   Inode:                 17805976
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               a66f8a6327e02f71ff5a5add3591c27c83050c3a2914ad383d763c9c2f336607
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               9ccf335d5ab27a89da68b8320ec8dbeecc670e8e0cf485e504405cea7185a14d
+  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -9507,9 +9506,13 @@ detect_runtime() {
   log "using runtime: $CR / compose: $COMPOSE"
 }
 
-# dc: run a compose command against the repo compose file. COMPOSE is expanded
-# unquoted on purpose so a two-word value ("podman compose") splits correctly.
+# dc: run a compose command against the repo compose file. COMPOSE may be two
+# words ("podman compose" / "docker compose"); it is expanded unquoted so it
+# splits into separate arguments. These scripts run under a strict
+# IFS=$'\n\t' (no space), which would otherwise keep "podman compose" as one
+# nonexistent command — so restore a normal IFS locally just for the split.
 dc() {
+  local IFS=$' \t\n'
   # shellcheck disable=SC2086
   $COMPOSE -f "$REPO_ROOT/compose.yaml" "$@"
 }
@@ -9558,7 +9561,7 @@ GOTUNNELS_RP_ORIGINS=http://localhost:8080
 GOTUNNELS_CORS_ALLOWED_ORIGINS=*
 GOTUNNELS_CSP_HEADER_NAME=Content-Security-Policy-Report-Only
 GOTUNNELS_CSP_MODE=report-only
-GOTUNNELS_CSP_POLICY=default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+GOTUNNELS_CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 UPTRACE_DSN=${UPTRACE_DSN:-}
 OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
 OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS:-}
@@ -9750,14 +9753,14 @@ bash "$SCRIPT_DIR/up.sh" "$PROJECT"
   Relative path:         scripts/test.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/test.sh
   Size:                  2.2 KiB (2305 bytes)
-  Last modified:         2026-07-01 14:42:29.000000000 -0400
+  Last modified:         2026-07-01 17:33:36.640546100 -0400
   Permissions:           -rwxr-xr-x
   Owner:                 kushal:kushal
   Inode:                 17805977
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               62df4aec65c959198d4d167bf02dee92257882829a505ff730d0bed7e87a21a8
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               8fd091516b3174b9577849add2b5af3f00e80291653871f15e90c67cc344e37a
+  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -9777,7 +9780,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 . "$SCRIPT_DIR/lib.sh"
 
-GO_IMAGE="${GO_IMAGE:-docker.io/library/golang:1.23-bookworm}"
+GO_IMAGE="${GO_IMAGE:-docker.io/library/golang:1.26-bookworm}"
 
 # run_go "<go shell snippet>" — execute a snippet with a Go toolchain, on host
 # if available else in a container mounting the repo.
@@ -9957,9 +9960,9 @@ log "tear down with: scripts/down.sh $PROJECT"
 # DUMP SUMMARY
 ################################################################################
   Files dumped   : 77
-  Total size     : 280.2 KiB (286980 bytes)
+  Total size     : 280.4 KiB (287228 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-01T17:15:55-04:00
+  Completed at   : 2026-07-01T17:34:45-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
