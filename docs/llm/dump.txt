@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-01T17:05:00-04:00
+  Generated at   : 2026-07-01T17:09:39-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : c7f64b8259fc930e685ddd33c4e54903fbe42b9a
-  Commit (short) : c7f64b8
-  Commit date    : 2026-07-01 17:04:56 -0400
-  Commit message : run dump
+  Commit (full)  : 36d9e31c9d89a77bdcafd44cafa1305bfdc7ea05
+  Commit (short) : 36d9e31
+  Commit date    : 2026-07-01 17:09:09 -0400
+  Commit message : update github actions
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 77
   Excluded path  : docs/llm/
@@ -3303,14 +3303,14 @@ updates:
   Relative path:         .github/workflows/ci.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/workflows/ci.yaml
   Size:                  648 B (648 bytes)
-  Last modified:         2026-07-01 14:42:35.000000000 -0400
+  Last modified:         2026-07-01 17:08:59.728119526 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805935
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               20621fc18b695a666c585a4a4bb90d48a4aea177176503516e82d13a8e3f0dc0
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               dac16a4600a1a4d47a196615c6e78593ee24c35beb42b14bd541845bac3ca9cc
+  Last git commit:       36d9e31 2026-07-01 17:09:09 -0400 update github actions
 
 --- CONTENT ---
 # Build and test. Deliberately thin: all logic lives in scripts/test.sh so the
@@ -3334,9 +3334,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.23"
           # go.sum is intentionally absent on first import; do not fail on it.
@@ -3355,14 +3355,14 @@ jobs:
   Relative path:         .github/workflows/dependency-freshness.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/workflows/dependency-freshness.yaml
   Size:                  640 B (640 bytes)
-  Last modified:         2026-07-01 14:42:47.000000000 -0400
+  Last modified:         2026-07-01 17:08:59.728119526 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805936
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               074ef27d3809f12614ca7219811ebb26d8b61ea4145d64c26ba15e3188707002
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               c0368e7f48320dea4515588d2ff71cbebe7d8a43066bb11e40269d7040d56884
+  Last git commit:       36d9e31 2026-07-01 17:09:09 -0400 update github actions
 
 --- CONTENT ---
 # Weekly dependency-freshness check: bump everything, tidy, and run the suite.
@@ -3382,9 +3382,9 @@ jobs:
   freshness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.23"
           cache: false
@@ -3402,14 +3402,14 @@ jobs:
   Relative path:         .github/workflows/govulncheck.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/workflows/govulncheck.yaml
   Size:                  671 B (671 bytes)
-  Last modified:         2026-07-01 14:42:41.000000000 -0400
+  Last modified:         2026-07-01 17:08:59.728119526 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805934
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               87100355965834627dacb9831159d52d8e3ed8b959bead19a5424fcbbe404755
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               e1ef7c8ef47e9e2f28cc50d759f0856bda5c1cbff08c150f386b069d9222a1ea
+  Last git commit:       36d9e31 2026-07-01 17:09:09 -0400 update github actions
 
 --- CONTENT ---
 # Vulnerability scanning with govulncheck (reachability-aware: only flags
@@ -3432,9 +3432,9 @@ jobs:
   govulncheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.23"
           cache: false
@@ -9958,7 +9958,7 @@ log "tear down with: scripts/down.sh $PROJECT"
   Files dumped   : 77
   Total size     : 280.2 KiB (286980 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-01T17:05:02-04:00
+  Completed at   : 2026-07-01T17:09:41-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
