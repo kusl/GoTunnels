@@ -11,6 +11,8 @@
 # Environment:
 #   GOTUNNELS_PROJECT / GOTUNNELS_INSTANCE_ID  alternative ways to name the run
 #   UPTRACE_DSN                                optional telemetry DSN
+#   GOTUNNELS_TUNNEL_LOG_WAIT                  seconds to wait before printing
+#                                              the tunnel URL log lines (def 60)
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -84,3 +86,42 @@ printf '  %sAPI     :%s %s\n' "$_c_grn" "$_c_reset" "$API_URL" >&2
 printf '  %sInstance:%s %s (urls saved to tunnel-urls.txt)\n' "$_c_dim" "$_c_reset" "$PROJECT" >&2
 echo >&2
 log "tear down with: scripts/down.sh $PROJECT"
+
+# 10) Final check. Cloudflare Quick Tunnels can take a little while after the
+#     containers start to finish registering and become reachable. Give them a
+#     moment, then re-read the cloudflared container logs with the runtime
+#     ($CR, e.g. podman) and print the raw log line(s) that announce each
+#     https://<subdomain>.trycloudflare.com URL. That line is the signal the
+#     tunnel is live — and it is the exact line to copy/paste.
+#
+#     Override the pause with GOTUNNELS_TUNNEL_LOG_WAIT (seconds); set it to 0
+#     to skip waiting entirely.
+FINAL_WAIT="${GOTUNNELS_TUNNEL_LOG_WAIT:-60}"
+if [ "$FINAL_WAIT" -gt 0 ] 2>/dev/null; then
+  log "waiting ${FINAL_WAIT}s for the Quick Tunnels to settle, then printing their URL log lines…"
+  sleep "$FINAL_WAIT"
+fi
+
+echo >&2
+# "service|human label" pairs. An explicit for-loop list is not subject to IFS
+# word splitting, and the ${var%%|*} / ${var##*|} expansions do not use IFS
+# either, so this is safe under IFS=$'\n\t'.
+for _pair in "cloudflared-frontend|Web app" "cloudflared-api|API"; do
+  _svc="${_pair%%|*}"
+  _label="${_pair##*|}"
+  _cid="$(cid_of "$PROJECT" "$_svc")"
+  if [ -z "$_cid" ]; then
+    warn "$_label: container '$_svc' not found; cannot read its logs"
+    continue
+  fi
+  # grep exits non-zero when it matches nothing; '|| true' keeps that from
+  # tripping 'set -e' on this final, informational step.
+  _lines="$("$CR" logs "$_cid" 2>&1 | grep -E 'https://[a-z0-9._-]+\.trycloudflare\.com' || true)"
+  if [ -n "$_lines" ]; then
+    ok "$_label — tunnel URL (from: $CR logs $_svc):"
+    printf '%s\n' "$_lines" >&2
+  else
+    warn "$_label: no trycloudflare.com URL in '$_svc' logs yet (check: dc -p $PROJECT logs $_svc)"
+  fi
+  echo >&2
+done

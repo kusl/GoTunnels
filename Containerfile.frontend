@@ -5,7 +5,14 @@
 # the API's runtime tunnel URL) is NOT baked in — the startup script copies it
 # into /srv at run time, so this image is identical for every instance.
 
-FROM caddy:2-alpine
+# Fully-qualified on purpose. Podman on Fedora resolves an unqualified name
+# (e.g. `caddy:2-alpine`) against unqualified-search-registries, which tries
+# registry.fedoraproject.org first — that registry has no `caddy` image, so the
+# build fails with "manifest unknown". Naming the Docker Hub source explicitly
+# (docker.io/library/… is the canonical form for official images) skips the
+# search and pulls the real image. This matches how compose.yaml pins its
+# images (docker.io/library/postgres, docker.io/cloudflare/cloudflared).
+FROM docker.io/library/caddy:2-alpine
 
 # Copy the web app, then place the Caddyfile where Caddy expects it and remove
 # the copy that landed under the web root so it is never served.
