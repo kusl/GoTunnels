@@ -551,3 +551,5 @@ keep as much of the logic in bash shell scripts or whatever
 as much as possible and the github actions should run functions from the scripts 
 please read the full `scratch.md` for context 
 also in the readme be sure to indicate that we are using LLM so it is easy to see  
+give me the whole project and I will copy paste it 
+on top of this new repository I just created
