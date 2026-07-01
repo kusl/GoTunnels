@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-01T18:11:40-04:00
+  Generated at   : 2026-07-01T18:25:26-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,9 +17,9 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : 995655c6be58b011a36a4d094b6bb31ed376dbc8
-  Commit (short) : 995655c
-  Commit date    : 2026-07-01 18:11:28 -0400
+  Commit (full)  : d9df366327c6621654bc0c02940893005ad21602
+  Commit (short) : d9df366
+  Commit date    : 2026-07-01 18:25:18 -0400
   Commit message : add claude response
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 77
@@ -9457,15 +9457,15 @@ ok "instance '$PROJECT' removed (containers + volumes)."
   File name:             lib.sh
   Relative path:         scripts/lib.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/lib.sh
-  Size:                  7.9 KiB (8128 bytes)
-  Last modified:         2026-07-01 17:33:07.351546311 -0400
+  Size:                  9.0 KiB (9222 bytes)
+  Last modified:         2026-07-01 18:25:12.128366543 -0400
   Permissions:           -rwxr-xr-x
   Owner:                 kushal:kushal
   Inode:                 17805976
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               9ccf335d5ab27a89da68b8320ec8dbeecc670e8e0cf485e504405cea7185a14d
-  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
+  SHA-256:               300f4505daede997248462fe544cbb176dfd4bf5ad667309134339b1e32e9efc
+  Last git commit:       d9df366 2026-07-01 18:25:18 -0400 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -9621,8 +9621,21 @@ resolve_project() {
 # ---------------------------------------------------------------------------
 # health + tunnel discovery
 # ---------------------------------------------------------------------------
+# cid_of project service — first matching container id, or "" if none.
+#
+# BEST-EFFORT / MUST NEVER FAIL. Callers run under `set -euo pipefail` and
+# capture this with a bare assignment, e.g. `cid="$(cid_of …)"`, whose exit
+# status is that of this pipeline. Two things would otherwise make the pipeline
+# non-zero and abort the whole caller via errexit:
+#   1. `head -1` closes the pipe after one line, SIGPIPE-ing the producer
+#      (`{podman,docker} compose ps`, exit 141), which `pipefail` then surfaces
+#      as failure; and/or
+#   2. `podman compose ps -q` sometimes exits non-zero even when it has already
+#      printed the id.
+# So we read the whole stream with `sed -n '1p'` (no early close → no SIGPIPE)
+# and swallow any producer failure with `|| true`.
 cid_of() { # project service
-  dc -p "$1" ps -q "$2" 2>/dev/null | head -1
+  dc -p "$1" ps -q "$2" 2>/dev/null | sed -n '1p' || true
 }
 
 wait_healthy() { # project service timeout_seconds
@@ -9645,7 +9658,11 @@ poll_tunnel_url() { # project service timeout_seconds
   for i in $(seq 1 "$timeout"); do
     cid="$(cid_of "$project" "$svc")"
     if [ -n "$cid" ]; then
-      url="$($CR logs "$cid" 2>&1 | grep -Eo 'https://[a-z0-9._-]+\.trycloudflare\.com' | head -1)"
+      # `|| true` is required: before the URL is logged, `grep` matches nothing
+      # and exits 1; once it matches, `head -n1` SIGPIPE-s `grep`. Under
+      # `pipefail` either would make this bare assignment abort the caller via
+      # errexit — so neutralize the pipeline's exit status here.
+      url="$($CR logs "$cid" 2>&1 | grep -Eo 'https://[a-z0-9._-]+\.trycloudflare\.com' | head -n1 || true)"
       if [ -n "$url" ]; then echo "$url"; return 0; fi
     fi
     sleep 1
@@ -10017,9 +10034,9 @@ done
 # DUMP SUMMARY
 ################################################################################
   Files dumped   : 77
-  Total size     : 283.4 KiB (290215 bytes)
+  Total size     : 284.4 KiB (291309 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-01T18:11:42-04:00
+  Completed at   : 2026-07-01T18:25:28-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
