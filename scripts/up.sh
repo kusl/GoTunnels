@@ -33,10 +33,14 @@ log "project (instance): $PROJECT"
 log "building images…"
 dc -p "$PROJECT" build
 
-# 2) Database first, wait until healthy.
+# 2) Database first, wait until it actually accepts connections.
+#    We pass an explicit `pg_isready` probe so readiness does NOT hinge on
+#    podman's health *timer* firing (it often doesn't in a rootless shell) — see
+#    the long note on wait_healthy in lib.sh. 60s is plenty for a fresh volume.
 log "starting database…"
 dc -p "$PROJECT" up -d db
-wait_healthy "$PROJECT" db 120
+wait_healthy "$PROJECT" db 60 \
+  pg_isready -U "${POSTGRES_USER:-gotunnels}" -d "${POSTGRES_DB:-gotunnels}" -q
 
 # 3) Frontend + its tunnel, WITHOUT pulling in the api dependency yet.
 log "starting frontend and its tunnel…"

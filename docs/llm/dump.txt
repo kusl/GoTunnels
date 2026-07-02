@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-02T01:56:20-04:00
+  Generated at   : 2026-07-02T02:16:10-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : db531fc6b6a8b6b5d7fe855cb4dfedcf8cd7452e
-  Commit (short) : db531fc
-  Commit date    : 2026-07-01 19:20:17 -0400
-  Commit message : remove dead link from readme
+  Commit (full)  : 881822e00a8885bce576c089f880581e53270374
+  Commit (short) : 881822e
+  Commit date    : 2026-07-02 02:15:35 -0400
+  Commit message : add claude response
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 77
   Excluded path  : docs/llm/
@@ -28,7 +28,6 @@ REPOSITORY METADATA
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
- M docs/llm/vendor/claude-conversations.md
  M docs/llm/vendor/output.txt
 
 ################################################################################
@@ -9458,15 +9457,15 @@ ok "instance '$PROJECT' removed (containers + volumes)."
   File name:             lib.sh
   Relative path:         scripts/lib.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/lib.sh
-  Size:                  9.0 KiB (9222 bytes)
-  Last modified:         2026-07-01 18:25:12.128366543 -0400
+  Size:                  12.1 KiB (12450 bytes)
+  Last modified:         2026-07-02 02:14:07.896791437 -0400
   Permissions:           -rwxr-xr-x
   Owner:                 kushal:kushal
   Inode:                 17805976
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               300f4505daede997248462fe544cbb176dfd4bf5ad667309134339b1e32e9efc
-  Last git commit:       d9df366 2026-07-01 18:25:18 -0400 add claude response
+  SHA-256:               be3246425005527017ce83c1a09c51a373a2d72c8c1c04fe6e971922efc68cd1
+  Last git commit:       881822e 2026-07-02 02:15:35 -0400 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -9639,18 +9638,73 @@ cid_of() { # project service
   dc -p "$1" ps -q "$2" 2>/dev/null | sed -n '1p' || true
 }
 
-wait_healthy() { # project service timeout_seconds
-  local project="$1" svc="$2" timeout="${3:-90}" i cid status
-  log "waiting for '$svc' to become healthy (up to ${timeout}s)"
+# health_status cid — the container's healthcheck status, or "" when it has
+# none. The `{{if .State.Health}}` guard stops Go's template engine from
+# printing the literal "<no value>" for a container without a healthcheck, so
+# "no healthcheck" and "not reported yet" both read as the empty string.
+health_status() { # cid
+  [ -n "${1:-}" ] || return 0
+  $CR inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$1" 2>/dev/null || true
+}
+
+# wait_healthy project service timeout [probe-cmd...] — block until <service> is
+# actually ready, up to <timeout> seconds.
+#
+# Why this is more than a poll of `.State.Health.Status`:
+#   podman-compose *does* translate compose's `healthcheck:` into podman
+#   `--health-cmd` / `--health-interval` flags, so the container is created WITH
+#   a healthcheck. But podman drives the *periodic* re-check from a per-container
+#   systemd timer, and in a rootless / plain-shell session that timer frequently
+#   never fires — so `.State.Health.Status` sits at "starting" forever even
+#   though Postgres accepted connections within a second or two. Passively
+#   waiting on that field therefore always times out here (this is exactly the
+#   "'db' did not become healthy in 120s" we kept hitting).
+#
+# So each second we accept readiness from whichever of these fires first:
+#   1. passive status == "healthy"      — docker (its daemon runs the checks),
+#                                          or podman if the timer *is* firing.
+#   2. `podman healthcheck run` exit 0   — runs the container's OWN healthcheck
+#                                          command once, on demand, with no timer
+#                                          involved (podman only). Bonus: it also
+#                                          updates the recorded status, so
+#                                          `podman ps` shows "healthy" afterward.
+#   3. the caller's probe, exit 0        — run as `$CR exec <cid> <probe...>`;
+#                                          the ultimate fallback that depends on
+#                                          nothing but the container running. For
+#                                          db we pass `pg_isready …`.
+# If no probe is given, only 1 and 2 are used.
+wait_healthy() { # project service timeout_seconds [probe-cmd...]
+  local project="$1" svc="$2" timeout="${3:-90}"
+  shift 3 2>/dev/null || true
+  local i cid status st hs
+  log "waiting for '$svc' to become ready (up to ${timeout}s)"
   for i in $(seq 1 "$timeout"); do
     cid="$(cid_of "$project" "$svc")"
     if [ -n "$cid" ]; then
-      status="$($CR inspect --format '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo '')"
+      status="$(health_status "$cid")"
       if [ "$status" = "healthy" ]; then ok "'$svc' is healthy"; return 0; fi
+      if [ "$CR" = "podman" ] && "$CR" healthcheck run "$cid" >/dev/null 2>&1; then
+        ok "'$svc' is healthy"; return 0
+      fi
+      if [ "$#" -gt 0 ] && "$CR" exec "$cid" "$@" >/dev/null 2>&1; then
+        ok "'$svc' is ready"; return 0
+      fi
     fi
     sleep 1
   done
-  err "'$svc' did not become healthy in ${timeout}s"
+  # Don't fail with a bare timeout — surface the container's real state and its
+  # recent logs so a genuine Postgres problem (bad config, crash loop, wrong
+  # password) is visible instead of being hidden behind "did not become ready".
+  err "'$svc' did not become ready in ${timeout}s"
+  if [ -n "${cid:-}" ]; then
+    st="$($CR inspect --format '{{.State.Status}}' "$cid" 2>/dev/null || echo '?')"
+    hs="$(health_status "$cid")"; [ -n "$hs" ] || hs='(none)'
+    err "  container: state=$st health=$hs id=$(printf '%.12s' "$cid")"
+    err "  recent '$svc' logs ($CR logs --tail 40 $svc):"
+    "$CR" logs --tail 40 "$cid" 2>&1 | sed 's/^/    /' >&2 || true
+  else
+    err "  no container id resolved for '$svc' — was it created? (check: dc -p $project ps)"
+  fi
   return 1
 }
 
@@ -9891,15 +9945,15 @@ main "$@"
   File name:             up.sh
   Relative path:         scripts/up.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/up.sh
-  Size:                  4.9 KiB (5100 bytes)
-  Last modified:         2026-07-01 18:10:59.308795591 -0400
+  Size:                  5.3 KiB (5443 bytes)
+  Last modified:         2026-07-02 02:14:24.768822868 -0400
   Permissions:           -rwxr-xr-x
   Owner:                 kushal:kushal
   Inode:                 17805978
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               b2bbd6bc9e01dd6a8b89b7770c7de1524904ae1a1a76e867f3a8c17f263acacb
-  Last git commit:       995655c 2026-07-01 18:11:28 -0400 add claude response
+  SHA-256:               9f436cb9686caf23d22b0d2d19e9b499af4b4701ab70c197a04eaf9074b02cc4
+  Last git commit:       881822e 2026-07-02 02:15:35 -0400 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -9937,10 +9991,14 @@ log "project (instance): $PROJECT"
 log "building images…"
 dc -p "$PROJECT" build
 
-# 2) Database first, wait until healthy.
+# 2) Database first, wait until it actually accepts connections.
+#    We pass an explicit `pg_isready` probe so readiness does NOT hinge on
+#    podman's health *timer* firing (it often doesn't in a rootless shell) — see
+#    the long note on wait_healthy in lib.sh. 60s is plenty for a fresh volume.
 log "starting database…"
 dc -p "$PROJECT" up -d db
-wait_healthy "$PROJECT" db 120
+wait_healthy "$PROJECT" db 60 \
+  pg_isready -U "${POSTGRES_USER:-gotunnels}" -d "${POSTGRES_DB:-gotunnels}" -q
 
 # 3) Frontend + its tunnel, WITHOUT pulling in the api dependency yet.
 log "starting frontend and its tunnel…"
@@ -10035,9 +10093,9 @@ done
 # DUMP SUMMARY
 ################################################################################
   Files dumped   : 77
-  Total size     : 284.4 KiB (291252 bytes)
+  Total size     : 287.9 KiB (294823 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-02T01:56:22-04:00
+  Completed at   : 2026-07-02T02:16:12-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################

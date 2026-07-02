@@ -168,18 +168,73 @@ cid_of() { # project service
   dc -p "$1" ps -q "$2" 2>/dev/null | sed -n '1p' || true
 }
 
-wait_healthy() { # project service timeout_seconds
-  local project="$1" svc="$2" timeout="${3:-90}" i cid status
-  log "waiting for '$svc' to become healthy (up to ${timeout}s)"
+# health_status cid — the container's healthcheck status, or "" when it has
+# none. The `{{if .State.Health}}` guard stops Go's template engine from
+# printing the literal "<no value>" for a container without a healthcheck, so
+# "no healthcheck" and "not reported yet" both read as the empty string.
+health_status() { # cid
+  [ -n "${1:-}" ] || return 0
+  $CR inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$1" 2>/dev/null || true
+}
+
+# wait_healthy project service timeout [probe-cmd...] — block until <service> is
+# actually ready, up to <timeout> seconds.
+#
+# Why this is more than a poll of `.State.Health.Status`:
+#   podman-compose *does* translate compose's `healthcheck:` into podman
+#   `--health-cmd` / `--health-interval` flags, so the container is created WITH
+#   a healthcheck. But podman drives the *periodic* re-check from a per-container
+#   systemd timer, and in a rootless / plain-shell session that timer frequently
+#   never fires — so `.State.Health.Status` sits at "starting" forever even
+#   though Postgres accepted connections within a second or two. Passively
+#   waiting on that field therefore always times out here (this is exactly the
+#   "'db' did not become healthy in 120s" we kept hitting).
+#
+# So each second we accept readiness from whichever of these fires first:
+#   1. passive status == "healthy"      — docker (its daemon runs the checks),
+#                                          or podman if the timer *is* firing.
+#   2. `podman healthcheck run` exit 0   — runs the container's OWN healthcheck
+#                                          command once, on demand, with no timer
+#                                          involved (podman only). Bonus: it also
+#                                          updates the recorded status, so
+#                                          `podman ps` shows "healthy" afterward.
+#   3. the caller's probe, exit 0        — run as `$CR exec <cid> <probe...>`;
+#                                          the ultimate fallback that depends on
+#                                          nothing but the container running. For
+#                                          db we pass `pg_isready …`.
+# If no probe is given, only 1 and 2 are used.
+wait_healthy() { # project service timeout_seconds [probe-cmd...]
+  local project="$1" svc="$2" timeout="${3:-90}"
+  shift 3 2>/dev/null || true
+  local i cid status st hs
+  log "waiting for '$svc' to become ready (up to ${timeout}s)"
   for i in $(seq 1 "$timeout"); do
     cid="$(cid_of "$project" "$svc")"
     if [ -n "$cid" ]; then
-      status="$($CR inspect --format '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo '')"
+      status="$(health_status "$cid")"
       if [ "$status" = "healthy" ]; then ok "'$svc' is healthy"; return 0; fi
+      if [ "$CR" = "podman" ] && "$CR" healthcheck run "$cid" >/dev/null 2>&1; then
+        ok "'$svc' is healthy"; return 0
+      fi
+      if [ "$#" -gt 0 ] && "$CR" exec "$cid" "$@" >/dev/null 2>&1; then
+        ok "'$svc' is ready"; return 0
+      fi
     fi
     sleep 1
   done
-  err "'$svc' did not become healthy in ${timeout}s"
+  # Don't fail with a bare timeout — surface the container's real state and its
+  # recent logs so a genuine Postgres problem (bad config, crash loop, wrong
+  # password) is visible instead of being hidden behind "did not become ready".
+  err "'$svc' did not become ready in ${timeout}s"
+  if [ -n "${cid:-}" ]; then
+    st="$($CR inspect --format '{{.State.Status}}' "$cid" 2>/dev/null || echo '?')"
+    hs="$(health_status "$cid")"; [ -n "$hs" ] || hs='(none)'
+    err "  container: state=$st health=$hs id=$(printf '%.12s' "$cid")"
+    err "  recent '$svc' logs ($CR logs --tail 40 $svc):"
+    "$CR" logs --tail 40 "$cid" 2>&1 | sed 's/^/    /' >&2 || true
+  else
+    err "  no container id resolved for '$svc' — was it created? (check: dc -p $project ps)"
+  fi
   return 1
 }
 
