@@ -430,4 +430,7 @@ gotunnels-xnnkzq_cloudflared-api_1
 real	4m0.380s
 user	5m10.849s
 sys	0m48.418s
-kushal@virginia:~/src/golang/GoTunnels$ 
+kushal@virginia:~/src/golang/GoTunnels$ exit
+logout
+Connection to virginia closed.
+kushal@fedora:~/src/golang/GoTunnels$ 
