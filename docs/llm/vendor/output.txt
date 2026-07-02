@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-01T19:20:04-04:00
+  Generated at   : 2026-07-02T01:56:20-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,9 +17,9 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : 2ec80a418cee9fcf7cc9930362ac4de31f97346a
-  Commit (short) : 2ec80a4
-  Commit date    : 2026-07-01 19:19:57 -0400
+  Commit (full)  : db531fc6b6a8b6b5d7fe855cb4dfedcf8cd7452e
+  Commit (short) : db531fc
+  Commit date    : 2026-07-01 19:20:17 -0400
   Commit message : remove dead link from readme
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 77
@@ -28,6 +28,7 @@ REPOSITORY METADATA
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
+ M docs/llm/vendor/claude-conversations.md
  M docs/llm/vendor/output.txt
 
 ################################################################################
@@ -10036,7 +10037,7 @@ done
   Files dumped   : 77
   Total size     : 284.4 KiB (291252 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-01T19:20:06-04:00
+  Completed at   : 2026-07-02T01:56:22-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
