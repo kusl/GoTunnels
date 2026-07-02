@@ -151,21 +151,37 @@ resolve_project() {
 # ---------------------------------------------------------------------------
 # health + tunnel discovery
 # ---------------------------------------------------------------------------
-# cid_of project service — first matching container id, or "" if none.
+# cid_of project service — the container id for <service> in <project>, or ""
+# if there is none.
+#
+# We resolve the id straight from the container runtime ($CR) by label, NOT via
+# `<compose> ps -q <service>`, because that compose path is broken here: on
+# Fedora `podman compose` shells out to the external `podman-compose` provider
+# (that's the ">>>> Executing external compose provider" banner), and
+# podman-compose's `ps` subcommand is not docker-compatible — it accepts NO
+# service argument and filters only by the project label. So
+# `<compose> ps -q db` either errors on the stray `db` token (non-zero, empty
+# stdout) or lists *every* container in the project; it never returns db's id
+# specifically. That is the "no container id resolved for 'db'" we hit even
+# though the container had been created.
+#
+# Every compose implementation we support — docker compose, podman compose, and
+# podman-compose — stamps each container with the docker-compat labels
+# `com.docker.compose.project` and `com.docker.compose.service`, so filtering on
+# both with the runtime's own `ps` returns exactly the one container we mean.
 #
 # BEST-EFFORT / MUST NEVER FAIL. Callers run under `set -euo pipefail` and
-# capture this with a bare assignment, e.g. `cid="$(cid_of …)"`, whose exit
-# status is that of this pipeline. Two things would otherwise make the pipeline
-# non-zero and abort the whole caller via errexit:
-#   1. `head -1` closes the pipe after one line, SIGPIPE-ing the producer
-#      (`{podman,docker} compose ps`, exit 141), which `pipefail` then surfaces
-#      as failure; and/or
-#   2. `podman compose ps -q` sometimes exits non-zero even when it has already
-#      printed the id.
-# So we read the whole stream with `sed -n '1p'` (no early close → no SIGPIPE)
-# and swallow any producer failure with `|| true`.
+# capture this with a bare assignment (`cid="$(cid_of …)"`), whose exit status
+# is that of this pipeline. `sed -n '1p'` prints the first id while still
+# draining the rest of the stream (no early pipe close → no SIGPIPE back to
+# `ps`), and the trailing `|| true` swallows any non-zero exit so errexit can't
+# abort the caller. `-a` is intentional: it also matches a crashed/exited
+# container so the error paths below can still read its logs.
 cid_of() { # project service
-  dc -p "$1" ps -q "$2" 2>/dev/null | sed -n '1p' || true
+  "$CR" ps -aq \
+    --filter "label=com.docker.compose.project=$1" \
+    --filter "label=com.docker.compose.service=$2" \
+    2>/dev/null | sed -n '1p' || true
 }
 
 # health_status cid — the container's healthcheck status, or "" when it has
