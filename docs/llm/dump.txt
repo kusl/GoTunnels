@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-02T02:16:10-04:00
+  Generated at   : 2026-07-02T02:39:36-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,9 +17,9 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : 881822e00a8885bce576c089f880581e53270374
-  Commit (short) : 881822e
-  Commit date    : 2026-07-02 02:15:35 -0400
+  Commit (full)  : 6f1845a71b947e03e7d853374817d0bf1ff70514
+  Commit (short) : 6f1845a
+  Commit date    : 2026-07-02 02:39:30 -0400
   Commit message : add claude response
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 77
@@ -9457,15 +9457,15 @@ ok "instance '$PROJECT' removed (containers + volumes)."
   File name:             lib.sh
   Relative path:         scripts/lib.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/lib.sh
-  Size:                  12.1 KiB (12450 bytes)
-  Last modified:         2026-07-02 02:14:07.896791437 -0400
+  Size:                  13.1 KiB (13440 bytes)
+  Last modified:         2026-07-02 02:39:08.884342484 -0400
   Permissions:           -rwxr-xr-x
   Owner:                 kushal:kushal
   Inode:                 17805976
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               be3246425005527017ce83c1a09c51a373a2d72c8c1c04fe6e971922efc68cd1
-  Last git commit:       881822e 2026-07-02 02:15:35 -0400 add claude response
+  SHA-256:               93b6b024894f9949c8f622cf7596fdebda6f3891bfc2677afa9104ec4229abb2
+  Last git commit:       6f1845a 2026-07-02 02:39:30 -0400 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -9621,21 +9621,37 @@ resolve_project() {
 # ---------------------------------------------------------------------------
 # health + tunnel discovery
 # ---------------------------------------------------------------------------
-# cid_of project service — first matching container id, or "" if none.
+# cid_of project service — the container id for <service> in <project>, or ""
+# if there is none.
+#
+# We resolve the id straight from the container runtime ($CR) by label, NOT via
+# `<compose> ps -q <service>`, because that compose path is broken here: on
+# Fedora `podman compose` shells out to the external `podman-compose` provider
+# (that's the ">>>> Executing external compose provider" banner), and
+# podman-compose's `ps` subcommand is not docker-compatible — it accepts NO
+# service argument and filters only by the project label. So
+# `<compose> ps -q db` either errors on the stray `db` token (non-zero, empty
+# stdout) or lists *every* container in the project; it never returns db's id
+# specifically. That is the "no container id resolved for 'db'" we hit even
+# though the container had been created.
+#
+# Every compose implementation we support — docker compose, podman compose, and
+# podman-compose — stamps each container with the docker-compat labels
+# `com.docker.compose.project` and `com.docker.compose.service`, so filtering on
+# both with the runtime's own `ps` returns exactly the one container we mean.
 #
 # BEST-EFFORT / MUST NEVER FAIL. Callers run under `set -euo pipefail` and
-# capture this with a bare assignment, e.g. `cid="$(cid_of …)"`, whose exit
-# status is that of this pipeline. Two things would otherwise make the pipeline
-# non-zero and abort the whole caller via errexit:
-#   1. `head -1` closes the pipe after one line, SIGPIPE-ing the producer
-#      (`{podman,docker} compose ps`, exit 141), which `pipefail` then surfaces
-#      as failure; and/or
-#   2. `podman compose ps -q` sometimes exits non-zero even when it has already
-#      printed the id.
-# So we read the whole stream with `sed -n '1p'` (no early close → no SIGPIPE)
-# and swallow any producer failure with `|| true`.
+# capture this with a bare assignment (`cid="$(cid_of …)"`), whose exit status
+# is that of this pipeline. `sed -n '1p'` prints the first id while still
+# draining the rest of the stream (no early pipe close → no SIGPIPE back to
+# `ps`), and the trailing `|| true` swallows any non-zero exit so errexit can't
+# abort the caller. `-a` is intentional: it also matches a crashed/exited
+# container so the error paths below can still read its logs.
 cid_of() { # project service
-  dc -p "$1" ps -q "$2" 2>/dev/null | sed -n '1p' || true
+  "$CR" ps -aq \
+    --filter "label=com.docker.compose.project=$1" \
+    --filter "label=com.docker.compose.service=$2" \
+    2>/dev/null | sed -n '1p' || true
 }
 
 # health_status cid — the container's healthcheck status, or "" when it has
@@ -9953,7 +9969,7 @@ main "$@"
   Hard links:            1
   MIME type:             text/x-shellscript
   SHA-256:               9f436cb9686caf23d22b0d2d19e9b499af4b4701ab70c197a04eaf9074b02cc4
-  Last git commit:       881822e 2026-07-02 02:15:35 -0400 add claude response
+  Last git commit:       bed38b3 2026-07-02 02:17:17 -0400 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -10093,9 +10109,9 @@ done
 # DUMP SUMMARY
 ################################################################################
   Files dumped   : 77
-  Total size     : 287.9 KiB (294823 bytes)
+  Total size     : 288.8 KiB (295813 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-02T02:16:12-04:00
+  Completed at   : 2026-07-02T02:39:38-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
