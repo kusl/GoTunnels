@@ -781,4 +781,9 @@ gotunnels-mbeba_cloudflared-api_1
 real	1m31.181s
 user	1m15.358s
 sys	0m20.815s
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash export.sh > docs/llm/vendor/output.txt
+
+real	0m2.433s
+user	0m1.214s
+sys	0m1.508s
 kushal@fedora:~/src/golang/GoTunnels$ 
