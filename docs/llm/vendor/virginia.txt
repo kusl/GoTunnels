@@ -277,3 +277,323 @@ c71ed6660e2a  localhost/gotunnels-q6jqbg_api:latest                             
 540cc5ed7ab9  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou...  28 minutes ago     Up 28 minutes                                                                      gotunnels-novzg_cloudflared-frontend_1
 e45229c25e69  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou...  28 minutes ago     Up 28 minutes                                                                      gotunnels-novzg_cloudflared-api_1
 kushal@virginia:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; time git status; time git fetch; time git status; time git remote show origin; time git pull; time git status; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/down.sh gotunnels-ekhmuw; time bash scripts/down.sh gotunnels-xnnkzq; time bash scripts/down.sh gotunnels-q6jqbg; time bash scripts/down.sh gotunnels-novzg; podman ps -a;
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.013s
+user	0m0.000s
+sys	0m0.008s
+
+real	0m0.301s
+user	0m0.116s
+sys	0m0.044s
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.006s
+user	0m0.000s
+sys	0m0.006s
+* remote origin
+  Fetch URL: https://github.com/kusl/GoTunnels/
+  Push  URL: https://github.com/kusl/GoTunnels/
+  HEAD branch: main
+  Remote branch:
+    main tracked
+  Local branch configured for 'git pull':
+    main merges with remote main
+  Local ref configured for 'git push':
+    main pushes to main (up to date)
+
+real	0m0.240s
+user	0m0.100s
+sys	0m0.036s
+Already up to date.
+
+real	0m0.277s
+user	0m0.126s
+sys	0m0.033s
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.006s
+user	0m0.005s
+sys	0m0.001s
+[gotunnels] using runtime: podman / compose: podman compose
+[gotunnels] tearing down instance: gotunnels-ekhmuw
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+Error: no container with name or ID "gotunnels-ekhmuw_frontend_1" found: no such container
+Error: no container with name or ID "gotunnels-ekhmuw_cloudflared-frontend_1" found: no such container
+Error: no container with name or ID "gotunnels-ekhmuw_cloudflared-api_1" found: no such container
+gotunnels-ekhmuw_api_1
+gotunnels-ekhmuw_db_1
+Error: no container with ID or name "gotunnels-ekhmuw_cloudflared-frontend_1" found: no such container
+Error: no container with ID or name "gotunnels-ekhmuw_cloudflared-api_1" found: no such container
+Error: no container with ID or name "gotunnels-ekhmuw_frontend_1" found: no such container
+gotunnels-ekhmuw_api_1
+gotunnels-ekhmuw_db_1
+gotunnels-ekhmuw_pgdata
+c09416031fc8904953778867d73f83de2d0e8d4d299c9025c896b6b92355e37e
+gotunnels-ekhmuw_default
+[gotunnels] instance 'gotunnels-ekhmuw' removed (containers + volumes).
+
+real	0m2.141s
+user	0m1.693s
+sys	0m0.633s
+[gotunnels] using runtime: podman / compose: podman compose
+[gotunnels] tearing down instance: gotunnels-xnnkzq
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+Error: no container with name or ID "gotunnels-xnnkzq_cloudflared-frontend_1" found: no such container
+Error: no container with name or ID "gotunnels-xnnkzq_cloudflared-api_1" found: no such container
+Error: no container with name or ID "gotunnels-xnnkzq_frontend_1" found: no such container
+gotunnels-xnnkzq_api_1
+gotunnels-xnnkzq_db_1
+Error: no container with ID or name "gotunnels-xnnkzq_cloudflared-frontend_1" found: no such container
+Error: no container with ID or name "gotunnels-xnnkzq_cloudflared-api_1" found: no such container
+Error: no container with ID or name "gotunnels-xnnkzq_frontend_1" found: no such container
+gotunnels-xnnkzq_api_1
+gotunnels-xnnkzq_db_1
+gotunnels-xnnkzq_pgdata
+1759000f82f4ba3935717cd359f909dca779658ea04c88b8a2af43c46f52f034
+gotunnels-xnnkzq_default
+[gotunnels] instance 'gotunnels-xnnkzq' removed (containers + volumes).
+
+real	0m2.287s
+user	0m1.609s
+sys	0m0.790s
+[gotunnels] using runtime: podman / compose: podman compose
+[gotunnels] tearing down instance: gotunnels-q6jqbg
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+Error: no container with name or ID "gotunnels-q6jqbg_cloudflared-frontend_1" found: no such container
+Error: no container with name or ID "gotunnels-q6jqbg_cloudflared-api_1" found: no such container
+Error: no container with name or ID "gotunnels-q6jqbg_frontend_1" found: no such container
+gotunnels-q6jqbg_api_1
+gotunnels-q6jqbg_db_1
+Error: no container with ID or name "gotunnels-q6jqbg_cloudflared-frontend_1" found: no such container
+Error: no container with ID or name "gotunnels-q6jqbg_cloudflared-api_1" found: no such container
+Error: no container with ID or name "gotunnels-q6jqbg_frontend_1" found: no such container
+gotunnels-q6jqbg_api_1
+gotunnels-q6jqbg_db_1
+gotunnels-q6jqbg_pgdata
+bf4385589f889502e9d09c7c100542f160e1f9f61d504d8a6e6d4e911c7bbdca
+gotunnels-q6jqbg_default
+[gotunnels] instance 'gotunnels-q6jqbg' removed (containers + volumes).
+
+real	0m2.109s
+user	0m1.662s
+sys	0m0.685s
+[gotunnels] using runtime: podman / compose: podman compose
+[gotunnels] tearing down instance: gotunnels-novzg
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+gotunnels-novzg_cloudflared-frontend_1
+gotunnels-novzg_db_1
+gotunnels-novzg_frontend_1
+gotunnels-novzg_cloudflared-api_1
+gotunnels-novzg_api_1
+gotunnels-novzg_cloudflared-frontend_1
+gotunnels-novzg_cloudflared-api_1
+gotunnels-novzg_frontend_1
+gotunnels-novzg_api_1
+gotunnels-novzg_db_1
+gotunnels-novzg_pgdata
+3989d06c11a2ff512b30701d4945f84b6cde0ec208f6c10dc8f36d7123d3f69b
+gotunnels-novzg_default
+[gotunnels] instance 'gotunnels-novzg' removed (containers + volumes).
+
+real	0m3.433s
+user	0m1.920s
+sys	0m0.931s
+CONTAINER ID  IMAGE                                          COMMAND               CREATED      STATUS      PORTS                           NAMES
+bd211afec4dd  mcr.microsoft.com/dotnet/aspire-dashboard:9.0                        10 days ago  Up 10 days  0.0.0.0:18888->18888/tcp        weather_aspire-dashboard_1
+c8c1426c67a1  localhost/weather_otelcol:latest               --config=/etc/ote...  10 days ago  Up 10 days  4317-4318/tcp, 55678-55679/tcp  weather_otelcol_1
+4f1eb6cf871d  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou...  10 days ago  Up 10 days                                  weather_tunnel-aspire_1
+7b79251f64c7  localhost/weather_api:latest                                         10 days ago  Up 10 days  0.0.0.0:8080->8080/tcp          weather_api_1
+572ccbf00d43  localhost/weather_web:latest                                         10 days ago  Up 10 days  0.0.0.0:8081->8080/tcp          weather_web_1
+2bf99791ff03  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou...  10 days ago  Up 10 days                                  weather_tunnel-api_1
+744aab8753b7  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou...  10 days ago  Up 10 days                                  weather_tunnel-web_1
+kushal@virginia:~/src/golang/GoTunnels$ podman ps -a
+CONTAINER ID  IMAGE                                          COMMAND               CREATED      STATUS      PORTS                           NAMES
+bd211afec4dd  mcr.microsoft.com/dotnet/aspire-dashboard:9.0                        10 days ago  Up 10 days  0.0.0.0:18888->18888/tcp        weather_aspire-dashboard_1
+c8c1426c67a1  localhost/weather_otelcol:latest               --config=/etc/ote...  10 days ago  Up 10 days  4317-4318/tcp, 55678-55679/tcp  weather_otelcol_1
+4f1eb6cf871d  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou...  10 days ago  Up 10 days                                  weather_tunnel-aspire_1
+7b79251f64c7  localhost/weather_api:latest                                         10 days ago  Up 10 days  0.0.0.0:8080->8080/tcp          weather_api_1
+572ccbf00d43  localhost/weather_web:latest                                         10 days ago  Up 10 days  0.0.0.0:8081->8080/tcp          weather_web_1
+2bf99791ff03  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou...  10 days ago  Up 10 days                                  weather_tunnel-api_1
+744aab8753b7  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou...  10 days ago  Up 10 days                                  weather_tunnel-web_1
+kushal@virginia:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; time git status; time git fetch; time git status; time git remote show origin; time git pull; time git status; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.007s
+user	0m0.006s
+sys	0m0.001s
+
+real	0m0.277s
+user	0m0.107s
+sys	0m0.043s
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.006s
+user	0m0.000s
+sys	0m0.006s
+* remote origin
+  Fetch URL: https://github.com/kusl/GoTunnels/
+  Push  URL: https://github.com/kusl/GoTunnels/
+  HEAD branch: main
+  Remote branch:
+    main tracked
+  Local branch configured for 'git pull':
+    main merges with remote main
+  Local ref configured for 'git push':
+    main pushes to main (up to date)
+
+real	0m0.238s
+user	0m0.109s
+sys	0m0.023s
+Already up to date.
+
+real	0m0.262s
+user	0m0.119s
+sys	0m0.039s
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.005s
+user	0m0.000s
+sys	0m0.006s
+[gotunnels] using runtime: podman / compose: podman compose
+[gotunnels] using existing /home/kushal/src/golang/GoTunnels/.env
+[gotunnels] project (instance): gotunnels-nrow1q
+[gotunnels] building images…
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+STEP 1/5: FROM docker.io/library/caddy:2-alpine
+[1/2] STEP 1/6: FROM golang:1.26-bookworm AS build
+STEP 2/5: COPY frontend/ /srv/
+[1/2] STEP 2/6: WORKDIR /src
+--> Using cache 04b11ba7abca23250d07278a84b0a6bbf1e49795a23c1d468302c15b62cf2d8b
+--> 04b11ba7abca
+[1/2] STEP 3/6: ENV CGO_ENABLED=0     GOFLAGS=-mod=mod     GOTOOLCHAIN=local
+--> Using cache 1585dd71df54e573d229a88d4f863eb5311cc78b84dacb6e7bbd55a712e35ae2
+--> 1585dd71df54
+[1/2] STEP 4/6: COPY . .
+--> Using cache 157194e36b212329c13a3f340f726f01b777ccd954015edd026293ba1f049170
+--> 157194e36b21
+STEP 3/5: COPY frontend/Caddyfile /etc/caddy/Caddyfile
+--> Using cache 0034d2a8fc6826841a3a32bb549dce0258bbe4904dfbe419d9d1a9998645a3fc
+--> 0034d2a8fc68
+[1/2] STEP 5/6: ARG VERSION=dev
+--> Using cache fec96eb50062c071019f1f52a2c74ac795e7dce4fb793e44db22bbbd5e4b158c
+--> fec96eb50062
+--> Using cache 224575ae3c32fece41b7f55c2cdd599543bc1120eb98e9b8e2d78b0d1f63346c
+--> 224575ae3c32
+[1/2] STEP 6/6: RUN go mod tidy  && go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+--> Using cache 9673d21a143eab9fe096ac9b7723b9166805767aee60886f91fc8101f6bf125e
+--> 9673d21a143e
+STEP 4/5: RUN rm -f /srv/Caddyfile
+--> Using cache 66286007e5f4fc4802784670a153254b948e12369fcc28b59ab93b15c2368e1b
+--> 66286007e5f4
+[2/2] STEP 1/6: FROM gcr.io/distroless/static-debian12:nonroot
+STEP 5/5: EXPOSE 8080
+[2/2] STEP 2/6: WORKDIR /
+--> Using cache d3dea2906f437d7b07bee963473111249f1273332abe29f042dd8a261a06ea72
+COMMIT gotunnels-nrow1q_frontend
+--> Using cache e14ab4df47cf49d299ef67fca396aff23ad8f94f577a9affba7a1f3e454ca183
+--> e14ab4df47cf
+[2/2] STEP 3/6: COPY --from=build /out/api /api
+--> d3dea2906f43
+Successfully tagged localhost/gotunnels-nrow1q_frontend:latest
+Successfully tagged localhost/gotunnels-novzg_frontend:latest
+d3dea2906f437d7b07bee963473111249f1273332abe29f042dd8a261a06ea72
+--> Using cache 2f2da30ef2567d009f566f957be926f5b28e18c57548e5f3b1c0d5853dcfedb2
+--> 2f2da30ef256
+[2/2] STEP 4/6: USER nonroot:nonroot
+--> Using cache 9a157992a9d6481479debb4c1a39aa4c778b58478858f13871cb968382c6fef3
+--> 9a157992a9d6
+[2/2] STEP 5/6: EXPOSE 8080
+--> Using cache 41860cf5712720d45d1920faab38fdefea3670e6de4dc1edf738817d6f4242a7
+--> 41860cf57127
+[2/2] STEP 6/6: ENTRYPOINT ["/api"]
+--> Using cache b8b970780840e5ee83a8636eae286a4534228a0d551a3b18d7e146c18b5b544c
+[2/2] COMMIT gotunnels-nrow1q_api
+--> b8b970780840
+Successfully tagged localhost/gotunnels-nrow1q_api:latest
+Successfully tagged localhost/gotunnels-novzg_api:latest
+Successfully tagged localhost/gotunnels-q6jqbg_api:latest
+b8b970780840e5ee83a8636eae286a4534228a0d551a3b18d7e146c18b5b544c
+[gotunnels] starting database…
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+3a201aea62ea0ed2321afaf741fb4ab2a5f8a8e741b37884185c246f5c7c7386
+ade62b97dfe0d312e139bb3d9ee31b797a1d426134b75bdd7e21e0dd2104d304
+gotunnels-nrow1q_db_1
+[gotunnels] waiting for 'db' to become ready (up to 60s)
+[gotunnels] 'db' is ready
+[gotunnels] starting frontend and its tunnel…
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+Error: creating container storage: the container name "gotunnels-nrow1q_db_1" is already in use by ade62b97dfe0d312e139bb3d9ee31b797a1d426134b75bdd7e21e0dd2104d304. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+gotunnels-nrow1q_db_1
+6d2012ae9350116053c57c2592ef12c258774d2ba5c66980a25ff999fefa1ead
+gotunnels-nrow1q_api_1
+ccd3123c133fa7e0a11382fe94bfaeef09b9a65c55a78b237346160e03e62ef4
+gotunnels-nrow1q_frontend_1
+6cce564912fbd924620c843056f3860f4670bfd237d7b1029f9a609e4023bdb9
+gotunnels-nrow1q_cloudflared-frontend_1
+[gotunnels] waiting for the frontend Quick Tunnel URL…
+[gotunnels] frontend: https://dvd-cotton-positive-cooked.trycloudflare.com
+[gotunnels] starting API and its tunnel…
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+Error: no container with name or ID "gotunnels-nrow1q_cloudflared-api_1" found: no such container
+gotunnels-nrow1q_db_1
+gotunnels-nrow1q_api_1
+Error: no container with ID or name "gotunnels-nrow1q_cloudflared-api_1" found: no such container
+Error: container 6d2012ae9350116053c57c2592ef12c258774d2ba5c66980a25ff999fefa1ead has dependent containers which must be removed before it: ccd3123c133fa7e0a11382fe94bfaeef09b9a65c55a78b237346160e03e62ef4, 6cce564912fbd924620c843056f3860f4670bfd237d7b1029f9a609e4023bdb9: container already exists
+Error: container ade62b97dfe0d312e139bb3d9ee31b797a1d426134b75bdd7e21e0dd2104d304 has dependent containers which must be removed before it: 6d2012ae9350116053c57c2592ef12c258774d2ba5c66980a25ff999fefa1ead, ccd3123c133fa7e0a11382fe94bfaeef09b9a65c55a78b237346160e03e62ef4, 6cce564912fbd924620c843056f3860f4670bfd237d7b1029f9a609e4023bdb9: container already exists
+Error: creating container storage: the container name "gotunnels-nrow1q_db_1" is already in use by ade62b97dfe0d312e139bb3d9ee31b797a1d426134b75bdd7e21e0dd2104d304. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+gotunnels-nrow1q_db_1
+Error: creating container storage: the container name "gotunnels-nrow1q_api_1" is already in use by 6d2012ae9350116053c57c2592ef12c258774d2ba5c66980a25ff999fefa1ead. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+gotunnels-nrow1q_api_1
+717e4983eed5a496f0311acd5bb495db41fa37ecc845edbbf2d5c37183f96232
+gotunnels-nrow1q_cloudflared-api_1
+[gotunnels] did not observe API listening log yet
+[gotunnels] waiting for the API Quick Tunnel URL…
+[gotunnels] api: https://stress-establishing-occurrence-flyer.trycloudflare.com
+[gotunnels] wrote config.json into frontend container
+
+[gotunnels] GoTunnels is up.
+  Web app : https://dvd-cotton-positive-cooked.trycloudflare.com
+  API     : https://stress-establishing-occurrence-flyer.trycloudflare.com
+  Instance: gotunnels-nrow1q (urls saved to tunnel-urls.txt)
+
+[gotunnels] tear down with: scripts/down.sh gotunnels-nrow1q
+[gotunnels] waiting 60s for the Quick Tunnels to settle, then printing their URL log lines…
+
+[gotunnels] Web app — tunnel URL (from: podman logs cloudflared-frontend):
+2026-07-04T23:20:11Z INF |  https://dvd-cotton-positive-cooked.trycloudflare.com                                      |
+
+[gotunnels] API — tunnel URL (from: podman logs cloudflared-api):
+2026-07-04T23:20:20Z INF |  https://stress-establishing-occurrence-flyer.trycloudflare.com                            |
+
+
+real	2m34.980s
+user	0m19.184s
+sys	0m9.087s
+kushal@virginia:~/src/golang/GoTunnels$ 
