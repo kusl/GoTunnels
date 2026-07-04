@@ -1,4 +1,4 @@
-kushal@fedora:~/src/golang/GoTunnels$ ssh virginia 
+kushal@fedora:~/src/golang/GoTunnels$ ssh virginia
 Linux virginia 6.12.94+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.94-1 (2026-06-20) x86_64
 
 The programs included with the Debian GNU/Linux system are free software;
@@ -7,29 +7,29 @@ individual files in /usr/share/doc/*/copyright.
 
 Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
 permitted by applicable law.
-Last login: Thu Jul  2 02:48:26 2026 from 100.105.139.82
+Last login: Sat Jul  4 17:53:18 2026 from 100.105.139.82
 kushal@virginia:~$ cd ~/src/golang/GoTunnels/; time git status; time git fetch; time git status; time git remote show origin; time git pull; time git status; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh
 On branch main
 Your branch is up to date with 'origin/main'.
 
 nothing to commit, working tree clean
 
-real	0m0.044s
-user	0m0.021s
-sys	0m0.004s
-remote: Enumerating objects: 105, done.
-remote: Counting objects: 100% (105/105), done.
-remote: Compressing objects: 100% (43/43), done.
-remote: Total 96 (delta 61), reused 87 (delta 52), pack-reused 0 (from 0)
-Unpacking objects: 100% (96/96), 61.27 KiB | 429.00 KiB/s, done.
+real	0m0.016s
+user	0m0.011s
+sys	0m0.005s
+remote: Enumerating objects: 106, done.
+remote: Counting objects: 100% (106/106), done.
+remote: Compressing objects: 100% (33/33), done.
+remote: Total 74 (delta 36), reused 74 (delta 36), pack-reused 0 (from 0)
+Unpacking objects: 100% (74/74), 191.20 KiB | 2.06 MiB/s, done.
 From https://github.com/kusl/GoTunnels
-   31a2ec2..f0b88b9  main       -> origin/main
+   f0b88b9..c0f590c  main       -> origin/main
 
-real	0m0.502s
-user	0m0.213s
-sys	0m0.087s
+real	0m0.424s
+user	0m0.174s
+sys	0m0.072s
 On branch main
-Your branch is behind 'origin/main' by 14 commits, and can be fast-forwarded.
+Your branch is behind 'origin/main' by 6 commits, and can be fast-forwarded.
   (use "git pull" to update your local branch)
 
 nothing to commit, working tree clean
@@ -48,39 +48,74 @@ sys	0m0.006s
   Local ref configured for 'git push':
     main pushes to main (local out of date)
 
-real	0m0.238s
-user	0m0.105s
-sys	0m0.033s
-Updating 31a2ec2..f0b88b9
-Fast-forward
- docs/llm/dump.txt                       |  802 +++++++++++++++++++++++++++++++++++++++-
- docs/llm/vendor/claude-conversations.md | 3257 ++++++++++++++++++++++++++++++++-----------------------------------------------------------------------------------------------------------------------------------
- docs/llm/vendor/fedora-laptop.txt       |  784 +++++++++++++++++++++++++++++++++++++++
- docs/llm/vendor/gemini-conversation.md  | 1012 +++++++++++++++++++++++++++++++++++++++++++++++++++
- docs/llm/vendor/output.txt              |  802 +++++++++++++++++++++++++++++++++++++++-
- docs/llm/vendor/virginia.txt            |  436 ++++++++++++++++++++++
- frontend/captcha.html                   |  674 ++++++++++++++++++++++++++++++++++
- frontend/css/style.css                  |   75 ++++
- 8 files changed, 5179 insertions(+), 2663 deletions(-)
- create mode 100644 docs/llm/vendor/fedora-laptop.txt
- create mode 100644 docs/llm/vendor/gemini-conversation.md
- create mode 100644 docs/llm/vendor/virginia.txt
- create mode 100644 frontend/captcha.html
-
-real	0m0.308s
+real	0m0.259s
 user	0m0.127s
-sys	0m0.068s
+sys	0m0.008s
+Updating f0b88b9..c0f590c
+Fast-forward
+ README.md                                  |   10 +
+ cmd/api/main.go                            |   14 +-
+ docs/ARCHITECTURE.md                       |  126 ++++
+ docs/llm/dump.txt                          | 4167 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------
+ docs/llm/vendor/GoTunnels-changes.zip      |  Bin 0 -> 67585 bytes
+ docs/llm/vendor/claude-conversations.md    | 5301 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ docs/llm/vendor/fedora-laptop.txt          |  803 ++++---------------------
+ docs/llm/vendor/output.txt                 | 4167 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------
+ docs/llm/vendor/virginia.txt               |  491 +++++----------
+ frontend/activity.html                     |    4 +-
+ frontend/captcha.html                      |  636 ++------------------
+ frontend/css/style.css                     |  345 ++++++++++-
+ frontend/index.html                        |   22 +-
+ frontend/js/api.js                         |   27 +-
+ frontend/js/page-captcha.js                |  730 ++++++++++++++++++++++
+ frontend/js/page-notes.js                  |  406 +++++++++++++
+ frontend/login.html                        |    2 +
+ frontend/notes.html                        |   76 +++
+ frontend/settings.html                     |    2 +
+ frontend/signup.html                       |    2 +
+ internal/captcha/captcha.go                |  234 ++++++++
+ internal/captcha/captcha_test.go           |   60 ++
+ internal/httpx/middleware.go               |   14 +
+ internal/notes/notes.go                    |  218 +++++++
+ internal/notes/notes_test.go               |   73 +++
+ internal/prefs/prefs.go                    |  126 ++++
+ internal/prefs/prefs_test.go               |   36 ++
+ internal/server/server.go                  |   54 +-
+ internal/store/store.go                    |  222 +++++++
+ migrations/0006_captcha_and_prefs.down.sql |    3 +
+ migrations/0006_captcha_and_prefs.up.sql   |   37 ++
+ migrations/0007_notes.down.sql             |    2 +
+ migrations/0007_notes.up.sql               |   20 +
+ 33 files changed, 15143 insertions(+), 3287 deletions(-)
+ create mode 100644 docs/llm/vendor/GoTunnels-changes.zip
+ create mode 100644 frontend/js/page-captcha.js
+ create mode 100644 frontend/js/page-notes.js
+ create mode 100644 frontend/notes.html
+ create mode 100644 internal/captcha/captcha.go
+ create mode 100644 internal/captcha/captcha_test.go
+ create mode 100644 internal/notes/notes.go
+ create mode 100644 internal/notes/notes_test.go
+ create mode 100644 internal/prefs/prefs.go
+ create mode 100644 internal/prefs/prefs_test.go
+ create mode 100644 migrations/0006_captcha_and_prefs.down.sql
+ create mode 100644 migrations/0006_captcha_and_prefs.up.sql
+ create mode 100644 migrations/0007_notes.down.sql
+ create mode 100644 migrations/0007_notes.up.sql
+
+real	0m0.326s
+user	0m0.166s
+sys	0m0.054s
 On branch main
 Your branch is up to date with 'origin/main'.
 
 nothing to commit, working tree clean
 
-real	0m0.014s
-user	0m0.007s
-sys	0m0.007s
+real	0m0.018s
+user	0m0.015s
+sys	0m0.004s
 [gotunnels] using runtime: podman / compose: podman compose
 [gotunnels] using existing /home/kushal/src/golang/GoTunnels/.env
-[gotunnels] project (instance): gotunnels-ekhmuw
+[gotunnels] project (instance): gotunnels-q6jqbg
 [gotunnels] building images…
 >>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
 
@@ -94,50 +129,49 @@ STEP 2/5: COPY frontend/ /srv/
 --> Using cache dad0f6c1c3f37fa3d3e9ec18f3e246de00056ac4632379f00aa1a7b59b0fea1c
 --> dad0f6c1c3f3
 [1/2] STEP 4/6: COPY . .
---> d39ea1422082
+--> 9089d7198f9a
 STEP 3/5: COPY frontend/Caddyfile /etc/caddy/Caddyfile
---> 258a20998240
+--> 7e9dcda59c6f
 [1/2] STEP 5/6: ARG VERSION=dev
---> c79721a6344d
---> b830d19d8790
+--> 8a39db5582cb
+--> cd71cd6b3855
 STEP 4/5: RUN rm -f /srv/Caddyfile
 [1/2] STEP 6/6: RUN go mod tidy  && go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+go: downloading github.com/jackc/pgx/v5 v5.10.0
+go: downloading github.com/go-webauthn/webauthn v0.11.2
 go: downloading go.opentelemetry.io/contrib/bridges/otelslog v0.19.0
 go: downloading go.opentelemetry.io/otel v1.44.0
 go: downloading go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.20.0
-go: downloading github.com/go-webauthn/webauthn v0.11.2
-go: downloading go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
-go: downloading github.com/jackc/pgx/v5 v5.10.0
 go: downloading go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.44.0
-go: downloading github.com/pquerna/otp v1.4.0
 go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.44.0
---> e28d27c40c12
-STEP 5/5: EXPOSE 8080
 go: downloading go.opentelemetry.io/otel/log v0.20.0
-COMMIT gotunnels-ekhmuw_frontend
---> 987980ed6a9a
-Successfully tagged localhost/gotunnels-ekhmuw_frontend:latest
-987980ed6a9ab240bb6f691b69f7f2175ffaec2fdc71eb512a20a75a591cbc79
-go: downloading golang.org/x/crypto v0.53.0
 go: downloading go.opentelemetry.io/otel/sdk/log v0.20.0
 go: downloading go.opentelemetry.io/otel/sdk/metric v1.44.0
+--> e38a2f302bbf
+STEP 5/5: EXPOSE 8080
+COMMIT gotunnels-q6jqbg_frontend
+--> bfbcefd548f0
+Successfully tagged localhost/gotunnels-q6jqbg_frontend:latest
+bfbcefd548f0e19badbaaee1387e090849f4ba97110ce3aaf034ee6f35a0602f
 go: downloading go.opentelemetry.io/otel/sdk v1.44.0
 go: downloading go.opentelemetry.io/otel/metric v1.44.0
 go: downloading go.opentelemetry.io/otel/trace v1.44.0
+go: downloading go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
+go: downloading github.com/pquerna/otp v1.4.0
+go: downloading golang.org/x/crypto v0.53.0
 go: downloading github.com/stretchr/testify v1.11.1
-go: downloading github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc
 go: downloading github.com/google/uuid v1.6.0
-go: downloading github.com/felixge/httpsnoop v1.0.4
 go: downloading github.com/jackc/puddle/v2 v2.2.2
-go: downloading golang.org/x/sys v0.46.0
 go: downloading github.com/go-logr/logr v1.4.3
 go: downloading github.com/go-logr/stdr v1.2.2
 go: downloading github.com/google/go-cmp v0.7.0
+go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0
 go: downloading go.opentelemetry.io/proto/otlp v1.10.0
 go: downloading google.golang.org/protobuf v1.36.11
-go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0
+go: downloading golang.org/x/sys v0.46.0
 go: downloading go.uber.org/goleak v1.3.0
 go: downloading go.opentelemetry.io/otel/metric/x v0.66.0
+go: downloading github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc
 go: downloading github.com/go-webauthn/x v0.1.14
 go: downloading github.com/golang-jwt/jwt/v5 v5.2.2
 go: downloading github.com/mitchellh/mapstructure v1.5.0
@@ -145,15 +179,16 @@ go: downloading github.com/google/go-tpm v0.9.1
 go: downloading github.com/jackc/pgpassfile v1.0.0
 go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
 go: downloading golang.org/x/text v0.38.0
+go: downloading github.com/felixge/httpsnoop v1.0.4
 go: downloading go.opentelemetry.io/auto/sdk v1.2.1
 go: downloading google.golang.org/grpc v1.81.1
 go: downloading github.com/cenkalti/backoff/v5 v5.0.3
+go: downloading github.com/cespare/xxhash/v2 v2.3.0
+go: downloading go.opentelemetry.io/otel/sdk/log/logtest v0.20.0
 go: downloading golang.org/x/sync v0.17.0
 go: downloading github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
-go: downloading go.opentelemetry.io/otel/sdk/log/logtest v0.20.0
 go: downloading github.com/davecgh/go-spew v1.1.1
 go: downloading github.com/pmezard/go-difflib v1.0.0
-go: downloading github.com/cespare/xxhash/v2 v2.3.0
 go: downloading github.com/fxamacker/cbor/v2 v2.7.0
 go: downloading google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa
 go: downloading google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa
@@ -163,86 +198,81 @@ go: downloading golang.org/x/net v0.55.0
 go: downloading golang.org/x/sync v0.21.0
 go: downloading github.com/golang/protobuf v1.5.4
 go: downloading gonum.org/v1/gonum v0.17.0
---> 458164f0d412
+--> 4c59d32a843b
 [2/2] STEP 1/6: FROM gcr.io/distroless/static-debian12:nonroot
 [2/2] STEP 2/6: WORKDIR /
 --> Using cache e14ab4df47cf49d299ef67fca396aff23ad8f94f577a9affba7a1f3e454ca183
 --> e14ab4df47cf
 [2/2] STEP 3/6: COPY --from=build /out/api /api
---> Using cache 85cda9251643cf0d8031ef184dba2d349d87f4b7c8c9f5e670c94cc57f74d77b
---> 85cda9251643
+--> 2f2da30ef256
 [2/2] STEP 4/6: USER nonroot:nonroot
---> Using cache 4b567c1db908010dfc99dbf6042bdff05e1e762260a8ee1a2554ca183f5c7fd9
---> 4b567c1db908
+--> 9a157992a9d6
 [2/2] STEP 5/6: EXPOSE 8080
---> Using cache 4b444827bd8013cc7b0441ddce19a3b95cda182e23d6cf6f242de9d2b34265b1
---> 4b444827bd80
+--> 41860cf57127
 [2/2] STEP 6/6: ENTRYPOINT ["/api"]
---> Using cache 5dc262c090277cf2efe675a3a7ad5a68e7303e40368fe46b21d4bb3efa253bc6
-[2/2] COMMIT gotunnels-ekhmuw_api
---> 5dc262c09027
-Successfully tagged localhost/gotunnels-ekhmuw_api:latest
-Successfully tagged localhost/gotunnels-xnnkzq_api:latest
-5dc262c090277cf2efe675a3a7ad5a68e7303e40368fe46b21d4bb3efa253bc6
+[2/2] COMMIT gotunnels-q6jqbg_api
+--> b8b970780840
+Successfully tagged localhost/gotunnels-q6jqbg_api:latest
+b8b970780840e5ee83a8636eae286a4534228a0d551a3b18d7e146c18b5b544c
 [gotunnels] starting database…
 >>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
 
-c09416031fc8904953778867d73f83de2d0e8d4d299c9025c896b6b92355e37e
-c873adafef59cc7aaca0903592cfda83b6ab4973395c25c6540f10ad452463b9
-gotunnels-ekhmuw_db_1
+bf4385589f889502e9d09c7c100542f160e1f9f61d504d8a6e6d4e911c7bbdca
+063987363a4ba444bf694fc6e4b5b8355f1d862d90ce5eaa6b8132b03cb6e7ca
+gotunnels-q6jqbg_db_1
 [gotunnels] waiting for 'db' to become ready (up to 60s)
-[gotunnels] 'db' is healthy
+[gotunnels] 'db' is ready
 [gotunnels] starting frontend and its tunnel…
 >>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
 
-Error: creating container storage: the container name "gotunnels-ekhmuw_db_1" is already in use by c873adafef59cc7aaca0903592cfda83b6ab4973395c25c6540f10ad452463b9. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
-gotunnels-ekhmuw_db_1
-6e4b6225aa23a9717a63b1667b2d2d022188b194eff303adf91a89af69e2ebde
-gotunnels-ekhmuw_api_1
-995ee512e7c4f1986324b4051c4a2b9d81f0849888c6fc4511dbcb324d253dcc
-gotunnels-ekhmuw_frontend_1
-aac90146b544cfa53feaf55b5923dee00d7ad47ff0c5b979acb2d9a3dce25c15
-gotunnels-ekhmuw_cloudflared-frontend_1
+Error: creating container storage: the container name "gotunnels-q6jqbg_db_1" is already in use by 063987363a4ba444bf694fc6e4b5b8355f1d862d90ce5eaa6b8132b03cb6e7ca. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+gotunnels-q6jqbg_db_1
+c71ed6660e2a856f275ce7c9ca8386712eab8ed3717f56891f75f78264b90d1a
+gotunnels-q6jqbg_api_1
+993169f094dec2a3329973541215400b42c8bb4447f46269d174094983b75d80
+gotunnels-q6jqbg_frontend_1
+8ab4babfa35cf0e0a4af33df23fdbf65760f8aefab7e5d84c37ad9f38cc810a4
+gotunnels-q6jqbg_cloudflared-frontend_1
 [gotunnels] waiting for the frontend Quick Tunnel URL…
-[gotunnels] frontend: https://aus-images-lip-font.trycloudflare.com
+[gotunnels] frontend: https://updates-separated-condition-entrepreneur.trycloudflare.com
 [gotunnels] starting API and its tunnel…
 >>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
 
-Error: no container with name or ID "gotunnels-ekhmuw_cloudflared-api_1" found: no such container
-gotunnels-ekhmuw_db_1
-gotunnels-ekhmuw_api_1
-Error: no container with ID or name "gotunnels-ekhmuw_cloudflared-api_1" found: no such container
-Error: container 6e4b6225aa23a9717a63b1667b2d2d022188b194eff303adf91a89af69e2ebde has dependent containers which must be removed before it: 995ee512e7c4f1986324b4051c4a2b9d81f0849888c6fc4511dbcb324d253dcc, aac90146b544cfa53feaf55b5923dee00d7ad47ff0c5b979acb2d9a3dce25c15: container already exists
-Error: container c873adafef59cc7aaca0903592cfda83b6ab4973395c25c6540f10ad452463b9 has dependent containers which must be removed before it: 6e4b6225aa23a9717a63b1667b2d2d022188b194eff303adf91a89af69e2ebde, 995ee512e7c4f1986324b4051c4a2b9d81f0849888c6fc4511dbcb324d253dcc, aac90146b544cfa53feaf55b5923dee00d7ad47ff0c5b979acb2d9a3dce25c15: container already exists
-Error: creating container storage: the container name "gotunnels-ekhmuw_db_1" is already in use by c873adafef59cc7aaca0903592cfda83b6ab4973395c25c6540f10ad452463b9. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
-gotunnels-ekhmuw_db_1
-Error: creating container storage: the container name "gotunnels-ekhmuw_api_1" is already in use by 6e4b6225aa23a9717a63b1667b2d2d022188b194eff303adf91a89af69e2ebde. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
-gotunnels-ekhmuw_api_1
-c79d03649ae29d384766bb6fdb368bb5b3908fe82605ece40ae15e6469b4499d
-gotunnels-ekhmuw_cloudflared-api_1
+Error: no container with name or ID "gotunnels-q6jqbg_cloudflared-api_1" found: no such container
+gotunnels-q6jqbg_db_1
+gotunnels-q6jqbg_api_1
+Error: no container with ID or name "gotunnels-q6jqbg_cloudflared-api_1" found: no such container
+Error: container c71ed6660e2a856f275ce7c9ca8386712eab8ed3717f56891f75f78264b90d1a has dependent containers which must be removed before it: 993169f094dec2a3329973541215400b42c8bb4447f46269d174094983b75d80, 8ab4babfa35cf0e0a4af33df23fdbf65760f8aefab7e5d84c37ad9f38cc810a4: container already exists
+Error: container 063987363a4ba444bf694fc6e4b5b8355f1d862d90ce5eaa6b8132b03cb6e7ca has dependent containers which must be removed before it: c71ed6660e2a856f275ce7c9ca8386712eab8ed3717f56891f75f78264b90d1a, 993169f094dec2a3329973541215400b42c8bb4447f46269d174094983b75d80, 8ab4babfa35cf0e0a4af33df23fdbf65760f8aefab7e5d84c37ad9f38cc810a4: container already exists
+Error: creating container storage: the container name "gotunnels-q6jqbg_db_1" is already in use by 063987363a4ba444bf694fc6e4b5b8355f1d862d90ce5eaa6b8132b03cb6e7ca. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+gotunnels-q6jqbg_db_1
+Error: creating container storage: the container name "gotunnels-q6jqbg_api_1" is already in use by c71ed6660e2a856f275ce7c9ca8386712eab8ed3717f56891f75f78264b90d1a. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+gotunnels-q6jqbg_api_1
+dffb4cc68e69940528ba31ab111a78ea9e17fc678bd14c5b5fa6ba466c150cea
+gotunnels-q6jqbg_cloudflared-api_1
 [gotunnels] did not observe API listening log yet
 [gotunnels] waiting for the API Quick Tunnel URL…
-[gotunnels] api: https://shuttle-sur-php-sight.trycloudflare.com
+[gotunnels] api: https://webster-stones-taste-casting.trycloudflare.com
 [gotunnels] wrote config.json into frontend container
 
 [gotunnels] GoTunnels is up.
-  Web app : https://aus-images-lip-font.trycloudflare.com
-  API     : https://shuttle-sur-php-sight.trycloudflare.com
-  Instance: gotunnels-ekhmuw (urls saved to tunnel-urls.txt)
+  Web app : https://updates-separated-condition-entrepreneur.trycloudflare.com
+  API     : https://webster-stones-taste-casting.trycloudflare.com
+  Instance: gotunnels-q6jqbg (urls saved to tunnel-urls.txt)
 
-[gotunnels] tear down with: scripts/down.sh gotunnels-ekhmuw
+[gotunnels] tear down with: scripts/down.sh gotunnels-q6jqbg
 [gotunnels] waiting 60s for the Quick Tunnels to settle, then printing their URL log lines…
 
 [gotunnels] Web app — tunnel URL (from: podman logs cloudflared-frontend):
-2026-07-04T21:55:29Z INF |  https://aus-images-lip-font.trycloudflare.com                                             |
+2026-07-04T22:04:08Z INF |  https://updates-separated-condition-entrepreneur.trycloudflare.com                        |
 
 [gotunnels] API — tunnel URL (from: podman logs cloudflared-api):
-2026-07-04T21:55:37Z INF |  https://shuttle-sur-php-sight.trycloudflare.com                                           |
+2026-07-04T22:04:21Z INF |  https://webster-stones-taste-casting.trycloudflare.com                                    |
 
 
-real	3m40.678s
-user	4m13.858s
-sys	0m40.436s
+real	3m50.164s
+user	4m13.515s
+sys	0m35.620s
 kushal@virginia:~/src/golang/GoTunnels$ exit
 logout
 Connection to virginia closed.
