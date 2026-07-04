@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-04T09:28:38-04:00
+  Generated at   : 2026-07-04T10:04:58-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : f7b1286c32b7c80ec1de320904de29bd7243f106
-  Commit (short) : f7b1286
-  Commit date    : 2026-07-04 09:16:41 -0400
-  Commit message : add new captcha demo page
+  Commit (full)  : 0fdafb7b2b7121326eb8e87a84e41b588fcf7fb3
+  Commit (short) : 0fdafb7
+  Commit date    : 2026-07-04 09:35:44 -0400
+  Commit message : add output
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 78
   Excluded path  : docs/llm/
@@ -28,9 +28,8 @@ REPOSITORY METADATA
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
- M docs/llm/vendor/gemini-conversation.md
+ M docs/llm/vendor/claude-conversations.md
  M docs/llm/vendor/output.txt
- M frontend/captcha.html
 
 ################################################################################
 # FILE: export.sh  [THIS SCRIPT — included for full context]
@@ -1882,7 +1881,7 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   Hard links:            1
   MIME type:             text/html
   SHA-256:               57e12f11d83216418ad8075836b7d8c6e660d02fb33588d67f532a28030c28e1
-  Last git commit:       f7b1286 2026-07-04 09:16:41 -0400 add new captcha demo page
+  Last git commit:       8ef568e 2026-07-04 09:28:47 -0400 update output
 
 --- CONTENT ---
 <!doctype html>
@@ -10884,7 +10883,7 @@ done
   Files dumped   : 78
   Total size     : 313.2 KiB (320735 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-04T09:28:41-04:00
+  Completed at   : 2026-07-04T10:05:01-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
