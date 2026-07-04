@@ -21,8 +21,12 @@ export function clearToken() {
 
 // apiFetch performs a JSON request against the API base and throws an Error
 // (with .status and .data) on non-2xx responses.
+//
+// Pass { keepalive: true } for small requests that must survive the page
+// being hidden or unloaded (e.g. flushing CAPTCHA stats). We cannot use
+// navigator.sendBeacon because it cannot carry the Authorization header.
 export async function apiFetch(path, opts = {}) {
-  const { method = "GET", body, headers = {} } = opts;
+  const { method = "GET", body, headers = {}, keepalive = false } = opts;
   const cfg = await loadConfig();
   const base = cfg.apiBase || "";
 
@@ -42,6 +46,7 @@ export async function apiFetch(path, opts = {}) {
     body: payload,
     mode: "cors",
     credentials: "include",
+    keepalive,
   });
 
   const text = await res.text();
@@ -83,4 +88,24 @@ export const Api = {
   totpEnroll: () => apiFetch("/api/totp/enroll", { method: "POST" }),
   totpConfirm: (b) => apiFetch("/api/totp/confirm", { method: "POST", body: b }),
   totpDisable: (b) => apiFetch("/api/totp/disable", { method: "POST", body: b }),
+
+  captchaStats: () => apiFetch("/api/captcha/stats"),
+  captchaSync: (b, keepalive = false) =>
+    apiFetch("/api/captcha/sync", { method: "POST", body: b, keepalive }),
+  captchaReset: () => apiFetch("/api/captcha/reset", { method: "POST" }),
+  captchaLeaderboard: () => apiFetch("/api/captcha/leaderboard"),
+
+  prefGet: (key) => apiFetch("/api/prefs/" + encodeURIComponent(key)),
+  prefSet: (key, value) =>
+    apiFetch("/api/prefs/" + encodeURIComponent(key), { method: "PUT", body: { value } }),
+
+  notesList: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.before) q.set("before", String(params.before));
+    if (params.limit) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    return apiFetch("/api/notes" + (qs ? "?" + qs : ""));
+  },
+  noteCreate: (body) => apiFetch("/api/notes", { method: "POST", body: { body } }),
+  noteDelete: (id) => apiFetch("/api/notes/" + encodeURIComponent(id), { method: "DELETE" }),
 };

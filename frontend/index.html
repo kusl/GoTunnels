@@ -12,6 +12,8 @@
         <span class="brand"><span class="dot"></span> GoTunnels</span>
         <nav class="mainnav">
           <a href="/">Home</a>
+          <a href="/notes" data-auth="in" class="hidden">Notes</a>
+          <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
           <a href="/activity" data-auth="in" class="hidden">Activity</a>
           <a href="/settings" data-auth="in" class="hidden">Settings</a>
           <a href="/login" data-auth="out">Log in</a>
@@ -39,6 +41,8 @@
           <li>Passkey (WebAuthn) login, password fallback, and optional TOTP two-factor.</li>
           <li>Server-side sessions with a Bearer token that works cross-origin.</li>
           <li>Privacy-preserving audit log: IPs are hashed with a per-instance pepper, never stored raw.</li>
+          <li>A shared plain-text notes feed with visibility-aware polling for live updates.</li>
+          <li>A CAPTCHA toy whose stats sync to the server in batches and feed a leaderboard.</li>
           <li>OpenTelemetry traces, metrics, and logs over OTLP — vendor-neutral.</li>
           <li>Content-Security-Policy in report-only mode, reported back to the API.</li>
           <li>No exposed host ports; every service talks over the internal Compose network.</li>
@@ -47,10 +51,20 @@
 
       <h2>Get started</h2>
       <div class="card">
-        <p>Create an account, then add a passkey or enable TOTP from settings.</p>
-        <div class="btn-row">
-          <a href="/signup"><button class="primary" type="button">Sign up</button></a>
-          <a href="/login"><button class="ghost" type="button">Log in</button></a>
+        <div data-auth="out">
+          <p>Create an account, then add a passkey or enable TOTP from settings.</p>
+          <div class="btn-row">
+            <a href="/signup"><button class="primary" type="button">Sign up</button></a>
+            <a href="/login"><button class="ghost" type="button">Log in</button></a>
+          </div>
+        </div>
+        <div data-auth="in" class="hidden">
+          <p>You are signed in. Jump straight to the good parts:</p>
+          <div class="btn-row">
+            <a href="/notes"><button class="primary" type="button">Notes</button></a>
+            <a href="/captcha"><button class="ghost" type="button">CAPTCHA</button></a>
+            <a href="/settings"><button class="ghost" type="button">Settings</button></a>
+          </div>
         </div>
       </div>
     </main>

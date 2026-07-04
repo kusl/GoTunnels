@@ -138,3 +138,129 @@ raw SQL.
 migrations on startup, each in its own transaction, recording applied versions
 in `schema_migrations`. It is a deliberately tiny, dependency-free runner rather
 than a third-party migration tool.
+
+## User preferences
+
+`user_prefs` is a per-user key/value table (`user_id`, `key`, `value`) exposed
+through `GET/PUT /api/prefs/{key}`. It exists because some settings should
+follow the *account* and some should stay with the *device*, and the split is
+deliberate:
+
+- **Account settings** (server-side prefs): things that describe the person's
+  choice regardless of hardware — e.g. whether the CAPTCHA leaderboard is
+  expanded (`captcha.leaderboard.open`). Log in anywhere and it looks the way
+  you left it.
+- **Device settings** (localStorage): things that depend on the machine —
+  e.g. the Magic Solve speed, which is bounded by the display's refresh rate.
+  Carrying a 144 Hz speed setting to a 60 Hz laptop would be wrong.
+
+Keys are constrained to `[a-z0-9._-]`, must start alphanumeric, and are capped
+at 64 characters; values are capped at 4 KiB. Prefs are plain strings — the
+page owns the encoding. This keeps the endpoint generic without turning it
+into an arbitrary blob store.
+
+## CAPTCHA statistics: batched sync, not per-solve requests
+
+The CAPTCHA page's auto-solver can finish *hundreds* of puzzles per second, so
+one-request-per-solve was never on the table. Instead:
+
+- The browser accumulates deltas locally: `{manual_delta, auto_delta,
+  current_streak, best_streak}`.
+- It flushes them to `POST /api/captcha/sync` every ~4 seconds while anything
+  is pending, when the auto-solver stops, and — via `fetch(..., {keepalive:
+  true})` — when the tab is hidden or unloaded. (`navigator.sendBeacon` cannot
+  be used: it cannot carry the `Authorization` header this API relies on.)
+- The server applies the batch as a single UPSERT into `captcha_stats`:
+  totals are incremented, `best_streak` takes `GREATEST(stored, claimed)`, and
+  `current_streak` is last-write-wins so a session can resume on another
+  device.
+- The server clamps everything (per-sync deltas to 100 000, streaks to 10⁹)
+  and both layers enforce non-negativity — the DB with CHECK constraints, the
+  handler before the query. Scores are self-reported by client code; the
+  clamps bound the damage of a dishonest client without pretending this is an
+  anti-cheat system.
+
+Displayed solves are `server base + un-flushed pending + in-flight`, so the
+number never moves backwards while a request is in the air. If a sync fails,
+its deltas are restored to the pending pile and retried; nothing is lost short
+of the process dying mid-flight, which costs at most a few seconds of play.
+
+The leaderboard (`GET /api/captcha/leaderboard`) ranks by `best_streak` (ties:
+`total_solves`, then earliest update) with SQL `RANK() OVER`, returns the top
+10 plus the caller's own ranked row, and is collapsed by default behind a
+`<details>` element whose open state is the server-side pref above.
+
+`POST /api/captcha/reset` deletes the caller's row entirely — the "reset my
+stats" button is honest: the server forgets you, and you leave the
+leaderboard.
+
+## Notes: a deliberately minimal shared microblog
+
+`notes` is a plain-text, everyone-sees-everything feed with three verbs: list,
+create, delete. The constraints are the feature:
+
+- **Plain text only.** Bodies are validated server-side (valid UTF-8, CRLF
+  normalized to LF, no control characters besides newline and tab, 1–500
+  runes — the DB enforces the same range with a `char_length` CHECK) and
+  rendered client-side exclusively via `textContent`. Nothing in a note can
+  become markup; URLs are visibly text and not clickable, by design. The
+  per-note **Copy** button exists precisely because links do not work — you
+  copy, you inspect, you decide.
+- **Delete, never edit.** A note is either exactly what its author wrote or it
+  is gone. No edit endpoint exists, so no "edited after people replied"
+  ambiguity can exist either. Deletes are hard `DELETE`s (the row is gone, not
+  flagged), matching the privacy posture of the rest of the project, and the
+  table uses `ON DELETE CASCADE` from `users` — content leaves with the
+  account, unlike `activity_log`'s `SET NULL`, which is an *audit* record.
+- **Ownership in the query.** `DELETE FROM notes WHERE id = $1 AND user_id =
+  $2` — authorization is part of the statement, not a separate read followed
+  by a write. Deleting someone else's note and deleting a nonexistent note are
+  the same uniform 404, so the endpoint is not an existence oracle.
+- **Rate-limited creation.** `POST /api/notes` sits behind the existing token
+  bucket (0.5 rps sustained, burst 5) keyed by the *authenticated user id* —
+  inside `RequireAuth`, so the key is server-derived, not client-controlled.
+
+## Live updates: polling, on purpose
+
+The notes feed auto-refreshes by **polling** (`GET /api/notes`, newest 50)
+rather than SSE or WebSockets, and this is a considered choice, not a
+shortcut:
+
+- The API's `http.Server` sets `WriteTimeout: 30s`, which kills any
+  long-lived streaming response. Streams would also punch through the
+  otelhttp instrumentation (one span per infinite response) and interact
+  badly with the Cloudflare tunnel's buffering.
+- Polling makes every update a normal, small, instrumented, rate-limitable
+  request — the same shape as everything else in the API.
+
+The client polls every 5 s **only while the tab is visible**, refreshes
+immediately on becoming visible, and backs off exponentially to 60 s while
+the API is unreachable. Each response is reconciled against the rendered feed
+keyed by note id: notes that disappear from the newest-50 window are removed
+(deletions propagate live), your own new notes appear immediately, and other
+people's new notes appear immediately *unless you have scrolled down to
+read* — then they wait behind a "New notes ↑" pill so the feed never jumps
+under your thumb. A deletion older than the newest-50 window is not detected
+live; it surfaces on the next full page load, which is an accepted trade-off
+of window-based reconciliation.
+
+## Page gating: shells are public, data is not
+
+`/notes` and `/captcha` are "login-only" the same way `/activity` and
+`/settings` are: Caddy happily serves the static HTML shell to anyone, the
+page's script calls `requireAuth()` and redirects anonymous visitors to
+`/login`, and — the part that actually matters — **every API route behind
+those pages requires a session server-side** (`RequireAuth`). The redirect is
+UX; the enforcement is the 401. There is nothing sensitive in the static
+shells, so protecting them would add a server-side rendering dependency
+without adding security.
+
+## Domain metrics
+
+Beyond the automatic HTTP metrics, the new features export a few
+domain-level OpenTelemetry instruments: `gotunnels.captcha.solves` (counter,
+attribute `mode=manual|auto`), `gotunnels.captcha.syncs`,
+`gotunnels.captcha.streak` (a histogram of streak values reported at sync
+time), `gotunnels.notes.created`, and `gotunnels.notes.deleted`. Handlers
+also annotate their active span (batch sizes, note ids) so traces answer
+"what did this request actually do" without log-diving.

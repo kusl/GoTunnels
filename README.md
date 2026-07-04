@@ -26,6 +26,13 @@ ten independent instances side by side without configuring anything.
 - **Privacy-preserving audit log**: client IPs are never stored raw — only
   `sha256(pepper || ip)`, and the hash is shown to you plainly on your own
   activity page.
+- **A shared plain-text notes feed** (create / delete, never edit) with
+  visibility-aware polling for live updates, deferred "new notes" while you
+  read, and server-side ownership checks in the SQL itself.
+- **A CAPTCHA toy with server-backed stats**: the auto-solver can do hundreds
+  of solves a second, so the browser batches deltas and syncs every few
+  seconds; a `RANK() OVER` leaderboard and a per-user preferences endpoint
+  round it out.
 - **OpenTelemetry** traces, metrics, and logs over OTLP/HTTP — vendor-neutral,
   never tied to a specific backend.
 - **Content-Security-Policy** in report-only mode by default; violations are
@@ -175,6 +182,9 @@ Dependabot's Go alerts).
 │   ├── store/                   all SQL data access
 │   ├── auth/                    passwords, passkeys, TOTP, sessions, handlers
 │   ├── activity/                audit logging + IP hashing
+│   ├── captcha/                 CAPTCHA stats sync, reset, leaderboard
+│   ├── notes/                   plain-text microblog (list/create/delete)
+│   ├── prefs/                   per-user key/value preferences
 │   ├── health/                  liveness / readiness / info
 │   ├── csp/                     CSP report ingestion (3 wire formats)
 │   ├── httpx/                   CORS, request-id, recovery, rate limit, JSON

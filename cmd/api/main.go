@@ -15,11 +15,14 @@ import (
 
 	"github.com/kusl/GoTunnels/internal/activity"
 	"github.com/kusl/GoTunnels/internal/auth"
+	"github.com/kusl/GoTunnels/internal/captcha"
 	"github.com/kusl/GoTunnels/internal/config"
 	"github.com/kusl/GoTunnels/internal/csp"
 	"github.com/kusl/GoTunnels/internal/database"
 	"github.com/kusl/GoTunnels/internal/health"
 	"github.com/kusl/GoTunnels/internal/httpx"
+	"github.com/kusl/GoTunnels/internal/notes"
+	"github.com/kusl/GoTunnels/internal/prefs"
 	"github.com/kusl/GoTunnels/internal/server"
 	"github.com/kusl/GoTunnels/internal/store"
 	"github.com/kusl/GoTunnels/internal/telemetry"
@@ -110,6 +113,10 @@ func run() error {
 
 	cspHandler := csp.NewHandler(st, log, cfg.IPHashPepper())
 
+	captchaHandlers := captcha.NewHandlers(st, log)
+	notesHandlers := notes.NewHandlers(st, log)
+	prefsHandlers := prefs.NewHandlers(st, log)
+
 	srv := server.New(server.Deps{
 		Config:         cfg,
 		Log:            log,
@@ -117,7 +124,12 @@ func run() error {
 		Health:         healthHandler,
 		CSP:            cspHandler,
 		CSPRateLimiter: httpx.NewRateLimiter(5, 20), // 5 rps, burst 20, per hashed IP
-		Pepper:         cfg.IPHashPepper(),
+		Captcha:        captchaHandlers,
+		Notes:          notesHandlers,
+		Prefs:          prefsHandlers,
+		// One note every 2 seconds sustained, short bursts of 5, per user.
+		NotesRateLimiter: httpx.NewRateLimiter(0.5, 5),
+		Pepper:           cfg.IPHashPepper(),
 	})
 
 	// Run the server and wait for either a serve error or a shutdown signal.

@@ -237,3 +237,17 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 func WriteError(w http.ResponseWriter, status int, msg string) {
 	WriteJSON(w, status, map[string]string{"error": msg})
 }
+
+// DecodeJSON reads a size-limited JSON body into dst, writing a 400 and
+// returning false on failure. maxBytes <= 0 defaults to 1 MiB.
+func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64) bool {
+	if maxBytes <= 0 {
+		maxBytes = 1 << 20
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid JSON body")
+		return false
+	}
+	return true
+}

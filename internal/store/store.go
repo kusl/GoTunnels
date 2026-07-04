@@ -113,6 +113,48 @@ type CSPReportInput struct {
 	Raw                json.RawMessage
 }
 
+// CaptchaStats is a user's aggregate CAPTCHA game record. One row per user;
+// solves are folded in as batched deltas, never stored individually.
+type CaptchaStats struct {
+	UserID        string    `json:"user_id,omitempty"`
+	BestStreak    int64     `json:"best_streak"`
+	CurrentStreak int64     `json:"current_streak"`
+	TotalSolves   int64     `json:"total_solves"`
+	ManualSolves  int64     `json:"manual_solves"`
+	AutoSolves    int64     `json:"auto_solves"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// CaptchaSyncInput is one client-side batch of CAPTCHA progress. Deltas are
+// added to totals; streaks are point-in-time snapshots (best is merged with
+// GREATEST, current is last-write-wins).
+type CaptchaSyncInput struct {
+	ManualDelta   int64
+	AutoDelta     int64
+	CurrentStreak int64
+	BestStreak    int64
+}
+
+// CaptchaLeaderboardRow is one ranked leaderboard entry.
+type CaptchaLeaderboardRow struct {
+	Rank        int64  `json:"rank"`
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	BestStreak  int64  `json:"best_streak"`
+	TotalSolves int64  `json:"total_solves"`
+}
+
+// Note is one public microblog post.
+type Note struct {
+	ID          int64     `json:"id"`
+	UserID      string    `json:"user_id"`
+	Username    string    `json:"username"`
+	DisplayName string    `json:"display_name"`
+	Body        string    `json:"body"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 // ---------------------------------------------------------------------------
 // Users & roles
 // ---------------------------------------------------------------------------
@@ -556,6 +598,186 @@ func (s *Store) InsertCSPReport(ctx context.Context, in CSPReportInput) error {
 		in.OriginalPolicy, in.Disposition, in.SourceFile, in.LineNumber, in.ColumnNumber,
 		in.StatusCode, in.ScriptSample, in.IPHash, in.UserAgent, []byte(raw))
 	return err
+}
+
+// ---------------------------------------------------------------------------
+// CAPTCHA stats
+// ---------------------------------------------------------------------------
+
+// SyncCaptchaStats atomically folds one client batch into the user's aggregate
+// row, creating it on first sync. Totals accumulate; best_streak only ever
+// grows (GREATEST); current_streak is last-write-wins. The updated row is
+// returned so the client can reconcile its display with the server's truth.
+func (s *Store) SyncCaptchaStats(ctx context.Context, userID string, in CaptchaSyncInput) (CaptchaStats, error) {
+	st := CaptchaStats{UserID: userID}
+	err := s.pool.QueryRow(ctx, `
+		INSERT INTO captcha_stats
+			(user_id, best_streak, current_streak, total_solves, manual_solves, auto_solves, updated_at)
+		VALUES ($1::uuid, $2, $3, $4 + $5, $4, $5, now())
+		ON CONFLICT (user_id) DO UPDATE SET
+			best_streak    = GREATEST(captcha_stats.best_streak, EXCLUDED.best_streak),
+			current_streak = EXCLUDED.current_streak,
+			total_solves   = captcha_stats.total_solves + $4 + $5,
+			manual_solves  = captcha_stats.manual_solves + $4,
+			auto_solves    = captcha_stats.auto_solves + $5,
+			updated_at     = now()
+		RETURNING best_streak, current_streak, total_solves, manual_solves, auto_solves, updated_at`,
+		userID, in.BestStreak, in.CurrentStreak, in.ManualDelta, in.AutoDelta,
+	).Scan(&st.BestStreak, &st.CurrentStreak, &st.TotalSolves, &st.ManualSolves, &st.AutoSolves, &st.UpdatedAt)
+	return st, err
+}
+
+// GetCaptchaStats returns a user's aggregate row, or ErrNotFound if the user
+// has never synced.
+func (s *Store) GetCaptchaStats(ctx context.Context, userID string) (CaptchaStats, error) {
+	st := CaptchaStats{UserID: userID}
+	err := s.pool.QueryRow(ctx, `
+		SELECT best_streak, current_streak, total_solves, manual_solves, auto_solves, updated_at
+		FROM captcha_stats WHERE user_id = $1::uuid`, userID,
+	).Scan(&st.BestStreak, &st.CurrentStreak, &st.TotalSolves, &st.ManualSolves, &st.AutoSolves, &st.UpdatedAt)
+	return st, mapErr(err)
+}
+
+// DeleteCaptchaStats removes the user's aggregate row entirely (a true reset:
+// the user also disappears from the leaderboard until they play again).
+func (s *Store) DeleteCaptchaStats(ctx context.Context, userID string) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM captcha_stats WHERE user_id = $1::uuid`, userID)
+	return err
+}
+
+// captchaRankedCTE ranks every player once so the top-N query and the "where
+// am I" query cannot disagree on ordering. updated_at ASC breaks ties in
+// favour of whoever got there first.
+const captchaRankedCTE = `
+	SELECT user_id, best_streak, total_solves,
+	       RANK() OVER (ORDER BY best_streak DESC, total_solves DESC, updated_at ASC) AS rank
+	FROM captcha_stats`
+
+// CaptchaLeaderboard returns the top rows ordered by rank.
+func (s *Store) CaptchaLeaderboard(ctx context.Context, limit int) ([]CaptchaLeaderboardRow, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 10
+	}
+	rows, err := s.pool.Query(ctx, `
+		WITH ranked AS (`+captchaRankedCTE+`)
+		SELECT r.rank, r.user_id::text, u.username, u.display_name, r.best_streak, r.total_solves
+		FROM ranked r JOIN users u ON u.id = r.user_id
+		ORDER BY r.rank, u.username
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CaptchaLeaderboardRow
+	for rows.Next() {
+		var lr CaptchaLeaderboardRow
+		if err := rows.Scan(&lr.Rank, &lr.UserID, &lr.Username, &lr.DisplayName,
+			&lr.BestStreak, &lr.TotalSolves); err != nil {
+			return nil, err
+		}
+		out = append(out, lr)
+	}
+	return out, rows.Err()
+}
+
+// CaptchaRank returns the caller's own ranked row, or ErrNotFound if they have
+// never synced any stats.
+func (s *Store) CaptchaRank(ctx context.Context, userID string) (CaptchaLeaderboardRow, error) {
+	var lr CaptchaLeaderboardRow
+	err := s.pool.QueryRow(ctx, `
+		WITH ranked AS (`+captchaRankedCTE+`)
+		SELECT r.rank, r.user_id::text, u.username, u.display_name, r.best_streak, r.total_solves
+		FROM ranked r JOIN users u ON u.id = r.user_id
+		WHERE r.user_id = $1::uuid`, userID,
+	).Scan(&lr.Rank, &lr.UserID, &lr.Username, &lr.DisplayName, &lr.BestStreak, &lr.TotalSolves)
+	return lr, mapErr(err)
+}
+
+// ---------------------------------------------------------------------------
+// User preferences
+// ---------------------------------------------------------------------------
+
+// GetUserPref returns the stored value for a preference key, or ErrNotFound.
+func (s *Store) GetUserPref(ctx context.Context, userID, key string) (string, error) {
+	var v string
+	err := s.pool.QueryRow(ctx,
+		`SELECT value FROM user_prefs WHERE user_id = $1::uuid AND key = $2`,
+		userID, key).Scan(&v)
+	return v, mapErr(err)
+}
+
+// SetUserPref upserts a preference value.
+func (s *Store) SetUserPref(ctx context.Context, userID, key, value string) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO user_prefs (user_id, key, value, updated_at)
+		VALUES ($1::uuid, $2, $3, now())
+		ON CONFLICT (user_id, key)
+		DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+		userID, key, value)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// Notes (public microblog)
+// ---------------------------------------------------------------------------
+
+// CreateNote inserts a note and returns it with author info attached, so the
+// client can render the new card without a second round trip.
+func (s *Store) CreateNote(ctx context.Context, userID, body string) (Note, error) {
+	var n Note
+	err := s.pool.QueryRow(ctx, `
+		WITH inserted AS (
+			INSERT INTO notes (user_id, body)
+			VALUES ($1::uuid, $2)
+			RETURNING id, user_id, body, created_at
+		)
+		SELECT i.id, i.user_id::text, u.username, u.display_name, i.body, i.created_at
+		FROM inserted i JOIN users u ON u.id = i.user_id`,
+		userID, body,
+	).Scan(&n.ID, &n.UserID, &n.Username, &n.DisplayName, &n.Body, &n.CreatedAt)
+	return n, err
+}
+
+// ListNotes returns up to limit notes newest-first. When beforeID > 0 only
+// notes with id < beforeID are returned — a stable cursor for "load older"
+// pagination (ids are monotonic, so the cursor never shifts under the reader
+// the way OFFSET would when new notes arrive).
+func (s *Store) ListNotes(ctx context.Context, beforeID int64, limit int) ([]Note, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT n.id, n.user_id::text, u.username, u.display_name, n.body, n.created_at
+		FROM notes n JOIN users u ON u.id = n.user_id
+		WHERE ($1::bigint = 0 OR n.id < $1)
+		ORDER BY n.id DESC
+		LIMIT $2`, beforeID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Note
+	for rows.Next() {
+		var n Note
+		if err := rows.Scan(&n.ID, &n.UserID, &n.Username, &n.DisplayName, &n.Body, &n.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// DeleteNote hard-deletes a note if and only if it belongs to userID, and
+// reports whether a row was actually removed. Ownership is enforced inside
+// the single SQL statement, so there is no read-then-delete race and callers
+// cannot distinguish "not found" from "not yours" (no existence oracle).
+func (s *Store) DeleteNote(ctx context.Context, id int64, userID string) (bool, error) {
+	ct, err := s.pool.Exec(ctx,
+		`DELETE FROM notes WHERE id = $1 AND user_id = $2::uuid`, id, userID)
+	if err != nil {
+		return false, err
+	}
+	return ct.RowsAffected() > 0, nil
 }
 
 // ---------------------------------------------------------------------------

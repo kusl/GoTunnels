@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notes · GoTunnels</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="brand"><span class="dot"></span> GoTunnels</span>
+        <nav class="mainnav">
+          <a href="/">Home</a>
+          <a href="/notes" data-auth="in" class="hidden">Notes</a>
+          <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
+          <a href="/activity" data-auth="in" class="hidden">Activity</a>
+          <a href="/settings" data-auth="in" class="hidden">Settings</a>
+          <a href="/login" data-auth="out">Log in</a>
+          <a href="/signup" data-auth="out">Sign up</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <h1>Notes</h1>
+      <p class="lead">
+        A shared plain-text feed. Everyone signed in sees every note. No
+        images, no attachments, no clickable links — just text you can copy.
+        Notes can be deleted by their author, never edited.
+      </p>
+
+      <div id="msg" class="msg"></div>
+
+      <div class="card">
+        <label for="noteBody">Write a note</label>
+        <textarea id="noteBody" rows="3" maxlength="500"
+          placeholder="Up to 500 characters of plain text…"></textarea>
+        <div class="composer-foot">
+          <span id="charCount" class="hint">0 / 500</span>
+          <button type="button" id="postBtn" class="primary">Post</button>
+        </div>
+      </div>
+
+      <div class="feed-head">
+        <h2>Latest notes</h2>
+        <span id="feedStatus" class="status-pill" title="Auto-refresh status">live</span>
+      </div>
+
+      <button type="button" id="newPill" class="new-pill hidden">New notes ↑</button>
+
+      <div id="feed" class="feed" aria-live="polite"></div>
+
+      <div class="btn-row center">
+        <button type="button" id="loadOlder" class="ghost hidden">Load older notes</button>
+      </div>
+    </main>
+
+    <footer class="foot">
+      GoTunnels · built with LLM assistance (see the README)
+    </footer>
+
+    <dialog id="deleteDialog" class="confirm-dialog">
+      <form method="dialog">
+        <h2>Delete this note?</h2>
+        <p>The note is removed for everyone, permanently. Deleting cannot be undone, and notes cannot be edited — only deleted.</p>
+        <div class="dialog-actions">
+          <button type="submit" value="cancel" class="ghost" autofocus>Cancel</button>
+          <button type="submit" value="confirm" class="danger">Delete</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/js/page-notes.js"></script>
+  </body>
+</html>
