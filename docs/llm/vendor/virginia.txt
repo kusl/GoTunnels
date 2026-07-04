@@ -1,178 +1,4 @@
-kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh
-[gotunnels] using runtime: podman / compose: podman compose
-[gotunnels] using existing /home/kushal/src/golang/GoTunnels/.env
-[gotunnels] project (instance): gotunnels-ehiflq
-[gotunnels] building images…
->>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
-
-STEP 1/5: FROM docker.io/library/caddy:2-alpine
-[1/2] STEP 1/6: FROM golang:1.26-bookworm AS build
-STEP 2/5: COPY frontend/ /srv/
---> Using cache 8de81c4f823c69b139983dfef93489bd1d9e76c3c0bd71f2456c1fe0489bc6f7
---> 8de81c4f823c
-STEP 3/5: COPY frontend/Caddyfile /etc/caddy/Caddyfile
---> Using cache 1dcdf59f71ba7b2ce5081770fedc6ddd4da70570a6766ebbeeeedc6e70b7f509
---> 1dcdf59f71ba
-STEP 4/5: RUN rm -f /srv/Caddyfile
---> Using cache e170163757ffe0bd8d211ece66b0b9ff4f2423db1809d11d43375364333bc892
---> e170163757ff
-STEP 5/5: EXPOSE 8080
---> Using cache 1d92b326891da32bb747a4dd759c2d8fc6e4bc622f724fb076c00bc30f0cd0dd
-COMMIT gotunnels-ehiflq_frontend
---> 1d92b326891d
-Successfully tagged localhost/gotunnels-ehiflq_frontend:latest
-Successfully tagged localhost/gotunnels-66bdbw_frontend:latest
-Successfully tagged localhost/gotunnels-d5vnw_frontend:latest
-Successfully tagged localhost/gotunnels-ym1zdq_frontend:latest
-Successfully tagged localhost/gotunnels-dt6vjg_frontend:latest
-Successfully tagged localhost/gotunnels-qdiyew_frontend:latest
-Successfully tagged localhost/gotunnels-fifbya_frontend:latest
-Successfully tagged localhost/gotunnels-eclukq_frontend:latest
-1d92b326891da32bb747a4dd759c2d8fc6e4bc622f724fb076c00bc30f0cd0dd
-[1/2] STEP 2/6: WORKDIR /src
---> Using cache babdaca5bcc2fececbbc19b62b0bfc9eaedfc787aa587199af487dc7ea867421
---> babdaca5bcc2
-[1/2] STEP 3/6: ENV CGO_ENABLED=0     GOFLAGS=-mod=mod     GOTOOLCHAIN=local
---> Using cache 2048cbee3e7520d1cefe0c1d68b41d63b22a875582bb19fed499dd483de336d7
---> 2048cbee3e75
-[1/2] STEP 4/6: COPY . .
---> e4440f83eff4
-[1/2] STEP 5/6: ARG VERSION=dev
---> 870e70776495
-[1/2] STEP 6/6: RUN go mod tidy  && go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
-go: downloading github.com/jackc/pgx/v5 v5.10.0
-go: downloading github.com/go-webauthn/webauthn v0.11.2
-go: downloading go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
-go: downloading go.opentelemetry.io/contrib/bridges/otelslog v0.19.0
-go: downloading go.opentelemetry.io/otel v1.44.0
-go: downloading go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.20.0
-go: downloading go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.44.0
-go: downloading github.com/pquerna/otp v1.4.0
-go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.44.0
-go: downloading go.opentelemetry.io/otel/log v0.20.0
-go: downloading golang.org/x/crypto v0.53.0
-go: downloading go.opentelemetry.io/otel/sdk/log v0.20.0
-go: downloading go.opentelemetry.io/otel/sdk/metric v1.44.0
-go: downloading go.opentelemetry.io/otel/sdk v1.44.0
-go: downloading go.opentelemetry.io/otel/metric v1.44.0
-go: downloading go.opentelemetry.io/otel/trace v1.44.0
-go: downloading github.com/felixge/httpsnoop v1.0.4
-go: downloading github.com/stretchr/testify v1.11.1
-go: downloading github.com/jackc/puddle/v2 v2.2.2
-go: downloading golang.org/x/sys v0.46.0
-go: downloading github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc
-go: downloading github.com/go-logr/stdr v1.2.2
-go: downloading github.com/go-logr/logr v1.4.3
-go: downloading github.com/google/go-cmp v0.7.0
-go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0
-go: downloading google.golang.org/protobuf v1.36.11
-go: downloading go.opentelemetry.io/proto/otlp v1.10.0
-go: downloading github.com/google/uuid v1.6.0
-go: downloading go.uber.org/goleak v1.3.0
-go: downloading go.opentelemetry.io/otel/metric/x v0.66.0
-go: downloading github.com/jackc/pgpassfile v1.0.0
-go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
-go: downloading golang.org/x/text v0.38.0
-go: downloading go.opentelemetry.io/auto/sdk v1.2.1
-go: downloading google.golang.org/grpc v1.81.1
-go: downloading github.com/cenkalti/backoff/v5 v5.0.3
-go: downloading go.opentelemetry.io/otel/sdk/log/logtest v0.20.0
-go: downloading golang.org/x/sync v0.17.0
-go: downloading github.com/davecgh/go-spew v1.1.1
-go: downloading github.com/pmezard/go-difflib v1.0.0
-go: downloading github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
-go: downloading github.com/cespare/xxhash/v2 v2.3.0
-go: downloading github.com/go-webauthn/x v0.1.14
-go: downloading github.com/golang-jwt/jwt/v5 v5.2.2
-go: downloading github.com/mitchellh/mapstructure v1.5.0
-go: downloading github.com/google/go-tpm v0.9.1
-go: downloading gopkg.in/yaml.v3 v3.0.1
-go: downloading github.com/fxamacker/cbor/v2 v2.7.0
-go: downloading google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa
-go: downloading google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa
-go: downloading github.com/x448/float16 v0.8.4
-go: downloading golang.org/x/net v0.55.0
-go: downloading golang.org/x/sync v0.21.0
-go: downloading github.com/golang/protobuf v1.5.4
-go: downloading gonum.org/v1/gonum v0.17.0
---> 4b04b7467711
-[2/2] STEP 1/6: FROM gcr.io/distroless/static-debian12:nonroot
-[2/2] STEP 2/6: WORKDIR /
---> Using cache ea9af167ae5e058f672df8dadcc271a9bf0f3c9cde9671a600e8616c9b0b230b
---> ea9af167ae5e
-[2/2] STEP 3/6: COPY --from=build /out/api /api
---> Using cache 8a9f1e128ef6872a254a54e5f04402dcce3647879841cf2729bfe5d4160c831f
---> 8a9f1e128ef6
-[2/2] STEP 4/6: USER nonroot:nonroot
---> Using cache 633c109c36ef05d19fa7ed1c073822cb909a4a84055690d74249d0d360baed5b
---> 633c109c36ef
-[2/2] STEP 5/6: EXPOSE 8080
---> Using cache 0f87d03655e699e3a9ae0b4ee80d6799a5a1f336775af9542c3ff6ee15a4679c
---> 0f87d03655e6
-[2/2] STEP 6/6: ENTRYPOINT ["/api"]
---> Using cache 5c2fd56b4fade2cca3d1ea47b115832735edd6f028a65cbee2ffa844721fc752
-[2/2] COMMIT gotunnels-ehiflq_api
---> 5c2fd56b4fad
-Successfully tagged localhost/gotunnels-ehiflq_api:latest
-Successfully tagged localhost/gotunnels-66bdbw_api:latest
-Successfully tagged localhost/gotunnels-d5vnw_api:latest
-Successfully tagged localhost/gotunnels-ym1zdq_api:latest
-Successfully tagged localhost/gotunnels-dt6vjg_api:latest
-Successfully tagged localhost/gotunnels-qdiyew_api:latest
-Successfully tagged localhost/gotunnels-fifbya_api:latest
-Successfully tagged localhost/gotunnels-eclukq_api:latest
-5c2fd56b4fade2cca3d1ea47b115832735edd6f028a65cbee2ffa844721fc752
-[gotunnels] starting database…
->>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
-
-59458d4df7c77c5df764ee74e06c7c8e694eef02fc1eeb3001e3a1f787d4152e
-b28b20be2bb858782fc0b6c9d2118e9ee073f4202150a9631fc8013fb65270e6
-gotunnels-ehiflq_db_1
-[gotunnels] waiting for 'db' to become ready (up to 60s)
-[gotunnels] 'db' is ready
-[gotunnels] starting frontend and its tunnel…
->>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
-
-7be191d1ca2f4594d6518f4c6605616fc679782bc6bd079caca397745d3fbd68
-90a06a2bcb44b48d0e979b46ef4f029a5f0643a2521abc666a55a6640a8d47b7
-gotunnels-ehiflq_frontend_1
-gotunnels-ehiflq_cloudflared-frontend_1
-[gotunnels] waiting for the frontend Quick Tunnel URL…
-[gotunnels] frontend: https://sponsored-men-shakespeare-improved.trycloudflare.com
-[gotunnels] starting API and its tunnel…
->>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
-
-Error: no container with name or ID "gotunnels-ehiflq_cloudflared-api_1" found: no such container
-Error: no container with name or ID "gotunnels-ehiflq_api_1" found: no such container
-Error: no container with ID or name "gotunnels-ehiflq_cloudflared-api_1" found: no such container
-Error: no container with ID or name "gotunnels-ehiflq_api_1" found: no such container
-0caa9cf82c2723ffff181e44a10f4fbd00acd265cbfc55b65f656abf5c384279
-fa789b8a8a12e2345036c376ecbadd777eaff6e7029b010afa5b618043a686ee
-gotunnels-ehiflq_api_1
-gotunnels-ehiflq_cloudflared-api_1
-[gotunnels] waiting for the API Quick Tunnel URL…
-[gotunnels] api: https://cellular-differently-reduce-mortality.trycloudflare.com
-[gotunnels] wrote config.json into frontend container
-
-[gotunnels] GoTunnels is up.
-  Web app : https://sponsored-men-shakespeare-improved.trycloudflare.com
-  API     : https://cellular-differently-reduce-mortality.trycloudflare.com
-  Instance: gotunnels-ehiflq (urls saved to tunnel-urls.txt)
-
-[gotunnels] tear down with: scripts/down.sh gotunnels-ehiflq
-[gotunnels] waiting 60s for the Quick Tunnels to settle, then printing their URL log lines…
-
-[gotunnels] Web app — tunnel URL (from: podman logs cloudflared-frontend):
-2026-07-02T06:41:39Z INF |  https://sponsored-men-shakespeare-improved.trycloudflare.com                              |
-
-[gotunnels] API — tunnel URL (from: podman logs cloudflared-api):
-2026-07-02T06:41:43Z INF |  https://cellular-differently-reduce-mortality.trycloudflare.com                           |
-
-
-real	1m29.932s
-user	1m13.874s
-sys	0m21.645s
-kushal@fedora:~/src/golang/GoTunnels$ ssh virginia
+kushal@fedora:~/src/golang/GoTunnels$ ssh virginia 
 Linux virginia 6.12.94+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.94-1 (2026-06-20) x86_64
 
 The programs included with the Debian GNU/Linux system are free software;
@@ -181,255 +7,242 @@ individual files in /usr/share/doc/*/copyright.
 
 Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
 permitted by applicable law.
-Last login: Wed Jun 24 08:58:41 2026 from 192.168.0.73
-kushal@virginia:~$ cd ~/src/
-documentation/ dotnet/        mybash/        myhtml/        
-kushal@virginia:~$ cd ~/src/; mkdir -p ~/src/golang; time git clone git@github.com:kusl/GoTunnels.git
-Cloning into 'GoTunnels'...
-The authenticity of host 'github.com (140.82.114.3)' can't be established.
-ED25519 key fingerprint is SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU.
-This key is not known by any other names.
-Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
-Warning: Permanently added 'github.com' (ED25519) to the list of known hosts.
-git@github.com: Permission denied (publickey).
-fatal: Could not read from remote repository.
+Last login: Thu Jul  2 02:48:26 2026 from 100.105.139.82
+kushal@virginia:~$ cd ~/src/golang/GoTunnels/; time git status; time git fetch; time git status; time git remote show origin; time git pull; time git status; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh
+On branch main
+Your branch is up to date with 'origin/main'.
 
-Please make sure you have the correct access rights
-and the repository exists.
+nothing to commit, working tree clean
 
-real	0m3.163s
+real	0m0.044s
+user	0m0.021s
+sys	0m0.004s
+remote: Enumerating objects: 105, done.
+remote: Counting objects: 100% (105/105), done.
+remote: Compressing objects: 100% (43/43), done.
+remote: Total 96 (delta 61), reused 87 (delta 52), pack-reused 0 (from 0)
+Unpacking objects: 100% (96/96), 61.27 KiB | 429.00 KiB/s, done.
+From https://github.com/kusl/GoTunnels
+   31a2ec2..f0b88b9  main       -> origin/main
+
+real	0m0.502s
+user	0m0.213s
+sys	0m0.087s
+On branch main
+Your branch is behind 'origin/main' by 14 commits, and can be fast-forwarded.
+  (use "git pull" to update your local branch)
+
+nothing to commit, working tree clean
+
+real	0m0.006s
 user	0m0.001s
-sys	0m0.010s
-kushal@virginia:~/src$ cd ~/src/; mkdir -p ~/src/golang; time git clone https://github.com/kusl/GoTunnels/ --verbose;
-Cloning into 'GoTunnels'...
-POST git-upload-pack (175 bytes)
-POST git-upload-pack (202 bytes)
-remote: Enumerating objects: 390, done.
-remote: Counting objects: 100% (390/390), done.
-remote: Compressing objects: 100% (262/262), done.
-remote: Total 390 (delta 161), reused 341 (delta 112), pack-reused 0 (from 0)
-Receiving objects: 100% (390/390), 548.14 KiB | 6.85 MiB/s, done.
-Resolving deltas: 100% (161/161), done.
+sys	0m0.006s
+* remote origin
+  Fetch URL: https://github.com/kusl/GoTunnels/
+  Push  URL: https://github.com/kusl/GoTunnels/
+  HEAD branch: main
+  Remote branch:
+    main tracked
+  Local branch configured for 'git pull':
+    main merges with remote main
+  Local ref configured for 'git push':
+    main pushes to main (local out of date)
 
-real	0m0.567s
-user	0m0.261s
-sys	0m0.086s
-kushal@virginia:~/src$ rm GoTunnels
-rm: cannot remove 'GoTunnels': Is a directory
-kushal@virginia:~/src$ rm -r GoTunnels
-rm: remove write-protected regular file 'GoTunnels/.git/objects/pack/pack-9c788a49a7b6336bffe681813fefa863073628dd.rev'? y
-rm: remove write-protected regular file 'GoTunnels/.git/objects/pack/pack-9c788a49a7b6336bffe681813fefa863073628dd.pack'? y
-rm: remove write-protected regular file 'GoTunnels/.git/objects/pack/pack-9c788a49a7b6336bffe681813fefa863073628dd.idx'? y
-kushal@virginia:~/src$ cd ~/src/; mkdir -p ~/src/golang; cd ~/src/golang/; time git clone https://github.com/kusl/GoTunnels/ --verbose;
-Cloning into 'GoTunnels'...
-POST git-upload-pack (175 bytes)
-POST git-upload-pack (202 bytes)
-remote: Enumerating objects: 390, done.
-remote: Counting objects: 100% (390/390), done.
-remote: Compressing objects: 100% (262/262), done.
-remote: Total 390 (delta 161), reused 341 (delta 112), pack-reused 0 (from 0)
-Receiving objects: 100% (390/390), 548.14 KiB | 6.85 MiB/s, done.
-Resolving deltas: 100% (161/161), done.
+real	0m0.238s
+user	0m0.105s
+sys	0m0.033s
+Updating 31a2ec2..f0b88b9
+Fast-forward
+ docs/llm/dump.txt                       |  802 +++++++++++++++++++++++++++++++++++++++-
+ docs/llm/vendor/claude-conversations.md | 3257 ++++++++++++++++++++++++++++++++-----------------------------------------------------------------------------------------------------------------------------------
+ docs/llm/vendor/fedora-laptop.txt       |  784 +++++++++++++++++++++++++++++++++++++++
+ docs/llm/vendor/gemini-conversation.md  | 1012 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ docs/llm/vendor/output.txt              |  802 +++++++++++++++++++++++++++++++++++++++-
+ docs/llm/vendor/virginia.txt            |  436 ++++++++++++++++++++++
+ frontend/captcha.html                   |  674 ++++++++++++++++++++++++++++++++++
+ frontend/css/style.css                  |   75 ++++
+ 8 files changed, 5179 insertions(+), 2663 deletions(-)
+ create mode 100644 docs/llm/vendor/fedora-laptop.txt
+ create mode 100644 docs/llm/vendor/gemini-conversation.md
+ create mode 100644 docs/llm/vendor/virginia.txt
+ create mode 100644 frontend/captcha.html
 
-real	0m0.596s
-user	0m0.256s
-sys	0m0.089s
-kushal@virginia:~/src/golang$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh
+real	0m0.308s
+user	0m0.127s
+sys	0m0.068s
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.014s
+user	0m0.007s
+sys	0m0.007s
 [gotunnels] using runtime: podman / compose: podman compose
-[gotunnels] generating fresh .env with per-instance secrets
-[gotunnels] wrote /home/kushal/src/golang/GoTunnels/.env (gitignored)
-[gotunnels] project (instance): gotunnels-xnnkzq
+[gotunnels] using existing /home/kushal/src/golang/GoTunnels/.env
+[gotunnels] project (instance): gotunnels-ekhmuw
 [gotunnels] building images…
 >>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
 
 STEP 1/5: FROM docker.io/library/caddy:2-alpine
 [1/2] STEP 1/6: FROM golang:1.26-bookworm AS build
-Trying to pull docker.io/library/caddy:2-alpine...
-Resolved "golang" as an alias (/etc/containers/registries.conf.d/shortnames.conf)
-Trying to pull docker.io/library/golang:1.26-bookworm...
-Getting image source signatures
-Getting image source signatures
-Copying blob 4f4fb700ef54 skipped: already exists  
-Copying blob e6f31ffc071e [=====>--------------------------------] 607.4KiB / 3.7MiB | 10.7 MiB/s
-Copying blob f8432a27d075 [--------------------------------------] 0.0b / 2.6MiB
-Copying blob f8432a27d075 [--------------------------------------] 0.0b / 2.6MiB | 0.0 b/s
-Copying blob ee31d5a470f0 [--------------------------------------] 0.0b / 7.3KiB
-Copying blob 425befdf76e5 done   | 
-Copying blob 1aef77c7da04 done   | 
-Copying blob 425befdf76e5 done   | 
-Copying blob 1aef77c7da04 done   | 
-Copying blob 71699a82d1a0 done   | 
-Copying blob 791c68bc2063 done   | 
-Copying blob f4fd7bf6f603 done   | 
-Copying blob 67aaa626ba30 done   | 
-Copying blob 4f4fb700ef54 skipped: already exists  
-Copying config 9d9d715d68 done   | 
-Copying config 9d9d715d68 done   | 
-Writing manifest to image destination
+STEP 2/5: COPY frontend/ /srv/
 [1/2] STEP 2/6: WORKDIR /src
+--> Using cache c77a0847544509352d297c3b1c7ae4a6f9024d85b23fb53880b21d6098578032
 --> c77a08475445
 [1/2] STEP 3/6: ENV CGO_ENABLED=0     GOFLAGS=-mod=mod     GOTOOLCHAIN=local
+--> Using cache dad0f6c1c3f37fa3d3e9ec18f3e246de00056ac4632379f00aa1a7b59b0fea1c
 --> dad0f6c1c3f3
---> 3fd701c9d7a2
-STEP 3/5: COPY frontend/Caddyfile /etc/caddy/Caddyfile
 [1/2] STEP 4/6: COPY . .
---> 986fdbc0db8c
-STEP 4/5: RUN rm -f /srv/Caddyfile
---> 426f486d8fa5
+--> d39ea1422082
+STEP 3/5: COPY frontend/Caddyfile /etc/caddy/Caddyfile
+--> 258a20998240
 [1/2] STEP 5/6: ARG VERSION=dev
---> 11ece6022c2e
+--> c79721a6344d
+--> b830d19d8790
+STEP 4/5: RUN rm -f /srv/Caddyfile
 [1/2] STEP 6/6: RUN go mod tidy  && go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
-go: downloading github.com/jackc/pgx/v5 v5.10.0
-go: downloading go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
-go: downloading github.com/go-webauthn/webauthn v0.11.2
-go: downloading github.com/pquerna/otp v1.4.0
-go: downloading golang.org/x/crypto v0.53.0
 go: downloading go.opentelemetry.io/contrib/bridges/otelslog v0.19.0
 go: downloading go.opentelemetry.io/otel v1.44.0
 go: downloading go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.20.0
+go: downloading github.com/go-webauthn/webauthn v0.11.2
+go: downloading go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
+go: downloading github.com/jackc/pgx/v5 v5.10.0
 go: downloading go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.44.0
+go: downloading github.com/pquerna/otp v1.4.0
 go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.44.0
---> 352a5984ebaf
+--> e28d27c40c12
 STEP 5/5: EXPOSE 8080
-COMMIT gotunnels-xnnkzq_frontend
---> ba36bebfb9c4
-Successfully tagged localhost/gotunnels-xnnkzq_frontend:latest
-ba36bebfb9c431dcd35ac2d4c8db2b8deb778744d55b1651294a44d3c4557b76
 go: downloading go.opentelemetry.io/otel/log v0.20.0
+COMMIT gotunnels-ekhmuw_frontend
+--> 987980ed6a9a
+Successfully tagged localhost/gotunnels-ekhmuw_frontend:latest
+987980ed6a9ab240bb6f691b69f7f2175ffaec2fdc71eb512a20a75a591cbc79
+go: downloading golang.org/x/crypto v0.53.0
 go: downloading go.opentelemetry.io/otel/sdk/log v0.20.0
 go: downloading go.opentelemetry.io/otel/sdk/metric v1.44.0
 go: downloading go.opentelemetry.io/otel/sdk v1.44.0
-go: downloading github.com/jackc/puddle/v2 v2.2.2
-go: downloading github.com/stretchr/testify v1.11.1
-go: downloading github.com/felixge/httpsnoop v1.0.4
 go: downloading go.opentelemetry.io/otel/metric v1.44.0
 go: downloading go.opentelemetry.io/otel/trace v1.44.0
-go: downloading github.com/google/uuid v1.6.0
+go: downloading github.com/stretchr/testify v1.11.1
 go: downloading github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc
+go: downloading github.com/google/uuid v1.6.0
+go: downloading github.com/felixge/httpsnoop v1.0.4
+go: downloading github.com/jackc/puddle/v2 v2.2.2
 go: downloading golang.org/x/sys v0.46.0
-go: downloading github.com/jackc/pgpassfile v1.0.0
-go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
-go: downloading golang.org/x/text v0.38.0
-go: downloading github.com/davecgh/go-spew v1.1.1
-go: downloading golang.org/x/sync v0.17.0
-go: downloading github.com/pmezard/go-difflib v1.0.0
 go: downloading github.com/go-logr/logr v1.4.3
 go: downloading github.com/go-logr/stdr v1.2.2
+go: downloading github.com/google/go-cmp v0.7.0
 go: downloading go.opentelemetry.io/proto/otlp v1.10.0
 go: downloading google.golang.org/protobuf v1.36.11
-go: downloading github.com/google/go-cmp v0.7.0
 go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0
+go: downloading go.uber.org/goleak v1.3.0
+go: downloading go.opentelemetry.io/otel/metric/x v0.66.0
 go: downloading github.com/go-webauthn/x v0.1.14
 go: downloading github.com/golang-jwt/jwt/v5 v5.2.2
 go: downloading github.com/mitchellh/mapstructure v1.5.0
 go: downloading github.com/google/go-tpm v0.9.1
-go: downloading go.uber.org/goleak v1.3.0
-go: downloading go.opentelemetry.io/otel/metric/x v0.66.0
-go: downloading gopkg.in/yaml.v3 v3.0.1
+go: downloading github.com/jackc/pgpassfile v1.0.0
+go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
+go: downloading golang.org/x/text v0.38.0
 go: downloading go.opentelemetry.io/auto/sdk v1.2.1
-go: downloading github.com/cenkalti/backoff/v5 v5.0.3
-go: downloading go.opentelemetry.io/otel/sdk/log/logtest v0.20.0
 go: downloading google.golang.org/grpc v1.81.1
+go: downloading github.com/cenkalti/backoff/v5 v5.0.3
+go: downloading golang.org/x/sync v0.17.0
 go: downloading github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
-go: downloading github.com/fxamacker/cbor/v2 v2.7.0
+go: downloading go.opentelemetry.io/otel/sdk/log/logtest v0.20.0
+go: downloading github.com/davecgh/go-spew v1.1.1
+go: downloading github.com/pmezard/go-difflib v1.0.0
 go: downloading github.com/cespare/xxhash/v2 v2.3.0
+go: downloading github.com/fxamacker/cbor/v2 v2.7.0
 go: downloading google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa
 go: downloading google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa
+go: downloading gopkg.in/yaml.v3 v3.0.1
 go: downloading github.com/x448/float16 v0.8.4
 go: downloading golang.org/x/net v0.55.0
 go: downloading golang.org/x/sync v0.21.0
 go: downloading github.com/golang/protobuf v1.5.4
 go: downloading gonum.org/v1/gonum v0.17.0
---> 72b6a223f7af
+--> 458164f0d412
 [2/2] STEP 1/6: FROM gcr.io/distroless/static-debian12:nonroot
-Trying to pull gcr.io/distroless/static-debian12:nonroot...
-Getting image source signatures
-Copying blob 7c12895b777b skipped: already exists  
-Copying blob 875ea9878944 done   | 
-Copying blob 39dc083afc39 done   | 
-Copying blob 990a9c434e5e done   | 
-Copying blob bf7a4185f015 done   | 
-Copying blob 2780920e5dbf skipped: already exists  
-Copying blob 3214acf345c0 skipped: already exists  
-Copying blob 52630fc75a18 skipped: already exists  
-Copying blob dd64bf2dd177 skipped: already exists  
-Copying blob b839dfae01f6 skipped: already exists  
-Copying blob dcaa5a89b0cc done   | 
-Copying blob 069d1e267530 done   | 
-Copying config 8457fe6a81 done   | 
-Writing manifest to image destination
 [2/2] STEP 2/6: WORKDIR /
+--> Using cache e14ab4df47cf49d299ef67fca396aff23ad8f94f577a9affba7a1f3e454ca183
 --> e14ab4df47cf
 [2/2] STEP 3/6: COPY --from=build /out/api /api
+--> Using cache 85cda9251643cf0d8031ef184dba2d349d87f4b7c8c9f5e670c94cc57f74d77b
 --> 85cda9251643
 [2/2] STEP 4/6: USER nonroot:nonroot
+--> Using cache 4b567c1db908010dfc99dbf6042bdff05e1e762260a8ee1a2554ca183f5c7fd9
 --> 4b567c1db908
 [2/2] STEP 5/6: EXPOSE 8080
+--> Using cache 4b444827bd8013cc7b0441ddce19a3b95cda182e23d6cf6f242de9d2b34265b1
 --> 4b444827bd80
 [2/2] STEP 6/6: ENTRYPOINT ["/api"]
-[2/2] COMMIT gotunnels-xnnkzq_api
+--> Using cache 5dc262c090277cf2efe675a3a7ad5a68e7303e40368fe46b21d4bb3efa253bc6
+[2/2] COMMIT gotunnels-ekhmuw_api
 --> 5dc262c09027
+Successfully tagged localhost/gotunnels-ekhmuw_api:latest
 Successfully tagged localhost/gotunnels-xnnkzq_api:latest
 5dc262c090277cf2efe675a3a7ad5a68e7303e40368fe46b21d4bb3efa253bc6
 [gotunnels] starting database…
 >>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
 
-1759000f82f4ba3935717cd359f909dca779658ea04c88b8a2af43c46f52f034
-481c9db83f9bb9c03865cf6ca86be7a6b2d4293489c7a3d3f1ca23cb62130c08
-gotunnels-xnnkzq_db_1
+c09416031fc8904953778867d73f83de2d0e8d4d299c9025c896b6b92355e37e
+c873adafef59cc7aaca0903592cfda83b6ab4973395c25c6540f10ad452463b9
+gotunnels-ekhmuw_db_1
 [gotunnels] waiting for 'db' to become ready (up to 60s)
-[gotunnels] 'db' is ready
+[gotunnels] 'db' is healthy
 [gotunnels] starting frontend and its tunnel…
 >>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
 
-Error: creating container storage: the container name "gotunnels-xnnkzq_db_1" is already in use by 481c9db83f9bb9c03865cf6ca86be7a6b2d4293489c7a3d3f1ca23cb62130c08. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
-gotunnels-xnnkzq_db_1
-74e8953ffd0c9bf9c0c619427da9d4e050b7d5d75a1ef318c55b245a76583003
-gotunnels-xnnkzq_api_1
-d1da04bc2805a4c87e65adf5de9649b0d0f9ed678dd7406ca71378560204d221
-gotunnels-xnnkzq_frontend_1
-75e847a0bbef576de91a2321ae19eea238d615eaa0b0b1aa05e76d69db76081a
-gotunnels-xnnkzq_cloudflared-frontend_1
+Error: creating container storage: the container name "gotunnels-ekhmuw_db_1" is already in use by c873adafef59cc7aaca0903592cfda83b6ab4973395c25c6540f10ad452463b9. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+gotunnels-ekhmuw_db_1
+6e4b6225aa23a9717a63b1667b2d2d022188b194eff303adf91a89af69e2ebde
+gotunnels-ekhmuw_api_1
+995ee512e7c4f1986324b4051c4a2b9d81f0849888c6fc4511dbcb324d253dcc
+gotunnels-ekhmuw_frontend_1
+aac90146b544cfa53feaf55b5923dee00d7ad47ff0c5b979acb2d9a3dce25c15
+gotunnels-ekhmuw_cloudflared-frontend_1
 [gotunnels] waiting for the frontend Quick Tunnel URL…
-[gotunnels] frontend: https://silent-harder-his-commitment.trycloudflare.com
+[gotunnels] frontend: https://aus-images-lip-font.trycloudflare.com
 [gotunnels] starting API and its tunnel…
 >>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
 
-Error: no container with name or ID "gotunnels-xnnkzq_cloudflared-api_1" found: no such container
-gotunnels-xnnkzq_db_1
-gotunnels-xnnkzq_api_1
-Error: no container with ID or name "gotunnels-xnnkzq_cloudflared-api_1" found: no such container
-Error: container 74e8953ffd0c9bf9c0c619427da9d4e050b7d5d75a1ef318c55b245a76583003 has dependent containers which must be removed before it: d1da04bc2805a4c87e65adf5de9649b0d0f9ed678dd7406ca71378560204d221, 75e847a0bbef576de91a2321ae19eea238d615eaa0b0b1aa05e76d69db76081a: container already exists
-Error: container 481c9db83f9bb9c03865cf6ca86be7a6b2d4293489c7a3d3f1ca23cb62130c08 has dependent containers which must be removed before it: 74e8953ffd0c9bf9c0c619427da9d4e050b7d5d75a1ef318c55b245a76583003, d1da04bc2805a4c87e65adf5de9649b0d0f9ed678dd7406ca71378560204d221, 75e847a0bbef576de91a2321ae19eea238d615eaa0b0b1aa05e76d69db76081a: container already exists
-Error: creating container storage: the container name "gotunnels-xnnkzq_db_1" is already in use by 481c9db83f9bb9c03865cf6ca86be7a6b2d4293489c7a3d3f1ca23cb62130c08. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
-gotunnels-xnnkzq_db_1
-Error: creating container storage: the container name "gotunnels-xnnkzq_api_1" is already in use by 74e8953ffd0c9bf9c0c619427da9d4e050b7d5d75a1ef318c55b245a76583003. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
-gotunnels-xnnkzq_api_1
-69d2e892137ee3facbd6225d5de5a5b006244b649b40f86fa4b0a6de8bf50e9e
-gotunnels-xnnkzq_cloudflared-api_1
+Error: no container with name or ID "gotunnels-ekhmuw_cloudflared-api_1" found: no such container
+gotunnels-ekhmuw_db_1
+gotunnels-ekhmuw_api_1
+Error: no container with ID or name "gotunnels-ekhmuw_cloudflared-api_1" found: no such container
+Error: container 6e4b6225aa23a9717a63b1667b2d2d022188b194eff303adf91a89af69e2ebde has dependent containers which must be removed before it: 995ee512e7c4f1986324b4051c4a2b9d81f0849888c6fc4511dbcb324d253dcc, aac90146b544cfa53feaf55b5923dee00d7ad47ff0c5b979acb2d9a3dce25c15: container already exists
+Error: container c873adafef59cc7aaca0903592cfda83b6ab4973395c25c6540f10ad452463b9 has dependent containers which must be removed before it: 6e4b6225aa23a9717a63b1667b2d2d022188b194eff303adf91a89af69e2ebde, 995ee512e7c4f1986324b4051c4a2b9d81f0849888c6fc4511dbcb324d253dcc, aac90146b544cfa53feaf55b5923dee00d7ad47ff0c5b979acb2d9a3dce25c15: container already exists
+Error: creating container storage: the container name "gotunnels-ekhmuw_db_1" is already in use by c873adafef59cc7aaca0903592cfda83b6ab4973395c25c6540f10ad452463b9. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+gotunnels-ekhmuw_db_1
+Error: creating container storage: the container name "gotunnels-ekhmuw_api_1" is already in use by 6e4b6225aa23a9717a63b1667b2d2d022188b194eff303adf91a89af69e2ebde. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+gotunnels-ekhmuw_api_1
+c79d03649ae29d384766bb6fdb368bb5b3908fe82605ece40ae15e6469b4499d
+gotunnels-ekhmuw_cloudflared-api_1
 [gotunnels] did not observe API listening log yet
 [gotunnels] waiting for the API Quick Tunnel URL…
-[gotunnels] api: https://mail-rome-icons-finite.trycloudflare.com
+[gotunnels] api: https://shuttle-sur-php-sight.trycloudflare.com
 [gotunnels] wrote config.json into frontend container
 
 [gotunnels] GoTunnels is up.
-  Web app : https://silent-harder-his-commitment.trycloudflare.com
-  API     : https://mail-rome-icons-finite.trycloudflare.com
-  Instance: gotunnels-xnnkzq (urls saved to tunnel-urls.txt)
+  Web app : https://aus-images-lip-font.trycloudflare.com
+  API     : https://shuttle-sur-php-sight.trycloudflare.com
+  Instance: gotunnels-ekhmuw (urls saved to tunnel-urls.txt)
 
-[gotunnels] tear down with: scripts/down.sh gotunnels-xnnkzq
+[gotunnels] tear down with: scripts/down.sh gotunnels-ekhmuw
 [gotunnels] waiting 60s for the Quick Tunnels to settle, then printing their URL log lines…
 
 [gotunnels] Web app — tunnel URL (from: podman logs cloudflared-frontend):
-2026-07-02T06:53:28Z INF |  https://silent-harder-his-commitment.trycloudflare.com                                    |
+2026-07-04T21:55:29Z INF |  https://aus-images-lip-font.trycloudflare.com                                             |
 
 [gotunnels] API — tunnel URL (from: podman logs cloudflared-api):
-2026-07-02T06:53:38Z INF |  https://mail-rome-icons-finite.trycloudflare.com                                          |
+2026-07-04T21:55:37Z INF |  https://shuttle-sur-php-sight.trycloudflare.com                                           |
 
 
-real	4m0.380s
-user	5m10.849s
-sys	0m48.418s
+real	3m40.678s
+user	4m13.858s
+sys	0m40.436s
 kushal@virginia:~/src/golang/GoTunnels$ exit
 logout
 Connection to virginia closed.
