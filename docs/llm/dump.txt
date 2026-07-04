@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-04T08:24:43-04:00
+  Generated at   : 2026-07-04T08:57:52-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : a54e47d9da1491041e259e6cdc348d185fec584f
-  Commit (short) : a54e47d
-  Commit date    : 2026-07-02 03:04:17 -0400
-  Commit message : update virginia text file
+  Commit (full)  : 909436b127618a9d1a50d3973f680d07b3eec6da
+  Commit (short) : 909436b
+  Commit date    : 2026-07-04 08:49:17 -0400
+  Commit message : add gemini response
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 77
   Excluded path  : docs/llm/
@@ -28,7 +28,9 @@ REPOSITORY METADATA
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
+ M docs/llm/vendor/fedora-laptop.txt
  M docs/llm/vendor/output.txt
+ M frontend/css/style.css
 
 ################################################################################
 # FILE: export.sh  [THIS SCRIPT — included for full context]
@@ -1871,14 +1873,14 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   File name:             style.css
   Relative path:         frontend/css/style.css
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/css/style.css
-  Size:                  6.2 KiB (6427 bytes)
-  Last modified:         2026-07-01 09:28:59.000000000 -0400
+  Size:                  7.9 KiB (8099 bytes)
+  Last modified:         2026-07-04 08:50:33.516227811 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805944
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               7c3b3a59bda2536c5a406c30846a196c73e0c27e72e51714f873357fd53df922
+  SHA-256:               3cd5466dd46a2ac5d08936b1fd0b95bba366cbbf863b0f3c5d17980afb8003f9
   Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
 
 --- CONTENT ---
@@ -2083,6 +2085,81 @@ pre.codes {
 .qr { background: #fff; padding: 12px; border-radius: 8px; display: inline-block; margin-top: 8px; }
 .qr img { display: block; width: 180px; height: 180px; }
 .status-pill { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+
+/* ---- Mobile Responsiveness ---- */
+@media (max-width: 650px) {
+  /* Fix the navigation bar */
+  .topbar-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  nav.mainnav {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Transform the table into cards */
+  table, thead, tbody, th, td, tr {
+    display: block;
+  }
+
+  /* Visually hide the header, but keep it accessible for screen readers */
+  thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  /* Style the row as a card */
+  tr {
+    border-bottom: 2px solid var(--border-bright);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+  }
+
+  /* Style the cells as key-value pairs */
+  td {
+    border: none;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    padding-left: 110px;
+    text-align: right;
+    min-height: 38px; /* Ensures consistent height */
+  }
+
+  td:last-child {
+    border-bottom: 0;
+  }
+
+  /* Inject the column headers as labels */
+  td::before {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 90px;
+    padding-right: 10px;
+    white-space: nowrap;
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-faint);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  td:nth-of-type(1)::before { content: "When"; }
+  td:nth-of-type(2)::before { content: "Event"; }
+  td:nth-of-type(3)::before { content: "Method"; }
+  td:nth-of-type(4)::before { content: "Outcome"; }
+  td:nth-of-type(5)::before { content: "IP hash"; }
+
+  /* Allow the hash to take up the remaining space naturally */
+  td.hash {
+    max-width: none; 
+  }
+}
 
 
 ################################################################################
@@ -10109,9 +10186,9 @@ done
 # DUMP SUMMARY
 ################################################################################
   Files dumped   : 77
-  Total size     : 288.8 KiB (295813 bytes)
+  Total size     : 290.5 KiB (297485 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-04T08:24:46-04:00
+  Completed at   : 2026-07-04T08:57:55-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
