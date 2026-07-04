@@ -11,6 +11,7 @@ also we need to have a leaderboard, but only for people who are signed in
 on the same page, collapsed by default 
 but we should remember the user setting 
 if they expand it / collapse it again
+this captcha page will only be available to people who are logged in
 
 also the index.html is a little strange
 it says 
@@ -34,6 +35,7 @@ this page should also be responsive and mobile friendly
 see what I changed with the /activity page for inspiration (basically cards)
 also this page should somehow autorefresh 
 and this might be the most difficult part of the whole operation
+this feed is only available to people who are logged in
 
 please document all architectural decisions 
 and please update all readme as necessary as we continue to improve this application 
