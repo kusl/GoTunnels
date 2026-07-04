@@ -438,4 +438,170 @@ kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE
 real	0m2.436s
 user	0m1.234s
 sys	0m1.411s
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh
+[gotunnels] using runtime: podman / compose: podman compose
+[gotunnels] using existing /home/kushal/src/golang/GoTunnels/.env
+[gotunnels] project (instance): gotunnels-5v7hkw
+[gotunnels] building images…
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+[1/2] STEP 1/6: FROM golang:1.26-bookworm AS build
+STEP 1/5: FROM docker.io/library/caddy:2-alpine
+STEP 2/5: COPY frontend/ /srv/
+--> 2e255007ba82
+STEP 3/5: COPY frontend/Caddyfile /etc/caddy/Caddyfile
+--> 5aa6d198d63f
+STEP 4/5: RUN rm -f /srv/Caddyfile
+[1/2] STEP 2/6: WORKDIR /src
+--> Using cache babdaca5bcc2fececbbc19b62b0bfc9eaedfc787aa587199af487dc7ea867421
+--> babdaca5bcc2
+[1/2] STEP 3/6: ENV CGO_ENABLED=0     GOFLAGS=-mod=mod     GOTOOLCHAIN=local
+--> Using cache 2048cbee3e7520d1cefe0c1d68b41d63b22a875582bb19fed499dd483de336d7
+--> 2048cbee3e75
+[1/2] STEP 4/6: COPY . .
+--> 179dc160cd2e
+STEP 5/5: EXPOSE 8080
+COMMIT gotunnels-5v7hkw_frontend
+--> 549c8b76bbb3
+Successfully tagged localhost/gotunnels-5v7hkw_frontend:latest
+--> 7d57613da2f6
+549c8b76bbb3482e221602cece307ab8ebbcffd78a869f0edd2ce734fd268feb
+[1/2] STEP 5/6: ARG VERSION=dev
+--> 7a6c85918c70
+[1/2] STEP 6/6: RUN go mod tidy  && go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+go: downloading github.com/jackc/pgx/v5 v5.10.0
+go: downloading github.com/go-webauthn/webauthn v0.11.2
+go: downloading github.com/pquerna/otp v1.4.0
+go: downloading go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
+go: downloading golang.org/x/crypto v0.53.0
+go: downloading go.opentelemetry.io/contrib/bridges/otelslog v0.19.0
+go: downloading go.opentelemetry.io/otel v1.44.0
+go: downloading go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.20.0
+go: downloading go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.44.0
+go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.44.0
+go: downloading go.opentelemetry.io/otel/log v0.20.0
+go: downloading go.opentelemetry.io/otel/sdk/log v0.20.0
+go: downloading go.opentelemetry.io/otel/sdk/metric v1.44.0
+go: downloading go.opentelemetry.io/otel/sdk v1.44.0
+go: downloading go.opentelemetry.io/otel/metric v1.44.0
+go: downloading go.opentelemetry.io/otel/trace v1.44.0
+go: downloading github.com/felixge/httpsnoop v1.0.4
+go: downloading github.com/stretchr/testify v1.11.1
+go: downloading github.com/jackc/puddle/v2 v2.2.2
+go: downloading golang.org/x/sys v0.46.0
+go: downloading github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc
+go: downloading github.com/google/uuid v1.6.0
+go: downloading github.com/google/go-cmp v0.7.0
+go: downloading github.com/go-logr/logr v1.4.3
+go: downloading github.com/go-logr/stdr v1.2.2
+go: downloading github.com/jackc/pgpassfile v1.0.0
+go: downloading go.opentelemetry.io/otel/metric/x v0.66.0
+go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
+go: downloading golang.org/x/text v0.38.0
+go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0
+go: downloading go.opentelemetry.io/proto/otlp v1.10.0
+go: downloading google.golang.org/protobuf v1.36.11
+go: downloading go.uber.org/goleak v1.3.0
+go: downloading github.com/go-webauthn/x v0.1.14
+go: downloading github.com/mitchellh/mapstructure v1.5.0
+go: downloading github.com/golang-jwt/jwt/v5 v5.2.2
+go: downloading github.com/google/go-tpm v0.9.1
+go: downloading go.opentelemetry.io/auto/sdk v1.2.1
+go: downloading github.com/cespare/xxhash/v2 v2.3.0
+go: downloading google.golang.org/grpc v1.81.1
+go: downloading golang.org/x/sync v0.17.0
+go: downloading github.com/cenkalti/backoff/v5 v5.0.3
+go: downloading go.opentelemetry.io/otel/sdk/log/logtest v0.20.0
+go: downloading github.com/davecgh/go-spew v1.1.1
+go: downloading github.com/pmezard/go-difflib v1.0.0
+go: downloading github.com/fxamacker/cbor/v2 v2.7.0
+go: downloading github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
+go: downloading gopkg.in/yaml.v3 v3.0.1
+go: downloading github.com/x448/float16 v0.8.4
+go: downloading google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa
+go: downloading google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa
+go: downloading golang.org/x/net v0.55.0
+go: downloading golang.org/x/sync v0.21.0
+go: downloading github.com/golang/protobuf v1.5.4
+go: downloading gonum.org/v1/gonum v0.17.0
+--> 05b84551a3e4
+[2/2] STEP 1/6: FROM gcr.io/distroless/static-debian12:nonroot
+[2/2] STEP 2/6: WORKDIR /
+--> Using cache ea9af167ae5e058f672df8dadcc271a9bf0f3c9cde9671a600e8616c9b0b230b
+--> ea9af167ae5e
+[2/2] STEP 3/6: COPY --from=build /out/api /api
+--> Using cache 8a9f1e128ef6872a254a54e5f04402dcce3647879841cf2729bfe5d4160c831f
+--> 8a9f1e128ef6
+[2/2] STEP 4/6: USER nonroot:nonroot
+--> Using cache 633c109c36ef05d19fa7ed1c073822cb909a4a84055690d74249d0d360baed5b
+--> 633c109c36ef
+[2/2] STEP 5/6: EXPOSE 8080
+--> Using cache 0f87d03655e699e3a9ae0b4ee80d6799a5a1f336775af9542c3ff6ee15a4679c
+--> 0f87d03655e6
+[2/2] STEP 6/6: ENTRYPOINT ["/api"]
+--> Using cache 5c2fd56b4fade2cca3d1ea47b115832735edd6f028a65cbee2ffa844721fc752
+[2/2] COMMIT gotunnels-5v7hkw_api
+--> 5c2fd56b4fad
+Successfully tagged localhost/gotunnels-5v7hkw_api:latest
+Successfully tagged localhost/gotunnels-rctxna_api:latest
+Successfully tagged localhost/gotunnels-ftxxeg_api:latest
+Successfully tagged localhost/gotunnels-ehiflq_api:latest
+Successfully tagged localhost/gotunnels-66bdbw_api:latest
+Successfully tagged localhost/gotunnels-d5vnw_api:latest
+Successfully tagged localhost/gotunnels-ym1zdq_api:latest
+Successfully tagged localhost/gotunnels-dt6vjg_api:latest
+Successfully tagged localhost/gotunnels-qdiyew_api:latest
+Successfully tagged localhost/gotunnels-fifbya_api:latest
+Successfully tagged localhost/gotunnels-eclukq_api:latest
+5c2fd56b4fade2cca3d1ea47b115832735edd6f028a65cbee2ffa844721fc752
+[gotunnels] starting database…
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+21c0e54120ec0a982bb9a10a648a23e13ff6e844ca31baa7056d0f3ba84efd89
+667832914eaf58dffd55419517db87f1aabdef6b0efe8ae91fb31ef8fcad315a
+gotunnels-5v7hkw_db_1
+[gotunnels] waiting for 'db' to become ready (up to 60s)
+[gotunnels] 'db' is ready
+[gotunnels] starting frontend and its tunnel…
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+d97dada9fbb4e21f7bd15cbeafeef294e803519f686577476d9a027714e97269
+a368b3bc76f212cfc4273b23520488b83d0c57e7f3fd710850171bc003132bd7
+gotunnels-5v7hkw_frontend_1
+gotunnels-5v7hkw_cloudflared-frontend_1
+[gotunnels] waiting for the frontend Quick Tunnel URL…
+[gotunnels] frontend: https://dietary-coalition-athletic-defines.trycloudflare.com
+[gotunnels] starting API and its tunnel…
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+Error: no container with name or ID "gotunnels-5v7hkw_api_1" found: no such container
+Error: no container with name or ID "gotunnels-5v7hkw_cloudflared-api_1" found: no such container
+Error: no container with ID or name "gotunnels-5v7hkw_cloudflared-api_1" found: no such container
+Error: no container with ID or name "gotunnels-5v7hkw_api_1" found: no such container
+5fb184274fb434610fbf973ada7f1c88678e7281c481ce2b9e932c9d80b48a37
+4ab9bad7f798bc8f4af203e2fbbf3c697c09f79cec53848d36687365cff4b6d9
+gotunnels-5v7hkw_api_1
+gotunnels-5v7hkw_cloudflared-api_1
+[gotunnels] waiting for the API Quick Tunnel URL…
+[gotunnels] api: https://street-pose-entirely-sue.trycloudflare.com
+[gotunnels] wrote config.json into frontend container
+
+[gotunnels] GoTunnels is up.
+  Web app : https://dietary-coalition-athletic-defines.trycloudflare.com
+  API     : https://street-pose-entirely-sue.trycloudflare.com
+  Instance: gotunnels-5v7hkw (urls saved to tunnel-urls.txt)
+
+[gotunnels] tear down with: scripts/down.sh gotunnels-5v7hkw
+[gotunnels] waiting 60s for the Quick Tunnels to settle, then printing their URL log lines…
+
+[gotunnels] Web app — tunnel URL (from: podman logs cloudflared-frontend):
+2026-07-04T13:12:30Z INF |  https://dietary-coalition-athletic-defines.trycloudflare.com                              |
+
+[gotunnels] API — tunnel URL (from: podman logs cloudflared-api):
+2026-07-04T13:12:34Z INF |  https://street-pose-entirely-sue.trycloudflare.com                                        |
+
+
+real	1m28.781s
+user	1m10.970s
+sys	0m19.726s
 kushal@fedora:~/src/golang/GoTunnels$ 

@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+  /* Blocking, zero-dependency theme bootstrap. Runs before first paint so the
+     correct theme is applied immediately (no flash of the wrong theme).
+     Duplicates a couple of small constants from the main script on purpose —
+     it has to run before that script exists. */
+  (function () {
+    try {
+      var saved = localStorage.getItem('kus1987-captcha:theme');
+      var concrete = ['light', 'dark', 'solarized-light', 'solarized-dark'];
+      var theme = concrete.indexOf(saved) !== -1
+        ? saved
+        : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  })();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="index, follow">
+<title>Magic Solve CAPTCHA — Solve It Yourself, or Watch It Cheat</title>
+<meta name="description" content="A tiny, self-contained CAPTCHA puzzle. Tap the matching letters yourself, or let Magic Solve cheat at a speed you control. Light, dark, and Solarized themes. Zero network requests.">
+<meta name="author" content="kus1987">
+<meta name="theme-color" content="#f1f5f9">
+<link rel="canonical" href="https://kus1987.neocities.org/captcha">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://kus1987.neocities.org/captcha">
+<meta property="og:title" content="Magic Solve CAPTCHA">
+<meta property="og:description" content="Tap the matching letters yourself, or let Magic Solve cheat at a speed you control.">
+<meta property="og:image" content="https://kus1987.neocities.org/captcha-og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Magic Solve CAPTCHA">
+<meta name="twitter:description" content="Tap the matching letters yourself, or let Magic Solve cheat at a speed you control.">
+<meta name="twitter:image" content="https://kus1987.neocities.org/captcha-og.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Magic Solve CAPTCHA",
+  "url": "https://kus1987.neocities.org/captcha",
+  "description": "A tiny, self-contained CAPTCHA puzzle you can solve by hand or hand off to an adjustable-speed auto-solver.",
+  "applicationCategory": "Game",
+  "operatingSystem": "Any",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
+
+<style>
+  /* ================= Registered custom properties (animatable) ================= */
+  @property --hue-a {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 200;
+  }
+  @property --hue-b {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 320;
+  }
+
+  /* ================= Design tokens ================= */
+  :root {
+    color-scheme: light dark;
+    --space-1: .25rem;
+    --space-2: .5rem;
+    --space-3: .75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2.5rem;
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 22px;
+    --font-display: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --ease-pop: cubic-bezier(.34, 1.56, .64, 1);
+    --dur-fast: 120ms;
+    --dur-med: 240ms;
+  }
+
+  [data-theme="light"] {
+    --page-bg: #f1f5f9;
+    --bg-card: #ffffff;
+    --ink: #1e293b;
+    --ink-soft: #64748b;
+    --accent: #2563eb;
+    --accent-contrast: #ffffff;
+    --magic: #7c3aed;
+    --magic-contrast: #ffffff;
+    --good: #16a34a;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --border: color-mix(in oklab, var(--ink-soft) 30%, transparent);
+    --focus-ring: var(--accent);
+  }
+
+  [data-theme="dark"] {
+    --page-bg: #0b1220;
+    --bg-card: #1e293b;
+    --ink: #e2e8f0;
+    --ink-soft: #94a3b8;
+    --accent: #60a5fa;
+    --accent-contrast: #0b1220;
+    --magic: #c4b5fd;
+    --magic-contrast: #1e1b4b;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --border: color-mix(in oklab, var(--ink-soft) 35%, transparent);
+    --focus-ring: var(--accent);
+  }
+
+  [data-theme="solarized-light"] {
+    --page-bg: #eee8d5;
+    --bg-card: #fdf6e3;
+    --ink: #657b83;
+    --ink-soft: #93a1a1;
+    --accent: #268bd2;
+    --accent-contrast: #fdf6e3;
+    --magic: #6c71c4;
+    --magic-contrast: #fdf6e3;
+    --good: #859900;
+    --warn: #b58900;
+    --bad: #dc322f;
+    --border: color-mix(in oklab, var(--ink-soft) 45%, transparent);
+    --focus-ring: var(--accent);
+  }
+
+  [data-theme="solarized-dark"] {
+    --page-bg: #002b36;
+    --bg-card: #073642;
+    --ink: #839496;
+    --ink-soft: #586e75;
+    --accent: #268bd2;
+    --accent-contrast: #fdf6e3;
+    --magic: #6c71c4;
+    --magic-contrast: #fdf6e3;
+    --good: #859900;
+    --warn: #b58900;
+    --bad: #dc322f;
+    --border: color-mix(in oklab, var(--ink-soft) 45%, transparent);
+    --focus-ring: #839496;
+  }
+
+  /* ================= Reset & base ================= */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; }
+  html { overflow-x: hidden; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--page-bg);
+    transition: background-color var(--dur-med), color var(--dur-med);
+  }
+  h1, h2, p { margin: 0; }
+  button { font: inherit; color: inherit; }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ================= Ambient background (signature element) ================= */
+  .bg-ambient {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    --hue-a: 200;
+    --hue-b: 320;
+    --glow-a: hsl(var(--hue-a) 70% 88%);
+    --glow-b: hsl(var(--hue-b) 70% 88%);
+    /* Progressive enhancement: richer OKLCH pastels where CSS if() + oklch()
+       are supported (Chromium, as of 2026). Falls back to the hsl() values
+       above everywhere else — the declaration is simply ignored if if()
+       isn't recognized, so this can never break anything. */
+    --glow-a: if(supports(color: oklch(0.9 0.05 10)): oklch(0.92 0.05 var(--hue-a)); else: hsl(var(--hue-a) 70% 88%));
+    --glow-b: if(supports(color: oklch(0.9 0.05 10)): oklch(0.92 0.05 var(--hue-b)); else: hsl(var(--hue-b) 70% 88%));
+    background:
+      radial-gradient(circle at 15% 20%, var(--glow-a), transparent 55%),
+      radial-gradient(circle at 85% 75%, var(--glow-b), transparent 55%),
+      linear-gradient(135deg, var(--glow-a), var(--glow-b));
+    animation: drift-hue 50s linear infinite;
+  }
+  [data-theme="dark"] .bg-ambient,
+  [data-theme="solarized-dark"] .bg-ambient {
+    opacity: .35;
+  }
+  @keyframes drift-hue {
+    to { --hue-a: 560; --hue-b: 680; }
+  }
+
+  /* ================= Layout ================= */
+  .page {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-5);
+    padding: var(--space-5) max(var(--space-4), env(safe-area-inset-right)) var(--space-5) max(var(--space-4), env(safe-area-inset-left));
+  }
+
+  .app-header {
+    width: 100%;
+    max-width: 30rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    position: relative;
+  }
+  .title {
+    /* min-width: 0 overrides the flex-item default of min-width: auto,
+       which otherwise refuses to shrink text below its intrinsic width —
+       a classic flexbox overflow trap that would push header-controls
+       off-screen (and force horizontal scroll on the whole page) on
+       narrow phones instead of letting the title wrap. */
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: break-word;
+    font-family: var(--font-display);
+    font-size: clamp(1.05rem, 3vw + .5rem, 1.6rem);
+    font-weight: 800;
+  }
+  .title-spark {
+    background: linear-gradient(90deg, var(--accent), var(--magic));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .header-controls {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .card-wrap {
+    container-type: inline-size;
+    container-name: card;
+    width: 100%;
+    max-width: 30rem;
+  }
+  .card {
+    background: var(--bg-card);
+    color: var(--ink);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    box-shadow: 0 20px 45px -15px color-mix(in oklab, var(--ink) 45%, transparent);
+    display: grid;
+    gap: var(--space-4);
+    transition: background-color var(--dur-med), box-shadow var(--dur-med);
+  }
+
+  .app-footer {
+    max-width: 30rem;
+    text-align: center;
+    font-size: .8rem;
+    color: var(--ink-soft);
+  }
+
+  /* ================= Instructions & target ================= */
+  .instructions {
+    font-size: 1.05rem;
+  }
+  .target-badge {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.6em;
+    padding: 0 .2em;
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklab, var(--accent) 16%, var(--bg-card));
+    color: var(--accent);
+    font-weight: 800;
+  }
+
+  /* ================= Stats ================= */
+  .stats {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    background: var(--page-bg);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+  }
+  .stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .stat-value { font-size: 1.15rem; font-weight: 800; }
+  .stat-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); }
+
+  /* ================= Grid ================= */
+  .grid {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-3);
+  }
+  .cell {
+    aspect-ratio: 1;
+    min-height: 44px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--page-bg);
+    color: var(--ink);
+    padding: 0;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background-color var(--dur-fast), border-color var(--dur-fast), box-shadow var(--dur-fast);
+  }
+  .cell svg { width: 58%; height: 58%; fill: currentColor; pointer-events: none; }
+  .cell:hover:not(:disabled) { border-color: var(--accent); }
+  .cell:active:not(:disabled) { scale: .92; }
+  .cell.selected {
+    background: color-mix(in oklab, var(--accent) 18%, var(--bg-card));
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+  .cell.fb-correct { background: color-mix(in oklab, var(--good) 25%, var(--bg-card)); border-color: var(--good); }
+  .cell.fb-missed { border-color: var(--warn); box-shadow: inset 0 0 0 2px var(--warn); }
+  .cell.fb-wrong { background: color-mix(in oklab, var(--bad) 22%, var(--bg-card)); border-color: var(--bad); }
+  .cell:disabled { cursor: default; opacity: .85; }
+  .cell:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* ================= Status line ================= */
+  .status-line {
+    min-height: 1.2em;
+    font-size: .9rem;
+    color: var(--ink-soft);
+  }
+
+  /* ================= Buttons ================= */
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+  .btn {
+    font-weight: 700;
+    padding: .75rem 1rem;
+    border-radius: var(--radius-md);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform var(--dur-fast) var(--ease-pop), background-color var(--dur-fast), color var(--dur-fast);
+  }
+  .btn:active:not(:disabled) { scale: .97; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+
+  .btn-primary { background: var(--accent); color: var(--accent-contrast); }
+  .btn-primary:hover:not(:disabled) { background: color-mix(in oklab, var(--accent) 85%, black); }
+
+  .btn-magic { background: var(--magic); color: var(--magic-contrast); }
+  .btn-magic:hover:not(:disabled) { background: color-mix(in oklab, var(--magic) 85%, black); }
+  .btn-magic.is-stopping { background: var(--bad); color: #fff; }
+
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--border); }
+  .btn-ghost:hover:not(:disabled) { background: color-mix(in oklab, var(--ink) 8%, transparent); }
+
+  .btn-danger { background: var(--bad); color: #fff; }
+  .btn-danger:hover { background: color-mix(in oklab, var(--bad) 85%, black); }
+
+  .btn-clear {
+    justify-self: center;
+    font-size: .82rem;
+    padding: .5rem .9rem;
+  }
+
+  /* ================= Speed control ================= */
+  .speed-control { display: grid; gap: var(--space-2); }
+  .speed-control-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    font-size: .85rem;
+  }
+  .speed-control-head label { font-weight: 600; }
+  #speedLabel { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .speed-control input[type="range"] {
+    width: 100%;
+    accent-color: var(--magic);
+    height: 1.5rem;
+  }
+  .speed-scale-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: .7rem;
+    color: var(--ink-soft);
+  }
+
+  /* ================= Theme menu (popover) ================= */
+  .icon-btn {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    border: 2px solid var(--border);
+    background: var(--bg-card);
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: border-color var(--dur-fast), transform var(--dur-fast) var(--ease-pop);
+  }
+  .icon-btn:hover { border-color: var(--accent); }
+  .icon-btn:active { scale: .92; }
+  .icon-btn:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+
+  .fps-chip {
+    font-size: .75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    background: var(--page-bg);
+    color: var(--ink-soft);
+    padding: .3rem .55rem;
+    border-radius: 999px;
+  }
+
+  .theme-menu {
+    /* NOTE: `display` is intentionally NOT set here. The popover UA
+       stylesheet defaults this to `display: none` while closed — that's
+       load-bearing, not decorative. A previous version of this file set
+       `display: grid` unconditionally on this base rule, which (being an
+       author style) overrode that native hidden state. Only `opacity`
+       differed between open/closed, so the closed menu was invisible but
+       still fully hit-testable and focusable, sitting at a fixed position
+       that overlapped the puzzle grid on narrow/mobile viewports — tapping
+       what looked like a grid cell could actually hit a theme button
+       underneath. `display` now only gets set in the :popover-open rule
+       below, so the closed panel is genuinely removed from hit-testing,
+       focus order, and layout, exactly like <dialog> without [open]. */
+    min-width: 12rem;
+    max-width: calc(100vw - 2rem);
+    padding: var(--space-3);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    color: var(--ink);
+    box-shadow: 0 16px 40px -12px color-mix(in oklab, var(--ink) 45%, transparent);
+    /* Fallback position for browsers without CSS anchor positioning. */
+    position: fixed;
+    top: 4.5rem;
+    right: max(1rem, env(safe-area-inset-right));
+    margin: 0;
+    opacity: 0;
+    transition: opacity var(--dur-fast);
+  }
+  .theme-menu:popover-open {
+    display: grid;
+    gap: var(--space-1);
+    opacity: 1;
+  }
+  @supports (anchor-name: --a) {
+    #themeBtn { anchor-name: --theme-trigger; }
+    .theme-menu {
+      position-anchor: --theme-trigger;
+      position: fixed;
+      top: anchor(bottom);
+      right: anchor(right);
+      margin-top: .5rem;
+    }
+  }
+  @supports (transition-behavior: allow-discrete) {
+    .theme-menu {
+      transition-behavior: allow-discrete;
+      transition-property: opacity, display, overlay;
+    }
+    @starting-style {
+      .theme-menu:popover-open { opacity: 0; }
+    }
+  }
+  @supports not selector(:popover-open) {
+    .theme-menu { display: none; opacity: 1; }
+    .theme-menu.fallback-open { display: grid; gap: var(--space-1); opacity: 1; }
+  }
+  .theme-menu-title {
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--ink-soft);
+    padding: 0 var(--space-2);
+    margin-bottom: var(--space-1);
+  }
+  .theme-menu button {
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: .5rem .6rem;
+    cursor: pointer;
+  }
+  .theme-menu button:hover { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+  .theme-menu button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: -2px; }
+  .theme-menu button[aria-current="true"] {
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    font-weight: 700;
+  }
+
+  /* ================= Dialog ================= */
+  .confirm-dialog {
+    border: none;
+    padding: 0;
+    border-radius: var(--radius-lg);
+    color: var(--ink);
+    background: var(--bg-card);
+    max-width: min(90vw, 28rem);
+    box-shadow: 0 20px 60px -10px rgba(0, 0, 0, .35);
+    opacity: 0;
+    scale: .96;
+    transition: opacity var(--dur-med) var(--ease-pop), scale var(--dur-med) var(--ease-pop);
+  }
+  .confirm-dialog[open] { opacity: 1; scale: 1; }
+  .confirm-dialog::backdrop {
+    background: color-mix(in oklab, black 45%, transparent);
+  }
+  @supports (transition-behavior: allow-discrete) {
+    .confirm-dialog {
+      transition-behavior: allow-discrete;
+      transition-property: opacity, scale, display, overlay;
+    }
+    @starting-style {
+      .confirm-dialog[open] { opacity: 0; scale: .96; }
+    }
+  }
+  .confirm-dialog form { padding: var(--space-5); display: grid; gap: var(--space-3); }
+  .confirm-dialog h2 { font-size: 1.1rem; }
+  .confirm-dialog p { font-size: .9rem; color: var(--ink-soft); line-height: 1.5; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+
+  /* ================= Motion & accessibility ================= */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+    .bg-ambient { animation: none; }
+  }
+
+  /* ================= Responsive tweaks ================= */
+  @container card (max-width: 22rem) {
+    .controls { grid-template-columns: 1fr; }
+    .card { padding: var(--space-4); }
+  }
+  @media (max-width: 380px) {
+    .app-header { max-width: 100%; }
+    .card-wrap { max-width: 100%; }
+  }
+</style>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div class="bg-ambient" aria-hidden="true"></div>
+
+<div class="page">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="brand"><span class="dot"></span> GoTunnels</span>
+        <nav class="mainnav">
+          <a href="/">Home</a>
+          <a href="/activity" data-auth="in" class="hidden">Activity</a>
+          <a href="/settings" data-auth="in" class="hidden">Settings</a>
+          <a href="/login" data-auth="out">Log in</a>
+          <a href="/signup" data-auth="out">Sign up</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="narrow">
+
+  <header class="app-header">
+    <h1 class="title">Magic Solve <span class="title-spark">CAPTCHA</span></h1>
+    <div class="header-controls">
+      <output id="fpsChip" class="fps-chip" aria-hidden="true">0 fps</output>
+      <button type="button" id="themeBtn" class="icon-btn" popovertarget="themeMenu" aria-haspopup="true" aria-expanded="false" aria-label="Change theme">
+        <span aria-hidden="true">🎨</span>
+      </button>
+    </div>
+  </header>
+
+  <div id="themeMenu" popover="auto" class="theme-menu" role="group" aria-label="Theme">
+    <p class="theme-menu-title">Theme</p>
+    <button type="button" data-theme-choice="auto" autofocus>🖥️ Match system</button>
+    <button type="button" data-theme-choice="light">☀️ Light</button>
+    <button type="button" data-theme-choice="dark">🌙 Dark</button>
+    <button type="button" data-theme-choice="solarized-light">📜 Solarized Light</button>
+    <button type="button" data-theme-choice="solarized-dark">🌒 Solarized Dark</button>
+  </div>
+
+  <div class="card-wrap">
+    <main class="card">
+      <p class="instructions">Select every tile showing <strong id="target" class="target-badge">A</strong></p>
+
+      <div class="stats">
+        <div class="stat"><span class="stat-value" id="streak">0</span><span class="stat-label">Streak</span></div>
+        <div class="stat"><span class="stat-value" id="best">0</span><span class="stat-label">Best</span></div>
+        <div class="stat"><span class="stat-value" id="solves">0</span><span class="stat-label">Solves</span></div>
+      </div>
+
+      <fieldset class="grid" id="grid" aria-label="CAPTCHA letter grid">
+        <legend class="sr-only">CAPTCHA puzzle: toggle every tile that matches the target letter, then verify</legend>
+      </fieldset>
+
+      <p class="status-line" id="statusLine" role="status" aria-live="polite"></p>
+
+      <div class="controls">
+        <button type="button" id="verifyBtn" class="btn btn-primary">Verify selection</button>
+        <button type="button" id="autoBtn" class="btn btn-magic">✨ Magic Solve</button>
+      </div>
+
+      <div class="speed-control">
+        <div class="speed-control-head">
+          <label for="speedSlider">Magic Solve speed</label>
+          <output id="speedLabel" for="speedSlider"></output>
+        </div>
+        <input type="range" id="speedSlider" min="1" max="100" step="1" value="35" aria-describedby="speedLabel">
+        <div class="speed-scale-labels" aria-hidden="true"><span>1 tap/sec</span><span>Hardware max</span></div>
+      </div>
+
+      <button type="button" id="clearBtn" class="btn btn-ghost btn-clear">Clear my data</button>
+    </main>
+  </div>
+
+  <footer class="app-footer">
+    <p>No trackers. No network requests. Nothing leaves your browser.</p>
+  </footer>
+</div>
+
+<dialog id="clearDialog" class="confirm-dialog">
+  <form method="dialog">
+    <h2>Clear your data?</h2>
+    <p>This resets your streak, best streak, solve count, theme and speed setting for <strong>this page only</strong>. It won't touch anything else on kus1987.neocities.org, and nothing is ever sent anywhere — it all happens right here in your browser.</p>
+    <div class="dialog-actions">
+      <button type="submit" value="cancel" class="btn btn-ghost" autofocus>Cancel</button>
+      <button type="submit" value="confirm" class="btn btn-danger">Clear my data</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module">
+'use strict';
+
+/* =====================================================================
+   Storage — namespaced so "Clear my data" only ever removes keys that
+   belong to THIS page, never anything else that might live on the same
+   Neocities origin.
+   ===================================================================== */
+const STORAGE_PREFIX = 'kus1987-captcha:';
+const KEYS = {
+  stats: STORAGE_PREFIX + 'stats',
+  theme: STORAGE_PREFIX + 'theme',
+  speed: STORAGE_PREFIX + 'speed',
+};
+const VALID_THEME_CHOICES = ['auto', 'light', 'dark', 'solarized-light', 'solarized-dark'];
+const THEME_COLOR_MAP = {
+  light: '#f1f5f9',
+  dark: '#0b1220',
+  'solarized-light': '#eee8d5',
+  'solarized-dark': '#002b36',
+};
+
+function safeGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function safeSet(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* private mode / quota — app still works in memory */ }
+}
+
+function defaultStats() { return { streak: 0, best: 0, solves: 0 }; }
+function loadStats() {
+  try {
+    const raw = JSON.parse(safeGet(KEYS.stats) ?? 'null');
+    if (!raw) return defaultStats();
+    return {
+      streak: Number.isFinite(raw.streak) ? raw.streak : 0,
+      best: Number.isFinite(raw.best) ? raw.best : 0,
+      solves: Number.isFinite(raw.solves) ? raw.solves : 0,
+    };
+  } catch { return defaultStats(); }
+}
+function saveStats(stats) { safeSet(KEYS.stats, JSON.stringify(stats)); }
+
+function defaultSpeed() { return 35; }
+function loadSpeed() {
+  const n = Number(safeGet(KEYS.speed));
+  return Number.isFinite(n) && n >= 1 && n <= 100 ? n : defaultSpeed();
+}
+function saveSpeed(v) { safeSet(KEYS.speed, String(v)); }
+
+function loadThemeChoice() {
+  const t = safeGet(KEYS.theme);
+  return VALID_THEME_CHOICES.includes(t) ? t : 'auto';
+}
+function saveThemeChoice(choice) { safeSet(KEYS.theme, choice); }
+
+function systemPrefersDark() {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+}
+function prefersReducedMotion() {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
+}
+
+/* =====================================================================
+   Minimal Signals — modeled on the TC39 Signals proposal's shape
+   (Signal.State / Signal.Computed with .get()/.set() and automatic
+   dependency tracking). Native Signals are not yet shipped in any
+   browser (the proposal is still Stage 1 as of 2026), so this is a
+   small, dependency-tracking implementation of the same mental model,
+   not a polyfill of the real thing. It intentionally skips the parts
+   of the real spec this app doesn't need (disposal, glitch-free
+   diamond scheduling for deep graphs) — the app's signal graph is
+   small and static, created once at boot.
+   ===================================================================== */
+let activeSubscriber = null;
+
+class StateSignal {
+  #value;
+  #observers = new Set();
+  constructor(initial) { this.#value = initial; }
+  get() {
+    if (activeSubscriber) this.#observers.add(activeSubscriber);
+    return this.#value;
+  }
+  set(next) {
+    if (Object.is(next, this.#value)) return;
+    this.#value = next;
+    [...this.#observers].forEach((run) => run());
+  }
+}
+
+class ComputedSignal {
+  #fn;
+  #value;
+  #dirty = true;
+  #observers = new Set();
+  constructor(fn) { this.#fn = fn; }
+  #recompute = () => {
+    this.#dirty = true;
+    [...this.#observers].forEach((run) => run());
+  };
+  get() {
+    if (this.#dirty) {
+      const prev = activeSubscriber;
+      activeSubscriber = this.#recompute;
+      try { this.#value = this.#fn(); }
+      finally { activeSubscriber = prev; }
+      this.#dirty = false;
+    }
+    if (activeSubscriber) this.#observers.add(activeSubscriber);
+    return this.#value;
+  }
+}
+
+function effect(fn) {
+  const run = () => {
+    const prev = activeSubscriber;
+    activeSubscriber = run;
+    try { fn(); } finally { activeSubscriber = prev; }
+  };
+  run();
+}
+
+const Signal = { State: StateSignal, Computed: ComputedSignal };
+
+/* =====================================================================
+   DOM references
+   ===================================================================== */
+const gridEl = document.getElementById('grid');
+const targetEl = document.getElementById('target');
+const streakEl = document.getElementById('streak');
+const bestEl = document.getElementById('best');
+const solvesEl = document.getElementById('solves');
+const statusLine = document.getElementById('statusLine');
+const verifyBtn = document.getElementById('verifyBtn');
+const autoBtn = document.getElementById('autoBtn');
+const speedSlider = document.getElementById('speedSlider');
+const speedLabel = document.getElementById('speedLabel');
+const clearBtn = document.getElementById('clearBtn');
+const clearDialog = document.getElementById('clearDialog');
+const themeBtn = document.getElementById('themeBtn');
+const themeMenu = document.getElementById('themeMenu');
+const fpsChip = document.getElementById('fpsChip');
+
+/* =====================================================================
+   App state (signals)
+   ===================================================================== */
+const themeChoiceSignal = new Signal.State(loadThemeChoice());
+const systemThemeSignal = new Signal.State(systemPrefersDark() ? 'dark' : 'light');
+const resolvedThemeSignal = new Signal.Computed(() => {
+  const choice = themeChoiceSignal.get();
+  return choice === 'auto' ? systemThemeSignal.get() : choice;
+});
+const statsSignal = new Signal.State(loadStats());
+const speedSignal = new Signal.State(loadSpeed());
+const phaseSignal = new Signal.State('idle'); // 'idle' | 'auto'
+const tapsInfoComputed = new Signal.Computed(() => speedToTapsInfo(speedSignal.get()));
+
+if (typeof matchMedia === 'function') {
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    systemThemeSignal.set(e.matches ? 'dark' : 'light');
+  });
+}
+
+/* =====================================================================
+   Puzzle logic (kept imperative — a 9-cell DOM grid doesn't benefit
+   from routing through signals, unlike the cross-cutting app state
+   above where several UI pieces must stay in sync).
+   ===================================================================== */
+const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O — avoids 1/0 confusion
+
+let currentLetters = [];
+let target = '';
+let selected = new Set();
+
+function pickTarget() {
+  return LETTERS[Math.floor(Math.random() * LETTERS.length)];
+}
+
+function buildGrid(targetLetter) {
+  const letters = new Array(9);
+  const matchCount = 1 + Math.floor(Math.random() * 4); // 1..4 matches: always solvable, never trivial
+  const matchIndices = new Set();
+  while (matchIndices.size < matchCount) {
+    matchIndices.add(Math.floor(Math.random() * 9));
+  }
+  for (let i = 0; i < 9; i++) {
+    if (matchIndices.has(i)) {
+      letters[i] = targetLetter;
+    } else {
+      let l;
+      do { l = LETTERS[Math.floor(Math.random() * LETTERS.length)]; } while (l === targetLetter);
+      letters[i] = l;
+    }
+  }
+  return letters;
+}
+
+function getCorrectIndices() {
+  const s = new Set();
+  currentLetters.forEach((l, i) => { if (l === target) s.add(i); });
+  return s;
+}
+
+function renderGrid(letters) {
+  gridEl.innerHTML = '';
+  letters.forEach((letter, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cell';
+    btn.dataset.index = String(i);
+    btn.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-label', `Letter ${letter}`);
+    btn.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      <text x="50" y="65" text-anchor="middle" font-size="60" font-weight="800">${letter}</text>
+    </svg>`;
+    btn.addEventListener('click', () => toggleCell(i));
+    gridEl.appendChild(btn);
+  });
+}
+
+function toggleCell(i) {
+  if (phaseSignal.get() !== 'idle') return;
+  const btn = gridEl.children[i];
+  if (!btn) return;
+  if (selected.has(i)) {
+    selected.delete(i);
+    btn.classList.remove('selected');
+    btn.setAttribute('aria-pressed', 'false');
+  } else {
+    selected.add(i);
+    btn.classList.add('selected');
+    btn.setAttribute('aria-pressed', 'true');
+  }
+}
+
+function clearFeedbackClasses() {
+  gridEl.querySelectorAll('.cell').forEach((btn) => {
+    btn.classList.remove('fb-correct', 'fb-missed', 'fb-wrong');
+  });
+}
+
+function newPuzzle() {
+  target = pickTarget();
+  currentLetters = buildGrid(target);
+  selected = new Set();
+  targetEl.textContent = target;
+  renderGrid(currentLetters);
+}
+
+function verify() {
+  if (phaseSignal.get() !== 'idle') return;
+
+  const correctIndices = getCorrectIndices();
+  const isCorrect = correctIndices.size === selected.size && [...correctIndices].every((i) => selected.has(i));
+
+  gridEl.querySelectorAll('.cell').forEach((btn, i) => {
+    btn.disabled = true;
+    const isTarget = correctIndices.has(i);
+    const isSelected = selected.has(i);
+    if (isTarget && isSelected) btn.classList.add('fb-correct');
+    else if (isTarget && !isSelected) btn.classList.add('fb-missed');
+    else if (!isTarget && isSelected) btn.classList.add('fb-wrong');
+  });
+  verifyBtn.disabled = true;
+
+  const stats = statsSignal.get();
+  if (isCorrect) {
+    const streak = stats.streak + 1;
+    statsSignal.set({ streak, best: Math.max(stats.best, streak), solves: stats.solves + 1 });
+    statusLine.textContent = `Correct! Streak ${streak}.`;
+  } else {
+    statsSignal.set({ ...stats, streak: 0 });
+    statusLine.textContent = 'Not quite — streak reset.';
+  }
+
+  const delay = prefersReducedMotion() ? 400 : 900;
+  setTimeout(() => {
+    clearFeedbackClasses();
+    newPuzzle();
+    syncInteractivity();
+  }, delay);
+}
+
+/* =====================================================================
+   Auto solver ("Magic Solve")
+   Speed slider maps 1..100 to 1 tap/sec .. hardware-unlimited using an
+   exponential curve (so low speeds get fine control) with an explicit
+   "no throttle at all" mode at the very top of the range, gated on
+   elapsed time inside a single shared requestAnimationFrame loop.
+   Using rAF (rather than setInterval) also means the loop simply
+   doesn't run at all while the tab is hidden, and resumes cleanly.
+   ===================================================================== */
+function speedToTapsInfo(v) {
+  if (v >= 100) return { tapsPerSec: Infinity, delayMs: 0 };
+  const t = (v - 1) / 99;
+  const tapsPerSec = Math.pow(600, t); // 1 .. ~600
+  return { tapsPerSec, delayMs: 1000 / tapsPerSec };
+}
+
+let rafId = null;
+let autoTargets = [];
+let autoIndex = 0;
+let lastTapTime = 0;
+
+function startAutoSolve() {
+  clearFeedbackClasses();
+  selected = new Set();
+  gridEl.querySelectorAll('.cell').forEach((btn) => {
+    btn.classList.remove('selected');
+    btn.setAttribute('aria-pressed', 'false');
+  });
+
+  autoTargets = currentLetters.map((l, i) => (l === target ? i : -1)).filter((i) => i !== -1);
+  autoIndex = 0;
+  lastTapTime = 0;
+  phaseSignal.set('auto');
+
+  if (autoTargets.length === 0) {
+    finishAutoRound();
+    return;
+  }
+  rafId = requestAnimationFrame(autoStep);
+}
+
+function autoStep(now) {
+  if (phaseSignal.get() !== 'auto') return;
+
+  const { delayMs } = speedToTapsInfo(speedSignal.get());
+  if (lastTapTime === 0 || now - lastTapTime >= delayMs) {
+    const idx = autoTargets[autoIndex++];
+    selected.add(idx);
+    const btn = gridEl.children[idx];
+    if (btn) { btn.classList.add('selected'); btn.setAttribute('aria-pressed', 'true'); }
+    lastTapTime = now;
+  }
+
+  if (autoIndex >= autoTargets.length) {
+    finishAutoRound();
+    return;
+  }
+  rafId = requestAnimationFrame(autoStep);
+}
+
+function finishAutoRound() {
+  const stats = statsSignal.get();
+  const streak = stats.streak + 1;
+  statsSignal.set({ streak, best: Math.max(stats.best, streak), solves: stats.solves + 1 });
+  statusLine.textContent = `Magic Solve — streak ${streak}.`;
+
+  const delay = prefersReducedMotion() ? 150 : 320;
+  setTimeout(() => {
+    if (phaseSignal.get() === 'auto') {
+      newPuzzle();
+      startAutoSolve();
+    }
+  }, delay);
+}
+
+function stopAutoSolve() {
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  phaseSignal.set('idle');
+  selected = new Set();
+  gridEl.querySelectorAll('.cell').forEach((btn) => {
+    btn.classList.remove('selected');
+    btn.setAttribute('aria-pressed', 'false');
+  });
+}
+
+function syncInteractivity() {
+  const solving = phaseSignal.get() === 'auto';
+  gridEl.querySelectorAll('.cell').forEach((btn) => { btn.disabled = solving; });
+  verifyBtn.disabled = solving;
+}
+
+autoBtn.addEventListener('click', () => {
+  if (phaseSignal.get() === 'auto') stopAutoSolve();
+  else startAutoSolve();
+});
+
+verifyBtn.addEventListener('click', verify);
+
+/* =====================================================================
+   Speed slider
+   ===================================================================== */
+const persistSpeed = debounce((v) => saveSpeed(v), 300);
+speedSlider.value = String(speedSignal.get());
+speedSlider.addEventListener('input', () => {
+  speedSignal.set(Number(speedSlider.value));
+});
+
+/* =====================================================================
+   Theme menu
+   ===================================================================== */
+const supportsPopover = 'showPopover' in document.createElement('div');
+if (!supportsPopover) {
+  themeMenu.removeAttribute('popover');
+  themeBtn.addEventListener('click', () => {
+    themeMenu.classList.toggle('fallback-open');
+    themeBtn.setAttribute('aria-expanded', String(themeMenu.classList.contains('fallback-open')));
+  });
+  document.addEventListener('click', (e) => {
+    if (themeMenu.classList.contains('fallback-open') && !themeMenu.contains(e.target) && e.target !== themeBtn) {
+      themeMenu.classList.remove('fallback-open');
+      themeBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
+} else {
+  themeMenu.addEventListener('toggle', (e) => {
+    themeBtn.setAttribute('aria-expanded', String(e.newState === 'open'));
+  });
+}
+
+function setTheme(choice) {
+  if (!VALID_THEME_CHOICES.includes(choice)) return;
+  const apply = () => themeChoiceSignal.set(choice);
+  if (document.startViewTransition && !prefersReducedMotion()) {
+    document.startViewTransition(apply);
+  } else {
+    apply();
+  }
+}
+
+themeMenu.querySelectorAll('[data-theme-choice]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    setTheme(btn.dataset.themeChoice);
+    if (supportsPopover && themeMenu.hidePopover) themeMenu.hidePopover();
+    else themeMenu.classList.remove('fallback-open');
+  });
+});
+
+function updateThemeColorMeta(appliedTheme) {
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', THEME_COLOR_MAP[appliedTheme] || '#f1f5f9');
+}
+
+/* =====================================================================
+   Clear my data
+   ===================================================================== */
+clearBtn.addEventListener('click', () => clearDialog.showModal());
+
+clearDialog.addEventListener('close', () => {
+  if (clearDialog.returnValue === 'confirm') performClear();
+});
+
+function performClear() {
+  try {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith(STORAGE_PREFIX))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch { /* storage unavailable — nothing to clear */ }
+
+  stopAutoSolve();
+  statsSignal.set(defaultStats());
+  speedSignal.set(defaultSpeed());
+  speedSlider.value = String(defaultSpeed());
+  themeChoiceSignal.set('auto');
+  clearFeedbackClasses();
+  newPuzzle();
+  syncInteractivity();
+  statusLine.textContent = 'Your data has been cleared.';
+}
+
+/* =====================================================================
+   Effects — keep the DOM in sync with signals
+   ===================================================================== */
+effect(() => {
+  const applied = resolvedThemeSignal.get();
+  document.documentElement.dataset.theme = applied;
+  updateThemeColorMeta(applied);
+  const choice = themeChoiceSignal.get();
+  themeMenu.querySelectorAll('[data-theme-choice]').forEach((btn) => {
+    const active = btn.dataset.themeChoice === choice;
+    btn.setAttribute('aria-current', active ? 'true' : 'false');
+  });
+  saveThemeChoice(choice);
+});
+
+effect(() => {
+  const { streak, best, solves } = statsSignal.get();
+  streakEl.textContent = String(streak);
+  bestEl.textContent = String(best);
+  solvesEl.textContent = String(solves);
+  saveStats({ streak, best, solves });
+});
+
+effect(() => {
+  const { tapsPerSec } = tapsInfoComputed.get();
+  speedLabel.textContent = tapsPerSec === Infinity ? 'MAX ⚡ hardware limit' : `${tapsPerSec.toFixed(1)} taps/sec`;
+  persistSpeed(speedSignal.get());
+});
+
+effect(() => {
+  const solving = phaseSignal.get() === 'auto';
+  autoBtn.textContent = solving ? '🛑 Stop' : '✨ Magic Solve';
+  autoBtn.classList.toggle('is-stopping', solving);
+  autoBtn.setAttribute('aria-pressed', String(solving));
+  syncInteractivity();
+});
+
+/* =====================================================================
+   FPS counter
+   ===================================================================== */
+let lastFrameTime = performance.now();
+let frameCount = 0;
+function updateFps(now) {
+  frameCount++;
+  const delta = now - lastFrameTime;
+  if (delta >= 1000) {
+    fpsChip.textContent = `${Math.round((frameCount * 1000) / delta)} fps`;
+    frameCount = 0;
+    lastFrameTime = now;
+  }
+  requestAnimationFrame(updateFps);
+}
+requestAnimationFrame(updateFps);
+
+/* =====================================================================
+   Boot
+   ===================================================================== */
+newPuzzle();
+</script>
+</body>
+</html>
