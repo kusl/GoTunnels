@@ -6111,3 +6111,5 @@ Claude is AI and can make mistakes. Please double-check responses.
 100
 75
 56
+
+cd ~/src/golang/GoTunnels/; time git status; time git fetch; time git status; time git remote show origin; time git pull; time git status; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/down.sh gotunnels-ekhmuw; time bash scripts/down.sh gotunnels-xnnkzq; time bash scripts/down.sh gotunnels-q6jqbg; time bash scripts/down.sh gotunnels-novzg; podman ps -a;
