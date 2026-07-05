@@ -39,3 +39,7 @@ export OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=BASE2_EXPONENTIA
 export OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=DELTA
 ```
 You can see the code in `dump.txt` and my deployment at `virginia.txt`
+Also please review all the tests once again. 
+Among others, please check if the github actions actually test our container files and podman compose process. 
+
+Please return FULL files for all files that need to change. 
