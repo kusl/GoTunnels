@@ -138,7 +138,7 @@ Also please review all the tests once again.
 Among others, please check if the github actions actually test our container files and podman compose process. 
 Please return FULL files for all files that need to change.
 
-Show more
+Show less
 
 Diagnosed SQL parameter type bug, traced CORS/env persistence issues, and architected telemetry configuration
 Diagnosed SQL parameter type bug, traced CORS/env persistence issues, and architected telemetry configuration
@@ -1023,8 +1023,224 @@ Done
 Every otel symbol confirmed. Shell + YAML validation:
 
 
-Validated fix efficacy and planned empirical verification tests
-Validated fix efficacy and planned empirical verification tests
+Verified test results and prepared multiple files for delivery
+Verified test results and prepared multiple files for delivery
+
+bash -n and shellcheck on all changed/new scripts
+
+Script
+The shellcheck findings are all pre-existing issues from before my changes—info-level warnings about shell directives and an unused loop counter pattern that's consistent throughout the codebase. No new errors were introduced, so I should verify the exit code with error-level severity filtering to confirm there are truly zero errors to address.
+
+
+Confirm zero shellcheck errors and validate YAML files
+
+Script
+
+Secrets scan on deliverables, then empirically test the ensure_env DSN-persist + reset_runtime_env behavior
+
+Script
+The "FOUND SECRETS" alert is a false positive—it just matched the placeholder format in the .env.example file, not an actual secret. The sandbox test confirms the fix is working: the shell-exported UPTRACE_DSN persisted correctly into .env without being overwritten.
+
+Now I need to verify the wait_for_log fix handles the SIGPIPE scenario properly under pipefail, and then test the sed extraction patterns against realistic JSON data. I should also validate that the assert helper functions in ci-container-test.sh work correctly by testing the critical extraction and assertion logic directly.The .env.example file only contains placeholder values with no real secrets, and I've confirmed both environment fixes work in the sandbox. Now I'll verify the wait_for_log fix and JSON extraction patterns.
+
+
+Empirically verify the wait_for_log fix, sed extractions, and assert helper semantics under strict mode
+
+Script
+
+Rerun harness under bash explicitly (default shell was sh)
+
+Script
+I've verified that the new drain pattern correctly catches the present pattern issue that the old -Eq approach missed under pipefail, and confirmed the token and note-id extractions work properly against the Go-encoder JSON output. The assert_contains function handles set -e correctly with FAILED tracking intact. Now I need to validate the SQL fix by running it against the local Postgres instance to ensure the final query in store.go has all the necessary casts and ON CONFLICT handling.Running the exact SQL from store.go against real Postgres to verify the fix works end-to-end through pgx's untyped-parameter path.
+
+
+Final SQL regression check: the fixed statement plans and executes correctly on both insert and update paths
+
+Script
+
+Run the SQL regression as the postgres user
+
+Script
+The store.go implementation is working correctly through the untyped-Parse path, with insert operations returning the expected 8/3/5 metrics and best staying at 4, while update operations show 20/7/13 with best at 4 and current dropping to 1—exactly matching what the CI test expects. Now I need to do a final visual review of all the modified files to ensure nothing's broken, then provide the complete files with their exact paths.
+
+Done
+The exact statement from store.go now plans and executes correctly through the untyped-Parse path — insert 8/3/5, update 20/7/13 with GREATEST keeping best=4. Let me pull the final file contents for delivery:
+
+
+Validated all deliverables and prepared comprehensive file submission
+Validated all deliverables and prepared comprehensive file submission
+
+Line counts of all 11 deliverables
+
+Script
+
+Read final store.go for delivery
+
+Script
+
+Read final config.go for delivery
+
+Script
+
+Read final telemetry.go and lib.sh for delivery
+
+Script
+I've gathered all the files and now I'm ready to compile the complete response with all 11 full files, including the final version of up.sh and the remaining smaller files.
+
+
+Read final up.sh, ci.yaml, compose.yaml, .env.example for delivery
+
+Script
+I need to finalize the remaining test files and documentation — I have the config_test.go changes ready to insert after the TestResolveTelemetry_UptraceDSN test, and I should verify the full content of docs/CONFIGURATION.md and ci-container-test.sh before pasting them out.
+
+
+Read final CONFIGURATION.md for delivery
+
+Script
+I've validated all the core files—store.go passes gofmt and SQL verification against PostgreSQL 16, config.go and its tests compile cleanly with all 13 tests passing, telemetry.go has every OpenTelemetry symbol checked against the pinned version, and lib.sh passes bash syntax and shellcheck validation with the helper functions tested in a sandbox environment.
+
+Now I'm finishing the validation sweep: up.sh and ci-container-test.sh both pass syntax and linting checks with extraction patterns and assertions verified, the YAML files parse correctly, documentation is updated, and I've confirmed no credentials are exposed in any deliverable.
+
+I'm ready to compile the full response with all 11 files, their paths, the root-cause findings with empirical verification, and deployment notes including the passkey issue on the current instance and the credential rotation steps needed for the PAT and Uptrace DSN.
+
+Show less
+Done
+All 11 files are finalized and validated. Here's what was actually wrong, each root cause verified empirically, followed by every full file.
+
+Root causes
+1. Captcha sync always 500. SyncCaptchaStats had VALUES (..., $4 + $5, ...). pgx v5's default statement-cache mode sends the extended-protocol Parse with no declared parameter types, so Postgres must infer them — and $4 + $5 fails at plan time with operator is not unique: unknown + unknown. The statement could never even execute, hence a 500 on every single call. I reproduced the exact error on Postgres 16 via PREPARE without a type list, and verified the fix (::bigint casts on every integer placeholder, in both the VALUES and the ON CONFLICT clauses): insert path returns 8/3/5, update path returns 20/7/13 with GREATEST keeping best=4 and current dropping to 1.
+
+2. CORS failure on signup (and silently broken passkeys). Your virginia.txt log shows podman-compose ignores --no-deps: step 3 (up -d --no-deps frontend cloudflared-frontend) also created and started the api container (frontend depends_on api) with env frozen at that moment. Step 6's up then hit "name already in use" and never recreated it — so the api never received the tunnel-derived RP_ID/RP_ORIGINS/CORS_ALLOWED_ORIGINS. Deleting .env "fixed" CORS only because a fresh .env defaults to *. Side effect: passkeys on your current deployment are broken (RP ID is stuck at localhost while the origin is trycloudflare.com) until you redeploy. Fix is two-part: reset_runtime_env returns the three tunnel-derived keys to bootstrap defaults at every run start (so deleting .env is never needed and your secrets/DSN survive), and step 6 now removes any dependency-created api container before starting it so compose recreates it with the correct env (a no-op under docker compose).
+
+3. "did not observe API listening log yet" on every run. wait_for_log used grep -Eq: grep exits at first match, podman logs takes SIGPIPE (exit 141), and under pipefail the pipeline reports failure even though the pattern matched. Every success was inverted into a miss. Verified both directions in a harness: the old form misses a present pattern; the new full-drain form (grep -E ... >/dev/null) matches correctly. Same bug family you already fixed in cid_of and poll_tunnel_url.
+
+4. Uptrace telemetry gaps. Good news first: your endpoint derivation was already correct — https://api.uptrace.dev is a valid OTLP/HTTP base and otel-go v1.44.0's WithEndpointURL appends /v1/{traces,metrics,logs} itself; gzip was already on. What was missing per Uptrace's guidance: delta temporality and base2 exponential histograms. Both are now wired via WithTemporalitySelector/WithAggregationSelector (every symbol verified against the pinned v1.44.0 source). Plus one nasty footgun I found and fixed: an existing .env with an empty UPTRACE_DSN= line silently clobbered a shell-exported DSN (load_env re-exports the empty value), turning telemetry off with zero errors — ensure_env now persists caller-exported telemetry vars into .env before loading it. Verified in a sandbox: exported DSN survives, stale tunnel values reset, generated secrets preserved.
+
+5. CI. New scripts/ci-container-test.sh builds both Containerfiles, brings up db+api+frontend via podman-compose (no tunnels), and runs an HTTP smoke test from a curl container on the compose network — including the captcha-sync regression (which only reproduces against real Postgres), prefs, notes, leaderboard, CORS preflight, and the frontend CSP header. Wired into ci.yaml as a second job.
+
+Validation: gofmt -e clean on all 4 Go files; all 13 config tests pass (ran for real in a stdlib-only scratch module); bash -n + shellcheck error-free on all scripts; YAML parses; no PAT or DSN in any file.
+
+internal/store/store.go
+go
+// Package store is the single data-access layer. Every SQL query in the
+// application lives here, so the rest of the code deals in Go types and never
+// in SQL strings. It wraps a pgx connection pool.
+//
+// UUID handling note: to avoid pulling in a separate UUID dependency, user ids
+// are exchanged as plain strings. Queries always select `id::text` and always
+// bind uuid parameters with an explicit `$N::uuid` cast, which sidesteps the
+// lack of an implicit text->uuid cast in PostgreSQL.
+package store
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"time"
+
+	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// ErrNotFound is returned when a lookup finds no row.
+var ErrNotFound = errors.New("store: not found")
+
+// Store is the data-access facade over a pgx pool.
+type Store struct {
+	pool *pgxpool.Pool
+}
+
+// New wraps a pool.
+func New(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
+
+// Pool exposes the underlying pool for health checks.
+func (s *Store) Pool() *pgxpool.Pool { return s.pool }
+
+// Ping verifies database connectivity.
+func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+// User is an application user.
+type User struct {
+	ID          string
+	Username    string
+	DisplayName string
+	CreatedAt   time.Time
+}
+
+// Session is a server-side session record.
+type Session struct {
+	ID         string
+	UserID     string
+	AuthMethod string
+	CreatedAt  time.Time
+	LastSeenAt time.Time
+	ExpiresAt  time.Time
+	RevokedAt  *time.Time
+}
+
+// Flow is an in-progress WebAuthn ceremony's stored state.
+type Flow struct {
+	ID          string
+	UserID      *string
+	Kind        string
+	SessionData []byte
+	ExpiresAt   time.Time
+}
+
+// Activity is one audit-log row.
+type Activity struct {
+	ID         int64           `json:"id"`
+	UserID     *string         `json:"user_id,omitempty"`
+	Username   string          `json:"username"`
+	EventType  string          `json:"event_type"`
+	AuthMethod string          `json:"auth_method"`
+	Outcome    string          `json:"outcome"`
+	IPHash     string          `json:"ip_hash"`
+	UserAgent  string          `json:"user_agent,omitempty"`
+	Detail     json.RawMessage `json:"detail,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+}
+
+// ActivityInput is the payload for recording an activity event.
+type ActivityInput struct {
+	UserID     *string
+	Username   string
+	EventType  string
+	AuthMethod string
+	Outcome    string
+	IPHash     string
+	UserAgent  string
+	Detail     map[string]any
+}
+
+// CSPReportInput is a normalised CSP violation ready to persist.
+type CSPReportInput struct {
+	DocumentURI        string
+	Referrer           string
+	BlockedURI         string
+	ViolatedDirective  string
+	EffectiveDirective string
+	OriginalPolicy     string
+	Disposition        string
+	SourceFile         string
+	LineNumber         int
+	ColumnNumber       int
+	StatusCode         int
+	ScriptSample       string
+	IPHash             string
+	UserAgent          string
+	Raw                json.RawMessage
+}
+
+// CaptchaStats is a user's aggregate CAPTCHA game record. One row per user;
+// solves are folded in as batched deltas, never stored individually.
+type CaptchaStats struct {
+	UserID        string    `json:"user_id,omitempty"`
 
 Want to be notified when Claude responds?
 
