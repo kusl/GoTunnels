@@ -271,4 +271,9 @@ a02ad819562f  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou..
 kushal@virginia:~/src/golang/GoTunnels$ exit
 logout
 Connection to virginia closed.
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash export.sh > docs/llm/vendor/output.txt
+
+real	0m3.105s
+user	0m1.415s
+sys	0m1.942s
 kushal@fedora:~/src/golang/GoTunnels$ 
