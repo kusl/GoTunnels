@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-04T22:48:07-04:00
+  Generated at   : 2026-07-05T05:31:32-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,18 +17,17 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : f99676ac221e016a58bf892eb5967026bafa8ac5
-  Commit (short) : f99676a
-  Commit date    : 2026-07-04 19:42:36 -0400
-  Commit message : add virginia logs
+  Commit (full)  : b29c6a343d0f34e07392fe08fb54efd8a9a4354a
+  Commit (short) : b29c6a3
+  Commit date    : 2026-07-05 05:31:18 -0400
+  Commit message : add claude response
   Remote origin  : git@github.com:kusl/GoTunnels.git
-  Files included : 91
+  Files included : 92
   Excluded path  : docs/llm/
   Excluded files : yarn.lock
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
- M docs/llm/vendor/claude-conversations.md
  M docs/llm/vendor/output.txt
 
 ################################################################################
@@ -425,7 +424,7 @@ FOOTER
 mv -f "$TMP_FILE" "$OUTPUT_FILE"
 
 ################################################################################
-# FILE TREE  (all 91 included files)
+# FILE TREE  (all 92 included files)
 ################################################################################
 .
 .
@@ -539,6 +538,7 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 │   └── embed.go
 ├── README.md
 └── scripts
+    ├── ci-container-test.sh
     ├── down.sh
     ├── lib.sh
     ├── run.sh
@@ -736,15 +736,15 @@ func run() error {
   File name:             compose.yaml
   Relative path:         compose.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/compose.yaml
-  Size:                  3.7 KiB (3861 bytes)
-  Last modified:         2026-07-01 14:38:31.000000000 -0400
+  Size:                  4.1 KiB (4222 bytes)
+  Last modified:         2026-07-05 05:29:43.120093587 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805972
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               5abaf9ca4ec58424bd202338ada3f3a481ab74cb2b68655470e0711f2e08f65f
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               04b94b25f444e96bc739672e37d373148c62c81826901b3e4a4bff9afbc9ddf5
+  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
 # compose.yaml — the whole GoTunnels stack.
@@ -806,6 +806,9 @@ services:
       UPTRACE_DSN: "${UPTRACE_DSN:-}"
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       OTEL_EXPORTER_OTLP_HEADERS: "${OTEL_EXPORTER_OTLP_HEADERS:-}"
+      OTEL_EXPORTER_OTLP_COMPRESSION: "${OTEL_EXPORTER_OTLP_COMPRESSION:-gzip}"
+      OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: "${OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE:-delta}"
+      OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION: "${OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION:-base2_exponential_bucket_histogram}"
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-gotunnels-api}"
       GOTUNNELS_DEV: "${GOTUNNELS_DEV:-false}"
     restart: unless-stopped
@@ -1268,15 +1271,15 @@ also annotate their active span (batch sizes, note ids) so traces answer
   File name:             CONFIGURATION.md
   Relative path:         docs/CONFIGURATION.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/docs/CONFIGURATION.md
-  Size:                  5.2 KiB (5347 bytes)
-  Last modified:         2026-07-01 17:34:19.384032849 -0400
+  Size:                  5.5 KiB (5723 bytes)
+  Last modified:         2026-07-05 05:30:33.962945422 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805987
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               4aacaa56656ce4dbecb3f1a15b69060a0e6c0a4ed453b0c9850d3ceaf0e6e377
-  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
+  SHA-256:               8c11c87c75097b1b4bf10245c09a5a4b5f4259d4e059999e0760d7bf414325f1
+  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
 # Configuration
@@ -1374,6 +1377,8 @@ disabled (stdout logging only).
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | (empty) | Base OTLP/HTTP endpoint, if not using a DSN. |
 | `OTEL_EXPORTER_OTLP_HEADERS` | (empty) | `k1=v1,k2=v2` headers for the exporter. |
 | `OTEL_EXPORTER_OTLP_COMPRESSION` | `gzip` | Exporter compression. |
+| `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | `delta` | `delta`, `cumulative`, or `lowmemory` (spec casing like `DELTA` also accepted). Uptrace prefers delta. |
+| `OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION` | `base2_exponential_bucket_histogram` | Or `explicit_bucket_histogram`. Exponential buckets give Uptrace accurate percentiles at lower cost. |
 | `OTEL_SERVICE_NAME` / `GOTUNNELS_SERVICE_NAME` | `gotunnels-api` | OTel `service.name`. |
 
 ## Dev
@@ -1402,15 +1407,15 @@ naming and the test toolchain:
   File name:             .env.example
   Relative path:         .env.example
   Absolute path:         /home/kushal/src/golang/GoTunnels/.env.example
-  Size:                  2.6 KiB (2713 bytes)
-  Last modified:         2026-07-01 16:58:58.076320109 -0400
+  Size:                  3.3 KiB (3471 bytes)
+  Last modified:         2026-07-05 05:30:22.608843488 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805983
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               a3eb187551b31c16a492c085eeb3f83ead12fa20d3a6f9dbd408b72579faa49e
-  Last git commit:       f7e07e5 2026-07-01 16:59:41 -0400 run dump
+  SHA-256:               359973121fd9b6e975e32a55a6c5e19e1608c0e6e19ab56e3f15a83563b34621
+  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
 # .env.example — shape of the environment file.
@@ -1461,9 +1466,22 @@ GOTUNNELS_CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self'; i
 #   OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.example.com
 #   OTEL_EXPORTER_OTLP_HEADERS=key1=value1,key2=value2
 # Leave blank to disable exporting (the app still logs JSON to stdout).
+#
+# NOTE: exporting UPTRACE_DSN in your shell before running scripts/up.sh also
+# works — ensure_env persists it into this file before loading it, so a blank
+# UPTRACE_DSN= line here can no longer clobber your export.
 UPTRACE_DSN=
 OTEL_EXPORTER_OTLP_ENDPOINT=
 OTEL_EXPORTER_OTLP_HEADERS=
+# gzip-compress OTLP payloads (Uptrace recommendation; set empty to disable).
+OTEL_EXPORTER_OTLP_COMPRESSION=gzip
+# Metrics temporality: delta | cumulative | lowmemory (spec casing DELTA etc.
+# is also accepted). Uptrace prefers delta.
+OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+# Histogram aggregation for Histogram instruments:
+#   base2_exponential_bucket_histogram (Uptrace recommendation; default)
+#   explicit_bucket_histogram
+OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=base2_exponential_bucket_histogram
 OTEL_SERVICE_NAME=gotunnels-api
 
 # --- Dev convenience ---------------------------------------------------------
@@ -5310,15 +5328,15 @@ updates:
   File name:             ci.yaml
   Relative path:         .github/workflows/ci.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/workflows/ci.yaml
-  Size:                  650 B (650 bytes)
-  Last modified:         2026-07-01 17:33:46.998370833 -0400
+  Size:                  1.5 KiB (1587 bytes)
+  Last modified:         2026-07-05 05:29:57.280107799 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805935
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               d83dad2a3795a355638f99887d9d058a821de75edce08e81dab97f55b81735af
-  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
+  SHA-256:               9c50b45ef68aab69cd415e19761b33aa06923f97e76cec5f2a7eced15b2b3077
+  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
 # Build and test. Deliberately thin: all logic lives in scripts/test.sh so the
@@ -5352,6 +5370,30 @@ jobs:
 
       - name: Build, vet, unit tests
         run: bash scripts/test.sh all
+
+  # Everything scripts/test.sh cannot see: that both Containerfiles build,
+  # that compose wiring + env substitution is correct, that migrations run
+  # against a real Postgres, and that the HTTP surface works end to end —
+  # including the captcha-sync regression that only reproduces against real
+  # Postgres via the pgx extended protocol. Ubuntu runners ship podman;
+  # podman-compose comes from pipx. No tunnels are started and no host ports
+  # are published; assertions run from a curl container on the compose network.
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install podman-compose
+        run: pipx install podman-compose
+
+      - name: Runtime versions
+        run: |
+          podman version
+          podman-compose version
+
+      - name: Build images + container smoke test
+        run: bash scripts/ci-container-test.sh gotunnels-ci
 
 
 ################################################################################
@@ -7781,15 +7823,15 @@ func TestClamp(t *testing.T) {
   File name:             config.go
   Relative path:         internal/config/config.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/config.go
-  Size:                  11.5 KiB (11814 bytes)
-  Last modified:         2026-07-01 09:26:37.000000000 -0400
+  Size:                  12.6 KiB (12944 bytes)
+  Last modified:         2026-07-05 05:29:08.656567891 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17806004
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               0a58efaca7d30fa13b7a233417fe1ef07a5df735b2720f7c70c729fe1555adb9
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               25d99d440065d081256ea6ff5479bdc4480f96cb976b95d3cb416a07eb846699
+  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
 // Package config is the single source of truth for every runtime setting.
@@ -7870,6 +7912,16 @@ type TelemetryConfig struct {
 	Headers     map[string]string // e.g. {"uptrace-dsn": "..."}
 	Insecure    bool              // allow http:// (in-cluster collectors)
 	Compression string            // "gzip" or ""
+
+	// MetricsTemporality mirrors OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+	// ("delta", "cumulative", or "lowmemory"; normalized to lowercase). Uptrace
+	// prefers delta temporality, so that is the default.
+	MetricsTemporality string
+	// MetricsHistogram mirrors OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION
+	// ("base2_exponential_bucket_histogram" or "explicit_bucket_histogram";
+	// normalized to lowercase). Exponential histograms compress better and give
+	// Uptrace more accurate percentiles, so they are the default.
+	MetricsHistogram string
 }
 
 // Load reads and validates configuration from the environment.
@@ -7951,7 +8003,20 @@ func (c *Config) resolveTelemetry() {
 	//   1. UPTRACE_DSN (convenience) -> derive endpoint + uptrace-dsn header
 	//   2. OTEL_EXPORTER_OTLP_ENDPOINT (+ OTEL_EXPORTER_OTLP_HEADERS)
 	//   3. disabled (stdout logging, no-op traces/metrics)
-	tc := TelemetryConfig{Headers: map[string]string{}, Compression: getenv("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip")}
+	//
+	// The two metrics knobs follow the OpenTelemetry spec's environment
+	// variables. Their spec values are UPPERCASE (e.g. DELTA,
+	// BASE2_EXPONENTIAL_BUCKET_HISTOGRAM) but we normalize to lowercase so
+	// comparisons elsewhere are simple and either casing works.
+	tc := TelemetryConfig{
+		Headers:     map[string]string{},
+		Compression: strings.ToLower(getenv("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip")),
+		MetricsTemporality: strings.ToLower(getenv(
+			"OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "delta")),
+		MetricsHistogram: strings.ToLower(getenv(
+			"OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION",
+			"base2_exponential_bucket_histogram")),
+	}
 
 	if dsn := os.Getenv("UPTRACE_DSN"); dsn != "" {
 		endpoint, insecure := endpointFromDSN(dsn)
@@ -10414,15 +10479,15 @@ func noteRateKey() func(*http.Request) string {
   File name:             store.go
   Relative path:         internal/store/store.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/store/store.go
-  Size:                  27.4 KiB (28134 bytes)
-  Last modified:         2026-07-04 17:16:37.000000000 -0400
+  Size:                  28.1 KiB (28874 bytes)
+  Last modified:         2026-07-05 05:28:44.424179585 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 19406623
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               f018db73c3a807ccdce6c220fa62de827d39e0807eca3ea4a829e649cbf66f2b
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               bb847155a2afcee3a306a53133468aee1db2db7b854d18b36bcebe061a354d06
+  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
 // Package store is the single data-access layer. Every SQL query in the
@@ -11035,18 +11100,28 @@ func (s *Store) InsertCSPReport(ctx context.Context, in CSPReportInput) error {
 // row, creating it on first sync. Totals accumulate; best_streak only ever
 // grows (GREATEST); current_streak is last-write-wins. The updated row is
 // returned so the client can reconcile its display with the server's truth.
+//
+// Every integer placeholder carries an explicit ::bigint cast. pgx v5 uses the
+// extended query protocol and, in its default statement-cache mode, sends the
+// Parse step without declared parameter types. Postgres then has to infer them
+// and the expression `$4 + $5` fails at plan time with
+// `ERROR: operator is not unique: unknown + unknown` — the statement can never
+// even execute, so the sync endpoint 500s on every request. Casting each
+// parameter pins the types and makes the statement plannable. (Placeholders
+// compared against a typed column, like `$1::uuid = user_id`, would be
+// inferable anyway, but we cast uniformly for clarity.)
 func (s *Store) SyncCaptchaStats(ctx context.Context, userID string, in CaptchaSyncInput) (CaptchaStats, error) {
 	st := CaptchaStats{UserID: userID}
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO captcha_stats
 			(user_id, best_streak, current_streak, total_solves, manual_solves, auto_solves, updated_at)
-		VALUES ($1::uuid, $2, $3, $4 + $5, $4, $5, now())
+		VALUES ($1::uuid, $2::bigint, $3::bigint, $4::bigint + $5::bigint, $4::bigint, $5::bigint, now())
 		ON CONFLICT (user_id) DO UPDATE SET
 			best_streak    = GREATEST(captcha_stats.best_streak, EXCLUDED.best_streak),
 			current_streak = EXCLUDED.current_streak,
-			total_solves   = captcha_stats.total_solves + $4 + $5,
-			manual_solves  = captcha_stats.manual_solves + $4,
-			auto_solves    = captcha_stats.auto_solves + $5,
+			total_solves   = captcha_stats.total_solves + $4::bigint + $5::bigint,
+			manual_solves  = captcha_stats.manual_solves + $4::bigint,
+			auto_solves    = captcha_stats.auto_solves + $5::bigint,
 			updated_at     = now()
 		RETURNING best_streak, current_streak, total_solves, manual_solves, auto_solves, updated_at`,
 		userID, in.BestStreak, in.CurrentStreak, in.ManualDelta, in.AutoDelta,
@@ -11411,15 +11486,15 @@ func TestMultiHandler_Enabled(t *testing.T) {
   File name:             telemetry.go
   Relative path:         internal/telemetry/telemetry.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/telemetry/telemetry.go
-  Size:                  6.7 KiB (6878 bytes)
-  Last modified:         2026-07-01 08:51:05.000000000 -0400
+  Size:                  9.4 KiB (9636 bytes)
+  Last modified:         2026-07-05 05:29:26.930473329 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805999
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               672e440431efe58320bb3918b490a0ff7457841282ea24d393e6621f12d5b449
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               032addbedd17d09ef480475fd90104fb8954788e13bedc886dd85a66b2d19785
+  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
 // Package telemetry wires the vendor-neutral OpenTelemetry Go SDK for all three
@@ -11440,6 +11515,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/kusl/GoTunnels/internal/config"
@@ -11453,6 +11529,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
@@ -11556,6 +11633,9 @@ func Setup(ctx context.Context, cfg *config.Config) (*Providers, error) {
 	p.Logger.Info("telemetry enabled",
 		slog.String("otlp.endpoint", cfg.Telemetry.EndpointURL),
 		slog.Bool("otlp.insecure", cfg.Telemetry.Insecure),
+		slog.String("otlp.compression", cfg.Telemetry.Compression),
+		slog.String("otlp.metrics.temporality", cfg.Telemetry.MetricsTemporality),
+		slog.String("otlp.metrics.histogram", cfg.Telemetry.MetricsHistogram),
 	)
 	return p, nil
 }
@@ -11593,7 +11673,11 @@ func traceHTTPOpts(cfg *config.Config) []otlptracehttp.Option {
 }
 
 func metricHTTPOpts(cfg *config.Config) []otlpmetrichttp.Option {
-	opts := []otlpmetrichttp.Option{otlpmetrichttp.WithEndpointURL(cfg.Telemetry.EndpointURL)}
+	opts := []otlpmetrichttp.Option{
+		otlpmetrichttp.WithEndpointURL(cfg.Telemetry.EndpointURL),
+		otlpmetrichttp.WithTemporalitySelector(temporalitySelector(cfg.Telemetry.MetricsTemporality)),
+		otlpmetrichttp.WithAggregationSelector(aggregationSelector(cfg.Telemetry.MetricsHistogram)),
+	}
 	if cfg.Telemetry.Insecure {
 		opts = append(opts, otlpmetrichttp.WithInsecure())
 	}
@@ -11604,6 +11688,66 @@ func metricHTTPOpts(cfg *config.Config) []otlpmetrichttp.Option {
 		opts = append(opts, otlpmetrichttp.WithCompression(otlpmetrichttp.GzipCompression))
 	}
 	return opts
+}
+
+// temporalitySelector maps OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+// (already lowercased by config) onto an SDK TemporalitySelector, following
+// the OTLP exporter spec:
+//
+//	delta:      Counter, ObservableCounter, Histogram -> delta; others cumulative
+//	lowmemory:  Counter, Histogram -> delta; others cumulative
+//	cumulative: everything cumulative (the SDK default)
+//
+// Uptrace prefers delta, which is our config default. Unknown values fall back
+// to the SDK default (cumulative) rather than failing startup.
+func temporalitySelector(pref string) sdkmetric.TemporalitySelector {
+	switch strings.ToLower(pref) {
+	case "delta":
+		return func(k sdkmetric.InstrumentKind) metricdata.Temporality {
+			switch k {
+			case sdkmetric.InstrumentKindCounter,
+				sdkmetric.InstrumentKindObservableCounter,
+				sdkmetric.InstrumentKindHistogram:
+				return metricdata.DeltaTemporality
+			default:
+				return metricdata.CumulativeTemporality
+			}
+		}
+	case "lowmemory":
+		return func(k sdkmetric.InstrumentKind) metricdata.Temporality {
+			switch k {
+			case sdkmetric.InstrumentKindCounter,
+				sdkmetric.InstrumentKindHistogram:
+				return metricdata.DeltaTemporality
+			default:
+				return metricdata.CumulativeTemporality
+			}
+		}
+	default: // "cumulative" or anything unrecognized
+		return sdkmetric.DefaultTemporalitySelector
+	}
+}
+
+// aggregationSelector maps OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION
+// (already lowercased by config) onto an SDK AggregationSelector. With
+// base2_exponential_bucket_histogram (our default, and what Uptrace
+// recommends), Histogram instruments use auto-scaling exponential buckets
+// (MaxSize 160 / MaxScale 20, the SDK's own defaults for this aggregation)
+// instead of fixed explicit boundaries; every other instrument kind keeps the
+// SDK default aggregation.
+func aggregationSelector(hist string) sdkmetric.AggregationSelector {
+	if strings.ToLower(hist) != "base2_exponential_bucket_histogram" {
+		return sdkmetric.DefaultAggregationSelector
+	}
+	return func(k sdkmetric.InstrumentKind) sdkmetric.Aggregation {
+		if k == sdkmetric.InstrumentKindHistogram {
+			return sdkmetric.AggregationBase2ExponentialHistogram{
+				MaxSize:  160,
+				MaxScale: 20,
+			}
+		}
+		return sdkmetric.DefaultAggregationSelector(k)
+	}
 }
 
 func logHTTPOpts(cfg *config.Config) []otlploghttp.Option {
@@ -12711,6 +12855,291 @@ the corresponding source.
 
 
 ################################################################################
+# FILE: scripts/ci-container-test.sh
+################################################################################
+
+--- METADATA ---
+  File name:             ci-container-test.sh
+  Relative path:         scripts/ci-container-test.sh
+  Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/ci-container-test.sh
+  Size:                  11.1 KiB (11433 bytes)
+  Last modified:         2026-07-05 05:28:05.231486945 -0400
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 19487463
+  Hard links:            1
+  MIME type:             text/x-shellscript
+  SHA-256:               bf444369d4648d3a619e3382fc61bb18efe7f09a98e3e9b2c51720a93149e1da
+  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
+
+--- CONTENT ---
+#!/usr/bin/env bash
+# scripts/ci-container-test.sh — build the Containerfiles and exercise the real
+# stack (db + api + frontend, no Cloudflare tunnels) end to end over HTTP.
+#
+# This is the piece plain `scripts/test.sh` cannot cover: that the images
+# actually build, that compose wiring + env substitution is right, that
+# migrations run against real Postgres, and that the HTTP surface behaves —
+# including a regression test for the captcha sync 500 (`operator is not
+# unique: unknown + unknown`), which only ever reproduced against a real
+# Postgres because unit tests never hit the pgx extended protocol.
+#
+# Runs identically on a laptop and in GitHub Actions:
+#   bash scripts/ci-container-test.sh [project-name]     (default: gotunnels-ci)
+#
+# No host ports are published; all HTTP assertions run from a throwaway curl
+# container attached to the instance's compose network. The api image is
+# distroless (no shell), so an external HTTP driver is the only option anyway.
+
+set -euo pipefail
+IFS=$'\n\t'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+detect_runtime
+ensure_env
+reset_runtime_env
+
+PROJECT="$(resolve_project "${1:-gotunnels-ci}")"
+export GOTUNNELS_INSTANCE_ID="${GOTUNNELS_INSTANCE_ID:-$PROJECT}"
+NET="${PROJECT}_default"
+# Pinned, fully qualified (podman does not assume docker.io). busybox wget in
+# the caddy image can't do PUT/DELETE, hence a real curl.
+CURL_IMAGE="docker.io/curlimages/curl:8.10.1"
+
+log "container test instance: $PROJECT"
+
+# ---------------------------------------------------------------------------
+# teardown + failure diagnostics
+# ---------------------------------------------------------------------------
+cleanup() {
+  status=$?
+  if [ "$status" -ne 0 ] && [ -n "${CR:-}" ]; then
+    err "container test FAILED (exit $status) — dumping service logs"
+    for _svc in db api frontend; do
+      _cid="$(cid_of "$PROJECT" "$_svc")"
+      if [ -n "$_cid" ]; then
+        err "----- logs: $_svc -----"
+        "$CR" logs --tail 120 "$_cid" 2>&1 | sed 's/^/    /' >&2 || true
+      else
+        err "----- logs: $_svc ----- (no container)"
+      fi
+    done
+  fi
+  if [ -n "${CR:-}" ]; then
+    log "tearing down CI instance $PROJECT"
+    dc -p "$PROJECT" down -v --remove-orphans >/dev/null 2>&1 || true
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+
+# ---------------------------------------------------------------------------
+# assertion helpers
+# ---------------------------------------------------------------------------
+FAILED=0
+
+# ccurl — run curl inside a one-shot container on the compose network. -sS so
+# transport errors surface; --max-time caps a wedged request, not the test.
+ccurl() {
+  "$CR" run --rm --network "$NET" "$CURL_IMAGE" -sS --max-time 30 "$@"
+}
+
+# assert_contains BODY NEEDLE LABEL — grep must DRAIN stdin (>/dev/null, not
+# -q): with -q it exits at first match, printf takes SIGPIPE, and under
+# pipefail a PASS would read as FAIL. Same trap as wait_for_log in lib.sh.
+assert_contains() {
+  if printf '%s' "$1" | grep -F -- "$2" >/dev/null; then
+    ok "PASS: $3"
+  else
+    err "FAIL: $3"
+    err "  expected to find: $2"
+    printf '%s\n' "$1" | head -20 | sed 's/^/    got: /' >&2
+    FAILED=1
+  fi
+}
+
+assert_icontains() { # case-insensitive variant (headers, HTML)
+  if printf '%s' "$1" | grep -Fi -- "$2" >/dev/null; then
+    ok "PASS: $3"
+  else
+    err "FAIL: $3"
+    err "  expected to find (case-insensitive): $2"
+    printf '%s\n' "$1" | head -20 | sed 's/^/    got: /' >&2
+    FAILED=1
+  fi
+}
+
+assert_not_contains() {
+  if printf '%s' "$1" | grep -F -- "$2" >/dev/null; then
+    err "FAIL: $3"
+    err "  expected NOT to find: $2"
+    FAILED=1
+  else
+    ok "PASS: $3"
+  fi
+}
+
+assert_eq() { # GOT WANT LABEL
+  if [ "$1" = "$2" ]; then
+    ok "PASS: $3"
+  else
+    err "FAIL: $3 (got '$1', want '$2')"
+    FAILED=1
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# 1) build both images
+# ---------------------------------------------------------------------------
+log "building images (Containerfile.api + Containerfile.frontend)…"
+dc -p "$PROJECT" build
+
+# ---------------------------------------------------------------------------
+# 2) database, then api + frontend (no tunnels in CI)
+# ---------------------------------------------------------------------------
+log "starting database…"
+dc -p "$PROJECT" up -d db
+wait_healthy "$PROJECT" db 90 \
+  pg_isready -U "${POSTGRES_USER:-gotunnels}" -d "${POSTGRES_DB:-gotunnels}" -q
+
+log "starting api + frontend…"
+# podman-compose ignores --no-deps and will re-process db; it prints a
+# "name already in use" for the existing container but exits 0, so this is
+# safe under both runtimes (docker compose honors --no-deps outright).
+dc -p "$PROJECT" up -d --no-deps api frontend
+
+# Unlike up.sh (best-effort warn), CI must hard-fail if the API never comes up.
+wait_for_log "$PROJECT" api 'http server listening' 90 \
+  || die "api never logged 'http server listening' — startup failed"
+ok "api is listening"
+
+# ---------------------------------------------------------------------------
+# 3) migrations actually ran
+# ---------------------------------------------------------------------------
+db_cid="$(cid_of "$PROJECT" db)"
+[ -n "$db_cid" ] || die "no db container id"
+mig="$("$CR" exec "$db_cid" psql -U "${POSTGRES_USER:-gotunnels}" -d "${POSTGRES_DB:-gotunnels}" \
+  -tAc 'SELECT COALESCE(max(version), 0) FROM schema_migrations' | tr -d '[:space:]')"
+log "schema_migrations max(version) = $mig"
+if [ "${mig:-0}" -ge 7 ] 2>/dev/null; then
+  ok "PASS: migrations applied (>= 7)"
+else
+  err "FAIL: expected migration version >= 7, got '$mig'"
+  FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# 4) health endpoints
+# ---------------------------------------------------------------------------
+ccurl -f http://api:8080/healthz >/dev/null && ok "PASS: /healthz"
+ccurl -f http://api:8080/readyz  >/dev/null && ok "PASS: /readyz (db reachable)"
+
+# ---------------------------------------------------------------------------
+# 5) signup -> bearer token
+# ---------------------------------------------------------------------------
+signup_resp="$(ccurl -X POST http://api:8080/api/signup \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"ciuser","password":"ci-password-123","display_name":"CI User"}')"
+TOKEN="$(printf '%s' "$signup_resp" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')"
+if [ -n "$TOKEN" ]; then
+  ok "PASS: signup issued a session token"
+else
+  err "FAIL: signup did not return a token"
+  printf '%s\n' "$signup_resp" | head -5 | sed 's/^/    got: /' >&2
+  die "cannot continue without a session token"
+fi
+AUTH="Authorization: Bearer $TOKEN"
+
+# ---------------------------------------------------------------------------
+# 6) captcha sync — REGRESSION for the 'unknown + unknown' 500.
+#    Before the ::bigint casts in store.SyncCaptchaStats, every call to this
+#    endpoint failed with {"error":"internal server error"}; both the insert
+#    and the update paths below would have 500ed.
+# ---------------------------------------------------------------------------
+sync1="$(ccurl -X POST http://api:8080/api/captcha/sync \
+  -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"manual_delta":3,"auto_delta":5,"current_streak":2,"best_streak":4}')"
+assert_contains "$sync1" '"total_solves":8'   "captcha sync insert path (3 manual + 5 auto = 8)"
+assert_contains "$sync1" '"best_streak":4'    "captcha sync insert path records best streak"
+assert_not_contains "$sync1" 'internal server error' "captcha sync does not 500 (insert)"
+
+sync2="$(ccurl -X POST http://api:8080/api/captcha/sync \
+  -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"manual_delta":4,"auto_delta":8,"current_streak":1,"best_streak":2}')"
+assert_contains "$sync2" '"total_solves":20'  "captcha sync update path accumulates (8 + 12 = 20)"
+assert_contains "$sync2" '"best_streak":4'    "captcha sync keeps GREATEST best streak (4 > 2)"
+assert_contains "$sync2" '"current_streak":1' "captcha sync current streak is last-write-wins"
+assert_not_contains "$sync2" 'internal server error' "captcha sync does not 500 (update)"
+
+stats="$(ccurl -H "$AUTH" http://api:8080/api/captcha/stats)"
+assert_contains "$stats" '"total_solves":20' "captcha stats reads back the synced totals"
+
+lb="$(ccurl -H "$AUTH" http://api:8080/api/captcha/leaderboard)"
+assert_contains "$lb" '"username":"ciuser"' "leaderboard ranks the CI user"
+
+# ---------------------------------------------------------------------------
+# 7) prefs round trip
+# ---------------------------------------------------------------------------
+put_pref="$(ccurl -X PUT http://api:8080/api/prefs/theme \
+  -H "$AUTH" -H 'Content-Type: application/json' -d '{"value":"dark"}')"
+assert_contains "$put_pref" '"status":"saved"' "prefs PUT saves"
+
+get_pref="$(ccurl -H "$AUTH" http://api:8080/api/prefs/theme)"
+assert_contains "$get_pref" '"value":"dark"' "prefs GET returns the stored value"
+assert_contains "$get_pref" '"exists":true'  "prefs GET reports exists=true"
+
+# ---------------------------------------------------------------------------
+# 8) notes create / list / delete
+# ---------------------------------------------------------------------------
+note_resp="$(ccurl -X POST http://api:8080/api/notes \
+  -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"body":"hello from the CI smoke test"}')"
+NOTE_ID="$(printf '%s' "$note_resp" | sed -n 's/.*"note":{"id":\([0-9][0-9]*\).*/\1/p')"
+if [ -n "$NOTE_ID" ]; then
+  ok "PASS: note created (id=$NOTE_ID)"
+else
+  err "FAIL: note creation did not return a numeric id"
+  printf '%s\n' "$note_resp" | head -5 | sed 's/^/    got: /' >&2
+  FAILED=1
+fi
+
+notes_list="$(ccurl -H "$AUTH" http://api:8080/api/notes)"
+assert_contains "$notes_list" 'hello from the CI smoke test' "notes list contains the new note"
+
+if [ -n "$NOTE_ID" ]; then
+  del_resp="$(ccurl -X DELETE "http://api:8080/api/notes/$NOTE_ID" -H "$AUTH")"
+  assert_contains "$del_resp" '"status":"deleted"' "note delete (hard delete semantics)"
+  notes_after="$(ccurl -H "$AUTH" http://api:8080/api/notes)"
+  assert_not_contains "$notes_after" 'hello from the CI smoke test' "deleted note is gone from the list"
+fi
+
+# ---------------------------------------------------------------------------
+# 9) CORS preflight (the middleware must answer OPTIONS itself with 204)
+# ---------------------------------------------------------------------------
+pre_code="$(ccurl -o /dev/null -w '%{http_code}' -X OPTIONS http://api:8080/api/signup \
+  -H 'Origin: https://example.com' -H 'Access-Control-Request-Method: POST')"
+assert_eq "$pre_code" "204" "CORS preflight answered with 204"
+
+# ---------------------------------------------------------------------------
+# 10) frontend serves the app with the CSP header
+# ---------------------------------------------------------------------------
+front="$(ccurl -D - http://frontend:8080/)"
+assert_icontains "$front" 'content-security-policy' "frontend sends a CSP header"
+assert_icontains "$front" '<html' "frontend serves the HTML app"
+
+# ---------------------------------------------------------------------------
+# verdict
+# ---------------------------------------------------------------------------
+if [ "$FAILED" -ne 0 ]; then
+  die "container smoke test had failures (see FAIL lines above)"
+fi
+ok "container smoke test passed."
+
+
+################################################################################
 # FILE: scripts/down.sh
 ################################################################################
 
@@ -12763,15 +13192,15 @@ ok "instance '$PROJECT' removed (containers + volumes)."
   File name:             lib.sh
   Relative path:         scripts/lib.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/lib.sh
-  Size:                  13.1 KiB (13440 bytes)
-  Last modified:         2026-07-02 02:39:08.884342484 -0400
+  Size:                  16.3 KiB (16765 bytes)
+  Last modified:         2026-07-05 05:28:18.176495561 -0400
   Permissions:           -rwxr-xr-x
   Owner:                 kushal:kushal
   Inode:                 17805976
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               93b6b024894f9949c8f622cf7596fdebda6f3891bfc2677afa9104ec4229abb2
-  Last git commit:       6f1845a 2026-07-02 02:39:30 -0400 add claude response
+  SHA-256:               65e9b20c46c25e983557068ca3e866c833d28f52768b3d047bf09974add6f2f4
+  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -12887,6 +13316,9 @@ GOTUNNELS_CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self'; i
 UPTRACE_DSN=${UPTRACE_DSN:-}
 OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
 OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS:-}
+OTEL_EXPORTER_OTLP_COMPRESSION=${OTEL_EXPORTER_OTLP_COMPRESSION:-gzip}
+OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=${OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE:-delta}
+OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=${OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION:-base2_exponential_bucket_histogram}
 OTEL_SERVICE_NAME=gotunnels-api
 GOTUNNELS_DEV=false
 EOF
@@ -12894,6 +13326,28 @@ EOF
   else
     log "using existing $ENV_FILE"
   fi
+
+  # Persist any telemetry settings the CALLER exported in their shell into
+  # .env BEFORE load_env runs. Order matters: an existing .env with an empty
+  # `UPTRACE_DSN=` line would otherwise clobber `export UPTRACE_DSN=...` from
+  # the invoking shell (load_env re-exports the empty value over it) and
+  # telemetry silently turns off. That is exactly the trap in
+  # `export UPTRACE_DSN=… ; bash scripts/up.sh` against an older .env — the
+  # only visible symptom is nothing ever arriving at the backend. Persisting
+  # here also means the DSN survives into future runs without re-exporting.
+  local _k _v
+  for _k in UPTRACE_DSN \
+            OTEL_EXPORTER_OTLP_ENDPOINT \
+            OTEL_EXPORTER_OTLP_HEADERS \
+            OTEL_EXPORTER_OTLP_COMPRESSION \
+            OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE \
+            OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION; do
+    _v="${!_k:-}"
+    if [ -n "$_v" ]; then
+      set_env_var "$_k" "$_v"
+    fi
+  done
+
   load_env
 }
 
@@ -12905,6 +13359,29 @@ load_env() {
   # shellcheck disable=SC1090
   . "$ENV_FILE"
   set +a
+}
+
+# reset_runtime_env — return the tunnel-derived keys to their bootstrap
+# defaults at the start of every run. Quick Tunnel hostnames are ephemeral, so
+# whatever up.sh wrote into .env on the LAST run is guaranteed stale on this
+# one. Left in place, those stale values become the API's CORS allow-list and
+# passkey RP if anything starts the api container before step 6 re-derives
+# them — which is precisely the CORS-on-signup failure that deleting .env
+# "fixed" (a fresh .env happens to default to `*`). Resetting the three keys
+# to the same permissive bootstrap values a fresh .env would carry makes
+# deleting .env unnecessary and, unlike deletion, preserves the generated
+# secrets (Postgres password, pepper, TOTP key) and any persisted DSN.
+reset_runtime_env() {
+  set_env_var GOTUNNELS_RP_ID localhost
+  set_env_var GOTUNNELS_RP_ORIGINS http://localhost:8080
+  set_env_var GOTUNNELS_CORS_ALLOWED_ORIGINS '*'
+  # load_env has usually already run by the time this is called; re-export so
+  # the current shell (and compose var substitution) sees the fresh values,
+  # not the stale ones .env held a moment ago.
+  export GOTUNNELS_RP_ID=localhost
+  export GOTUNNELS_RP_ORIGINS=http://localhost:8080
+  export GOTUNNELS_CORS_ALLOWED_ORIGINS='*'
+  log "reset tunnel-derived env (RP_ID / RP_ORIGINS / CORS) to bootstrap defaults"
 }
 
 # ---------------------------------------------------------------------------
@@ -13048,11 +13525,21 @@ poll_tunnel_url() { # project service timeout_seconds
 }
 
 # wait_for_log project service pattern timeout — poll container logs for a regex.
+#
+# The grep must DRAIN the whole log stream: `grep -E … >/dev/null`, NOT
+# `grep -Eq`. With -q grep exits at the first match, the runtime's `logs`
+# process takes SIGPIPE (exit 141), and under `pipefail` the pipeline — and so
+# this `if` condition — reports failure even though the pattern WAS present.
+# That inverted every success into a miss, which is why up.sh printed "did not
+# observe API listening log yet" on every run while the API was in fact
+# serving. Same failure family as cid_of / poll_tunnel_url above; keeping grep
+# reading to EOF lets `logs` exit 0. A genuine no-match still exits 1 and the
+# loop just polls again.
 wait_for_log() {
   local project="$1" svc="$2" pat="$3" timeout="${4:-60}" i cid
   for i in $(seq 1 "$timeout"); do
     cid="$(cid_of "$project" "$svc")"
-    if [ -n "$cid" ] && $CR logs "$cid" 2>&1 | grep -Eq "$pat"; then
+    if [ -n "$cid" ] && "$CR" logs "$cid" 2>&1 | grep -E -- "$pat" >/dev/null; then
       return 0
     fi
     sleep 1
@@ -13267,15 +13754,15 @@ main "$@"
   File name:             up.sh
   Relative path:         scripts/up.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/up.sh
-  Size:                  5.3 KiB (5443 bytes)
-  Last modified:         2026-07-02 02:14:24.768822868 -0400
+  Size:                  6.6 KiB (6814 bytes)
+  Last modified:         2026-07-05 05:28:33.736402422 -0400
   Permissions:           -rwxr-xr-x
   Owner:                 kushal:kushal
   Inode:                 17805978
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               9f436cb9686caf23d22b0d2d19e9b499af4b4701ab70c197a04eaf9074b02cc4
-  Last git commit:       bed38b3 2026-07-02 02:17:17 -0400 add claude response
+  SHA-256:               6adb95b7e5161adbfe66956f572cb260693322dd9c33b716c6c7f8d1b11aeece
+  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -13303,6 +13790,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 detect_runtime
 ensure_env
+# Quick Tunnel URLs are ephemeral: whatever last run wrote into .env for
+# RP_ID / RP_ORIGINS / CORS is stale now. Reset them to bootstrap defaults so
+# nothing (including a dependency-started api container, see step 6) can boot
+# against a dead tunnel's origin. This removes the need to delete .env.
+reset_runtime_env
 
 PROJECT="$(resolve_project "${1:-}")"
 export GOTUNNELS_INSTANCE_ID="${GOTUNNELS_INSTANCE_ID:-$PROJECT}"
@@ -13342,6 +13834,23 @@ export GOTUNNELS_RP_ORIGINS="$FRONTEND_URL"
 export GOTUNNELS_CORS_ALLOWED_ORIGINS="$FRONTEND_URL"
 
 # 6) Now start the API (with correct RP/CORS) and its tunnel.
+#
+#    podman-compose does NOT honor `--no-deps`: step 3's
+#    `up -d --no-deps frontend cloudflared-frontend` also created and started
+#    the api container (frontend depends_on api), freezing its environment
+#    with the pre-discovery values. A plain `up -d` here then hits "name
+#    already in use", keeps that stale container, and the API never sees the
+#    tunnel-derived GOTUNNELS_RP_ID / RP_ORIGINS / CORS_ALLOWED_ORIGINS just
+#    exported above — which is exactly the CORS-on-signup failure (and, worse,
+#    silently broken passkeys: RP ID stuck at its bootstrap value). So: if an
+#    api container already exists for this project, remove it and let compose
+#    recreate it with the current environment. Under docker compose (which
+#    honors --no-deps) no such container exists yet and this is a no-op.
+_stale_api_cid="$(cid_of "$PROJECT" api)"
+if [ -n "$_stale_api_cid" ]; then
+  warn "api container was pre-created by a dependency with pre-discovery env; recreating it"
+  "$CR" rm -f "$_stale_api_cid" >/dev/null 2>&1 || true
+fi
 log "starting API and its tunnel…"
 dc -p "$PROJECT" up -d --no-deps api cloudflared-api
 
@@ -13414,10 +13923,10 @@ done
 ################################################################################
 # DUMP SUMMARY
 ################################################################################
-  Files dumped   : 91
-  Total size     : 388.6 KiB (397948 bytes)
+  Files dumped   : 92
+  Total size     : 411.2 KiB (421137 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-04T22:48:10-04:00
+  Completed at   : 2026-07-05T05:31:35-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
