@@ -23,6 +23,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 detect_runtime
 ensure_env
+# Quick Tunnel URLs are ephemeral: whatever last run wrote into .env for
+# RP_ID / RP_ORIGINS / CORS is stale now. Reset them to bootstrap defaults so
+# nothing (including a dependency-started api container, see step 6) can boot
+# against a dead tunnel's origin. This removes the need to delete .env.
+reset_runtime_env
 
 PROJECT="$(resolve_project "${1:-}")"
 export GOTUNNELS_INSTANCE_ID="${GOTUNNELS_INSTANCE_ID:-$PROJECT}"
@@ -62,6 +67,23 @@ export GOTUNNELS_RP_ORIGINS="$FRONTEND_URL"
 export GOTUNNELS_CORS_ALLOWED_ORIGINS="$FRONTEND_URL"
 
 # 6) Now start the API (with correct RP/CORS) and its tunnel.
+#
+#    podman-compose does NOT honor `--no-deps`: step 3's
+#    `up -d --no-deps frontend cloudflared-frontend` also created and started
+#    the api container (frontend depends_on api), freezing its environment
+#    with the pre-discovery values. A plain `up -d` here then hits "name
+#    already in use", keeps that stale container, and the API never sees the
+#    tunnel-derived GOTUNNELS_RP_ID / RP_ORIGINS / CORS_ALLOWED_ORIGINS just
+#    exported above — which is exactly the CORS-on-signup failure (and, worse,
+#    silently broken passkeys: RP ID stuck at its bootstrap value). So: if an
+#    api container already exists for this project, remove it and let compose
+#    recreate it with the current environment. Under docker compose (which
+#    honors --no-deps) no such container exists yet and this is a no-op.
+_stale_api_cid="$(cid_of "$PROJECT" api)"
+if [ -n "$_stale_api_cid" ]; then
+  warn "api container was pre-created by a dependency with pre-discovery env; recreating it"
+  "$CR" rm -f "$_stale_api_cid" >/dev/null 2>&1 || true
+fi
 log "starting API and its tunnel…"
 dc -p "$PROJECT" up -d --no-deps api cloudflared-api
 

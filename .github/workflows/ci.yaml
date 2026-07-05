@@ -29,3 +29,27 @@ jobs:
 
       - name: Build, vet, unit tests
         run: bash scripts/test.sh all
+
+  # Everything scripts/test.sh cannot see: that both Containerfiles build,
+  # that compose wiring + env substitution is correct, that migrations run
+  # against a real Postgres, and that the HTTP surface works end to end —
+  # including the captcha-sync regression that only reproduces against real
+  # Postgres via the pgx extended protocol. Ubuntu runners ship podman;
+  # podman-compose comes from pipx. No tunnels are started and no host ports
+  # are published; assertions run from a curl container on the compose network.
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install podman-compose
+        run: pipx install podman-compose
+
+      - name: Runtime versions
+        run: |
+          podman version
+          podman-compose version
+
+      - name: Build images + container smoke test
+        run: bash scripts/ci-container-test.sh gotunnels-ci

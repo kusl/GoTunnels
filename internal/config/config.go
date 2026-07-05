@@ -76,6 +76,16 @@ type TelemetryConfig struct {
 	Headers     map[string]string // e.g. {"uptrace-dsn": "..."}
 	Insecure    bool              // allow http:// (in-cluster collectors)
 	Compression string            // "gzip" or ""
+
+	// MetricsTemporality mirrors OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+	// ("delta", "cumulative", or "lowmemory"; normalized to lowercase). Uptrace
+	// prefers delta temporality, so that is the default.
+	MetricsTemporality string
+	// MetricsHistogram mirrors OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION
+	// ("base2_exponential_bucket_histogram" or "explicit_bucket_histogram";
+	// normalized to lowercase). Exponential histograms compress better and give
+	// Uptrace more accurate percentiles, so they are the default.
+	MetricsHistogram string
 }
 
 // Load reads and validates configuration from the environment.
@@ -157,7 +167,20 @@ func (c *Config) resolveTelemetry() {
 	//   1. UPTRACE_DSN (convenience) -> derive endpoint + uptrace-dsn header
 	//   2. OTEL_EXPORTER_OTLP_ENDPOINT (+ OTEL_EXPORTER_OTLP_HEADERS)
 	//   3. disabled (stdout logging, no-op traces/metrics)
-	tc := TelemetryConfig{Headers: map[string]string{}, Compression: getenv("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip")}
+	//
+	// The two metrics knobs follow the OpenTelemetry spec's environment
+	// variables. Their spec values are UPPERCASE (e.g. DELTA,
+	// BASE2_EXPONENTIAL_BUCKET_HISTOGRAM) but we normalize to lowercase so
+	// comparisons elsewhere are simple and either casing works.
+	tc := TelemetryConfig{
+		Headers:     map[string]string{},
+		Compression: strings.ToLower(getenv("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip")),
+		MetricsTemporality: strings.ToLower(getenv(
+			"OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "delta")),
+		MetricsHistogram: strings.ToLower(getenv(
+			"OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION",
+			"base2_exponential_bucket_histogram")),
+	}
 
 	if dsn := os.Getenv("UPTRACE_DSN"); dsn != "" {
 		endpoint, insecure := endpointFromDSN(dsn)

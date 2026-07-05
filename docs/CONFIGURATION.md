@@ -93,6 +93,8 @@ disabled (stdout logging only).
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | (empty) | Base OTLP/HTTP endpoint, if not using a DSN. |
 | `OTEL_EXPORTER_OTLP_HEADERS` | (empty) | `k1=v1,k2=v2` headers for the exporter. |
 | `OTEL_EXPORTER_OTLP_COMPRESSION` | `gzip` | Exporter compression. |
+| `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | `delta` | `delta`, `cumulative`, or `lowmemory` (spec casing like `DELTA` also accepted). Uptrace prefers delta. |
+| `OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION` | `base2_exponential_bucket_histogram` | Or `explicit_bucket_histogram`. Exponential buckets give Uptrace accurate percentiles at lower cost. |
 | `OTEL_SERVICE_NAME` / `GOTUNNELS_SERVICE_NAME` | `gotunnels-api` | OTel `service.name`. |
 
 ## Dev

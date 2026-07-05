@@ -16,6 +16,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/kusl/GoTunnels/internal/config"
@@ -29,6 +30,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
@@ -132,6 +134,9 @@ func Setup(ctx context.Context, cfg *config.Config) (*Providers, error) {
 	p.Logger.Info("telemetry enabled",
 		slog.String("otlp.endpoint", cfg.Telemetry.EndpointURL),
 		slog.Bool("otlp.insecure", cfg.Telemetry.Insecure),
+		slog.String("otlp.compression", cfg.Telemetry.Compression),
+		slog.String("otlp.metrics.temporality", cfg.Telemetry.MetricsTemporality),
+		slog.String("otlp.metrics.histogram", cfg.Telemetry.MetricsHistogram),
 	)
 	return p, nil
 }
@@ -169,7 +174,11 @@ func traceHTTPOpts(cfg *config.Config) []otlptracehttp.Option {
 }
 
 func metricHTTPOpts(cfg *config.Config) []otlpmetrichttp.Option {
-	opts := []otlpmetrichttp.Option{otlpmetrichttp.WithEndpointURL(cfg.Telemetry.EndpointURL)}
+	opts := []otlpmetrichttp.Option{
+		otlpmetrichttp.WithEndpointURL(cfg.Telemetry.EndpointURL),
+		otlpmetrichttp.WithTemporalitySelector(temporalitySelector(cfg.Telemetry.MetricsTemporality)),
+		otlpmetrichttp.WithAggregationSelector(aggregationSelector(cfg.Telemetry.MetricsHistogram)),
+	}
 	if cfg.Telemetry.Insecure {
 		opts = append(opts, otlpmetrichttp.WithInsecure())
 	}
@@ -180,6 +189,66 @@ func metricHTTPOpts(cfg *config.Config) []otlpmetrichttp.Option {
 		opts = append(opts, otlpmetrichttp.WithCompression(otlpmetrichttp.GzipCompression))
 	}
 	return opts
+}
+
+// temporalitySelector maps OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+// (already lowercased by config) onto an SDK TemporalitySelector, following
+// the OTLP exporter spec:
+//
+//	delta:      Counter, ObservableCounter, Histogram -> delta; others cumulative
+//	lowmemory:  Counter, Histogram -> delta; others cumulative
+//	cumulative: everything cumulative (the SDK default)
+//
+// Uptrace prefers delta, which is our config default. Unknown values fall back
+// to the SDK default (cumulative) rather than failing startup.
+func temporalitySelector(pref string) sdkmetric.TemporalitySelector {
+	switch strings.ToLower(pref) {
+	case "delta":
+		return func(k sdkmetric.InstrumentKind) metricdata.Temporality {
+			switch k {
+			case sdkmetric.InstrumentKindCounter,
+				sdkmetric.InstrumentKindObservableCounter,
+				sdkmetric.InstrumentKindHistogram:
+				return metricdata.DeltaTemporality
+			default:
+				return metricdata.CumulativeTemporality
+			}
+		}
+	case "lowmemory":
+		return func(k sdkmetric.InstrumentKind) metricdata.Temporality {
+			switch k {
+			case sdkmetric.InstrumentKindCounter,
+				sdkmetric.InstrumentKindHistogram:
+				return metricdata.DeltaTemporality
+			default:
+				return metricdata.CumulativeTemporality
+			}
+		}
+	default: // "cumulative" or anything unrecognized
+		return sdkmetric.DefaultTemporalitySelector
+	}
+}
+
+// aggregationSelector maps OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION
+// (already lowercased by config) onto an SDK AggregationSelector. With
+// base2_exponential_bucket_histogram (our default, and what Uptrace
+// recommends), Histogram instruments use auto-scaling exponential buckets
+// (MaxSize 160 / MaxScale 20, the SDK's own defaults for this aggregation)
+// instead of fixed explicit boundaries; every other instrument kind keeps the
+// SDK default aggregation.
+func aggregationSelector(hist string) sdkmetric.AggregationSelector {
+	if strings.ToLower(hist) != "base2_exponential_bucket_histogram" {
+		return sdkmetric.DefaultAggregationSelector
+	}
+	return func(k sdkmetric.InstrumentKind) sdkmetric.Aggregation {
+		if k == sdkmetric.InstrumentKindHistogram {
+			return sdkmetric.AggregationBase2ExponentialHistogram{
+				MaxSize:  160,
+				MaxScale: 20,
+			}
+		}
+		return sdkmetric.DefaultAggregationSelector(k)
+	}
 }
 
 func logHTTPOpts(cfg *config.Config) []otlploghttp.Option {

@@ -111,6 +111,9 @@ GOTUNNELS_CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self'; i
 UPTRACE_DSN=${UPTRACE_DSN:-}
 OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
 OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS:-}
+OTEL_EXPORTER_OTLP_COMPRESSION=${OTEL_EXPORTER_OTLP_COMPRESSION:-gzip}
+OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=${OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE:-delta}
+OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=${OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION:-base2_exponential_bucket_histogram}
 OTEL_SERVICE_NAME=gotunnels-api
 GOTUNNELS_DEV=false
 EOF
@@ -118,6 +121,28 @@ EOF
   else
     log "using existing $ENV_FILE"
   fi
+
+  # Persist any telemetry settings the CALLER exported in their shell into
+  # .env BEFORE load_env runs. Order matters: an existing .env with an empty
+  # `UPTRACE_DSN=` line would otherwise clobber `export UPTRACE_DSN=...` from
+  # the invoking shell (load_env re-exports the empty value over it) and
+  # telemetry silently turns off. That is exactly the trap in
+  # `export UPTRACE_DSN=… ; bash scripts/up.sh` against an older .env — the
+  # only visible symptom is nothing ever arriving at the backend. Persisting
+  # here also means the DSN survives into future runs without re-exporting.
+  local _k _v
+  for _k in UPTRACE_DSN \
+            OTEL_EXPORTER_OTLP_ENDPOINT \
+            OTEL_EXPORTER_OTLP_HEADERS \
+            OTEL_EXPORTER_OTLP_COMPRESSION \
+            OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE \
+            OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION; do
+    _v="${!_k:-}"
+    if [ -n "$_v" ]; then
+      set_env_var "$_k" "$_v"
+    fi
+  done
+
   load_env
 }
 
@@ -129,6 +154,29 @@ load_env() {
   # shellcheck disable=SC1090
   . "$ENV_FILE"
   set +a
+}
+
+# reset_runtime_env — return the tunnel-derived keys to their bootstrap
+# defaults at the start of every run. Quick Tunnel hostnames are ephemeral, so
+# whatever up.sh wrote into .env on the LAST run is guaranteed stale on this
+# one. Left in place, those stale values become the API's CORS allow-list and
+# passkey RP if anything starts the api container before step 6 re-derives
+# them — which is precisely the CORS-on-signup failure that deleting .env
+# "fixed" (a fresh .env happens to default to `*`). Resetting the three keys
+# to the same permissive bootstrap values a fresh .env would carry makes
+# deleting .env unnecessary and, unlike deletion, preserves the generated
+# secrets (Postgres password, pepper, TOTP key) and any persisted DSN.
+reset_runtime_env() {
+  set_env_var GOTUNNELS_RP_ID localhost
+  set_env_var GOTUNNELS_RP_ORIGINS http://localhost:8080
+  set_env_var GOTUNNELS_CORS_ALLOWED_ORIGINS '*'
+  # load_env has usually already run by the time this is called; re-export so
+  # the current shell (and compose var substitution) sees the fresh values,
+  # not the stale ones .env held a moment ago.
+  export GOTUNNELS_RP_ID=localhost
+  export GOTUNNELS_RP_ORIGINS=http://localhost:8080
+  export GOTUNNELS_CORS_ALLOWED_ORIGINS='*'
+  log "reset tunnel-derived env (RP_ID / RP_ORIGINS / CORS) to bootstrap defaults"
 }
 
 # ---------------------------------------------------------------------------
@@ -272,11 +320,21 @@ poll_tunnel_url() { # project service timeout_seconds
 }
 
 # wait_for_log project service pattern timeout — poll container logs for a regex.
+#
+# The grep must DRAIN the whole log stream: `grep -E … >/dev/null`, NOT
+# `grep -Eq`. With -q grep exits at the first match, the runtime's `logs`
+# process takes SIGPIPE (exit 141), and under `pipefail` the pipeline — and so
+# this `if` condition — reports failure even though the pattern WAS present.
+# That inverted every success into a miss, which is why up.sh printed "did not
+# observe API listening log yet" on every run while the API was in fact
+# serving. Same failure family as cid_of / poll_tunnel_url above; keeping grep
+# reading to EOF lets `logs` exit 0. A genuine no-match still exits 1 and the
+# loop just polls again.
 wait_for_log() {
   local project="$1" svc="$2" pat="$3" timeout="${4:-60}" i cid
   for i in $(seq 1 "$timeout"); do
     cid="$(cid_of "$project" "$svc")"
-    if [ -n "$cid" ] && $CR logs "$cid" 2>&1 | grep -Eq "$pat"; then
+    if [ -n "$cid" ] && "$CR" logs "$cid" 2>&1 | grep -E -- "$pat" >/dev/null; then
       return 0
     fi
     sleep 1

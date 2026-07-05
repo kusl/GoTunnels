@@ -608,18 +608,28 @@ func (s *Store) InsertCSPReport(ctx context.Context, in CSPReportInput) error {
 // row, creating it on first sync. Totals accumulate; best_streak only ever
 // grows (GREATEST); current_streak is last-write-wins. The updated row is
 // returned so the client can reconcile its display with the server's truth.
+//
+// Every integer placeholder carries an explicit ::bigint cast. pgx v5 uses the
+// extended query protocol and, in its default statement-cache mode, sends the
+// Parse step without declared parameter types. Postgres then has to infer them
+// and the expression `$4 + $5` fails at plan time with
+// `ERROR: operator is not unique: unknown + unknown` — the statement can never
+// even execute, so the sync endpoint 500s on every request. Casting each
+// parameter pins the types and makes the statement plannable. (Placeholders
+// compared against a typed column, like `$1::uuid = user_id`, would be
+// inferable anyway, but we cast uniformly for clarity.)
 func (s *Store) SyncCaptchaStats(ctx context.Context, userID string, in CaptchaSyncInput) (CaptchaStats, error) {
 	st := CaptchaStats{UserID: userID}
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO captcha_stats
 			(user_id, best_streak, current_streak, total_solves, manual_solves, auto_solves, updated_at)
-		VALUES ($1::uuid, $2, $3, $4 + $5, $4, $5, now())
+		VALUES ($1::uuid, $2::bigint, $3::bigint, $4::bigint + $5::bigint, $4::bigint, $5::bigint, now())
 		ON CONFLICT (user_id) DO UPDATE SET
 			best_streak    = GREATEST(captcha_stats.best_streak, EXCLUDED.best_streak),
 			current_streak = EXCLUDED.current_streak,
-			total_solves   = captcha_stats.total_solves + $4 + $5,
-			manual_solves  = captcha_stats.manual_solves + $4,
-			auto_solves    = captcha_stats.auto_solves + $5,
+			total_solves   = captcha_stats.total_solves + $4::bigint + $5::bigint,
+			manual_solves  = captcha_stats.manual_solves + $4::bigint,
+			auto_solves    = captcha_stats.auto_solves + $5::bigint,
 			updated_at     = now()
 		RETURNING best_streak, current_streak, total_solves, manual_solves, auto_solves, updated_at`,
 		userID, in.BestStreak, in.CurrentStreak, in.ManualDelta, in.AutoDelta,
