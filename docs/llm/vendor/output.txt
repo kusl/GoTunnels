@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-05T09:10:34-04:00
+  Generated at   : 2026-07-05T10:29:51-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : 2e66be61d9d69801153940605c5d59260455198c
-  Commit (short) : 2e66be6
-  Commit date    : 2026-07-05 09:10:27 -0400
-  Commit message : add logs
+  Commit (full)  : b4d1caeebb897da4594cd6777b4a0f0f768e6a65
+  Commit (short) : b4d1cae
+  Commit date    : 2026-07-05 10:29:48 -0400
+  Commit message : add prompt
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 92
   Excluded path  : docs/llm/
@@ -13926,7 +13926,7 @@ done
   Files dumped   : 92
   Total size     : 411.2 KiB (421137 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-05T09:10:37-04:00
+  Completed at   : 2026-07-05T10:29:54-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
