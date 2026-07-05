@@ -100,7 +100,7 @@ Please return FULL files for all files that need to change.
 
 
 /
-Claude is responding
+Claude finished the response
 This is great progress. 
 However, there are a few issues. 
 First, I got some CORS error when signing up 
@@ -895,11 +895,22 @@ Now the CI test script. Let me verify exact request/response JSON shapes from th
 
 Catalogued API response formats and identified outstanding verification tasks
 Catalogued API response formats and identified outstanding verification tasks
+
+Verify JSON field names and status codes for captcha/notes/auth handlers
+
+Script
+I'm reviewing the API response shapes for the sync endpoint, which returns stats like manual and auto deltas along with streak information, and confirming the note operations—POST creates with a 201 status, DELETE removes with a 200 response, and GET retrieves the full list. The signup validation checks out with the password requirement and token in the response, but I need to verify what status code issueSession returns and whether the sync stats are wrapped in an object or returned directly.
+
+
+Check session issue status code and captcha/prefs response shapes
+
+Script
+Done
 please continue
 
 
-Verified completion and prepared script creation
-Verified completion and prepared script creation
+Scrutinizing script behavior under set -e conditions
+Scrutinizing script behavior under set -e conditions
 I need to track down the issueSession return value since the grep only showed where it's called, not defined. I should also verify the CaptchaStats JSON tags in store.go and confirm the migrations count is at least 7, then move on to writing the CI container test script and updating ci.yaml before doing a final validation pass.
 
 
@@ -1011,8 +1022,8 @@ Done
 Config tests all pass. The telemetry package needs otel deps I can't fetch here, so I verify the exact API usage against the pinned v1.44.0 source directly:
 
 
-Validated symbols, scripts, and configuration files thoroughly
-Validated symbols, scripts, and configuration files thoroughly
+Verifying no new errors introduced by changes
+Verifying no new errors introduced by changes
 
 Final verification of every otel symbol used in telemetry.go against pinned v1.44.0
 
@@ -1041,7 +1052,9 @@ Secrets scan on deliverables, then empirically test the ensure_env DSN-persist +
 Script
 The "FOUND SECRETS" alert is a false positive—it just matched the placeholder format in the .env.example file, not an actual secret. The sandbox test confirms the fix is working: the shell-exported UPTRACE_DSN persisted correctly into .env without being overwritten.
 
-Now I need to verify the wait_for_log fix handles the SIGPIPE scenario properly under pipefail, and then test the sed extraction patterns against realistic JSON data. I should also validate that the assert helper functions in ci-container-test.sh work correctly by testing the critical extraction and assertion logic directly.The .env.example file only contains placeholder values with no real secrets, and I've confirmed both environment fixes work in the sandbox. Now I'll verify the wait_for_log fix and JSON extraction patterns.
+Now I need to verify the wait_for_log fix handles the SIGPIPE scenario properly under pipefail, and then test the sed extraction patterns against realistic JSON data. I should also validate that the assert helper functions in ci-container-test.sh work correctly by testing the critical extraction and assertion logic directly.
+
+The .env.example file only contains placeholder values with no real secrets, and I've confirmed both environment fixes work in the sandbox. Now I'll verify the wait_for_log fix and JSON extraction patterns.
 
 
 Empirically verify the wait_for_log fix, sed extractions, and assert helper semantics under strict mode
@@ -1051,7 +1064,9 @@ Script
 Rerun harness under bash explicitly (default shell was sh)
 
 Script
-I've verified that the new drain pattern correctly catches the present pattern issue that the old -Eq approach missed under pipefail, and confirmed the token and note-id extractions work properly against the Go-encoder JSON output. The assert_contains function handles set -e correctly with FAILED tracking intact. Now I need to validate the SQL fix by running it against the local Postgres instance to ensure the final query in store.go has all the necessary casts and ON CONFLICT handling.Running the exact SQL from store.go against real Postgres to verify the fix works end-to-end through pgx's untyped-parameter path.
+I've verified that the new drain pattern correctly catches the present pattern issue that the old -Eq approach missed under pipefail, and confirmed the token and note-id extractions work properly against the Go-encoder JSON output. The assert_contains function handles set -e correctly with FAILED tracking intact. Now I need to validate the SQL fix by running it against the local Postgres instance to ensure the final query in store.go has all the necessary casts and ON CONFLICT handling.
+
+Running the exact SQL from store.go against real Postgres to verify the fix works end-to-end through pgx's untyped-parameter path.
 
 
 Final SQL regression check: the fixed statement plans and executes correctly on both insert and update paths
@@ -1241,8 +1256,2123 @@ type CSPReportInput struct {
 // solves are folded in as batched deltas, never stored individually.
 type CaptchaStats struct {
 	UserID        string    `json:"user_id,omitempty"`
+	BestStreak    int64     `json:"best_streak"`
+	CurrentStreak int64     `json:"current_streak"`
+	TotalSolves   int64     `json:"total_solves"`
+	ManualSolves  int64     `json:"manual_solves"`
+	AutoSolves    int64     `json:"auto_solves"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// CaptchaSyncInput is one client-side batch of CAPTCHA progress. Deltas are
+// added to totals; streaks are point-in-time snapshots (best is merged with
+// GREATEST, current is last-write-wins).
+type CaptchaSyncInput struct {
+	ManualDelta   int64
+	AutoDelta     int64
+	CurrentStreak int64
+	BestStreak    int64
+}
+
+// CaptchaLeaderboardRow is one ranked leaderboard entry.
+type CaptchaLeaderboardRow struct {
+	Rank        int64  `json:"rank"`
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	BestStreak  int64  `json:"best_streak"`
+	TotalSolves int64  `json:"total_solves"`
+}
+
+// Note is one public microblog post.
+type Note struct {
+	ID          int64     `json:"id"`
+	UserID      string    `json:"user_id"`
+	Username    string    `json:"username"`
+	DisplayName string    `json:"display_name"`
+	Body        string    `json:"body"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// ---------------------------------------------------------------------------
+// Users & roles
+// ---------------------------------------------------------------------------
+
+// CreateUser inserts a user and grants the default "user" role atomically.
+func (s *Store) CreateUser(ctx context.Context, username, displayName string) (User, error) {
+	lower := normalizeUsername(username)
+	if displayName == "" {
+		displayName = username
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return User{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var u User
+	err = tx.QueryRow(ctx, `
+		INSERT INTO users (username, username_lower, display_name)
+		VALUES ($1, $2, $3)
+		RETURNING id::text, username, display_name, created_at`,
+		username, lower, displayName,
+	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.CreatedAt)
+	if err != nil {
+		return User{}, err
+	}
+	if _, err = tx.Exec(ctx,
+		`INSERT INTO user_roles (user_id, role) VALUES ($1::uuid, 'user')`, u.ID); err != nil {
+		return User{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return User{}, err
+	}
+	return u, nil
+}
+
+// GetUserByUsername looks up a user case-insensitively.
+func (s *Store) GetUserByUsername(ctx context.Context, username string) (User, error) {
+	lower := normalizeUsername(username)
+	var u User
+	err := s.pool.QueryRow(ctx, `
+		SELECT id::text, username, display_name, created_at
+		FROM users WHERE username_lower = $1`, lower,
+	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.CreatedAt)
+	return u, mapErr(err)
+}
+
+// GetUserByID looks up a user by id.
+func (s *Store) GetUserByID(ctx context.Context, id string) (User, error) {
+	var u User
+	err := s.pool.QueryRow(ctx, `
+		SELECT id::text, username, display_name, created_at
+		FROM users WHERE id = $1::uuid`, id,
+	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.CreatedAt)
+	return u, mapErr(err)
+}
+
+// UsernameExists reports whether a username is already taken.
+func (s *Store) UsernameExists(ctx context.Context, username string) (bool, error) {
+	var exists bool
+	err := s.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM users WHERE username_lower = $1)`,
+		normalizeUsername(username),
+	).Scan(&exists)
+	return exists, err
+}
+
+// UserRoles returns the role names granted to a user.
+func (s *Store) UserRoles(ctx context.Context, userID string) ([]string, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT role FROM user_roles WHERE user_id = $1::uuid ORDER BY role`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var roles []string
+	for rows.Next() {
+		var r string
+		if err := rows.Scan(&r); err != nil {
+			return nil, err
+		}
+		roles = append(roles, r)
+	}
+	return roles, rows.Err()
+}
+
+// ---------------------------------------------------------------------------
+// Password credentials
+// ---------------------------------------------------------------------------
+
+// SetPassword upserts the password hash for a user.
+func (s *Store) SetPassword(ctx context.Context, userID, hash string) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO password_credentials (user_id, password_hash, updated_at)
+		VALUES ($1::uuid, $2, now())
+		ON CONFLICT (user_id)
+		DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now()`,
+		userID, hash)
+	return err
+}
+
+// GetPasswordHash returns the stored PHC hash, or ErrNotFound.
+func (s *Store) GetPasswordHash(ctx context.Context, userID string) (string, error) {
+	var hash string
+	err := s.pool.QueryRow(ctx,
+		`SELECT password_hash FROM password_credentials WHERE user_id = $1::uuid`,
+		userID).Scan(&hash)
+	return hash, mapErr(err)
+}
+
+// ---------------------------------------------------------------------------
+// WebAuthn credentials
+// ---------------------------------------------------------------------------
+
+// AddWebAuthnCredential stores a freshly registered credential. The full
+// webauthn.Credential is persisted as JSON (the source of truth for later
+// reconstruction) alongside broken-out columns used for indexing/uniqueness.
+func (s *Store) AddWebAuthnCredential(ctx context.Context, userID string, cred *webauthn.Credential) error {
+	blob, err := json.Marshal(cred)
+	if err != nil {
+		return err
+	}
+	transports := make([]string, 0, len(cred.Transport))
+	for _, t := range cred.Transport {
+		transports = append(transports, string(t))
+	}
+	_, err = s.pool.Exec(ctx, `
+		INSERT INTO webauthn_credentials
+			(user_id, credential_id, public_key, attestation_type, aaguid,
+			 sign_count, transports, clone_warning, credential)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		userID,
+		cred.ID,
+		cred.PublicKey,
+		cred.AttestationType,
+		cred.Authenticator.AAGUID,
+		int64(cred.Authenticator.SignCount),
+		transports,
+		cred.Authenticator.CloneWarning,
+		blob,
+	)
+	return err
+}
+
+// GetWebAuthnCredentials reconstructs a user's credentials from stored JSON.
+func (s *Store) GetWebAuthnCredentials(ctx context.Context, userID string) ([]webauthn.Credential, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT credential FROM webauthn_credentials WHERE user_id = $1::uuid ORDER BY id`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var creds []webauthn.Credential
+	for rows.Next() {
+		var blob []byte
+		if err := rows.Scan(&blob); err != nil {
+			return nil, err
+		}
+		var c webauthn.Credential
+		if err := json.Unmarshal(blob, &c); err != nil {
+			return nil, err
+		}
+		creds = append(creds, c)
+	}
+	return creds, rows.Err()
+}
+
+// CountWebAuthnCredentials returns how many passkeys a user has.
+func (s *Store) CountWebAuthnCredentials(ctx context.Context, userID string) (int, error) {
+	var n int
+	err := s.pool.QueryRow(ctx,
+		`SELECT count(*) FROM webauthn_credentials WHERE user_id = $1::uuid`, userID).Scan(&n)
+	return n, err
+}
+
+// UpdateWebAuthnCredential persists post-login changes (sign count, flags).
+func (s *Store) UpdateWebAuthnCredential(ctx context.Context, userID string, cred *webauthn.Credential) error {
+	blob, err := json.Marshal(cred)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, `
+		UPDATE webauthn_credentials
+		SET sign_count = $1, clone_warning = $2, credential = $3, last_used_at = now()
+		WHERE user_id = $4::uuid AND credential_id = $5`,
+		int64(cred.Authenticator.SignCount),
+		cred.Authenticator.CloneWarning,
+		blob,
+		userID,
+		cred.ID,
+	)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// WebAuthn flows (ceremony state)
+// ---------------------------------------------------------------------------
+
+// SaveFlow stores ceremony state keyed by a random flow id.
+func (s *Store) SaveFlow(ctx context.Context, f Flow) error {
+	var uid any
+	if f.UserID != nil {
+		uid = *f.UserID
+	}
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO webauthn_flows (id, user_id, kind, session_data, expires_at)
+		VALUES ($1, $2::uuid, $3, $4, $5)`,
+		f.ID, uid, f.Kind, f.SessionData, f.ExpiresAt)
+	return err
+}
+
+// GetFlow fetches ceremony state, or ErrNotFound if missing/expired.
+func (s *Store) GetFlow(ctx context.Context, id string) (Flow, error) {
+	var f Flow
+	var uid *string
+	err := s.pool.QueryRow(ctx, `
+		SELECT id, user_id::text, kind, session_data, expires_at
+		FROM webauthn_flows WHERE id = $1 AND expires_at > now()`, id,
+	).Scan(&f.ID, &uid, &f.Kind, &f.SessionData, &f.ExpiresAt)
+	if err != nil {
+		return Flow{}, mapErr(err)
+	}
+	f.UserID = uid
+	return f, nil
+}
+
+// DeleteFlow removes ceremony state (called once consumed).
+func (s *Store) DeleteFlow(ctx context.Context, id string) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM webauthn_flows WHERE id = $1`, id)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// TOTP
+// ---------------------------------------------------------------------------
+
+// UpsertTOTPSecret stores an unconfirmed encrypted TOTP secret.
+func (s *Store) UpsertTOTPSecret(ctx context.Context, userID string, encrypted []byte) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO totp_secrets (user_id, secret_encrypted, confirmed, created_at)
+		VALUES ($1::uuid, $2, false, now())
+		ON CONFLICT (user_id)
+		DO UPDATE SET secret_encrypted = EXCLUDED.secret_encrypted,
+		              confirmed = false, created_at = now(), confirmed_at = NULL`,
+		userID, encrypted)
+	return err
+}
+
+// ConfirmTOTP marks a user's TOTP secret confirmed.
+func (s *Store) ConfirmTOTP(ctx context.Context, userID string) error {
+	_, err := s.pool.Exec(ctx,
+		`UPDATE totp_secrets SET confirmed = true, confirmed_at = now() WHERE user_id = $1::uuid`,
+		userID)
+	return err
+}
+
+// GetTOTPSecret returns the encrypted secret and confirmation state.
+func (s *Store) GetTOTPSecret(ctx context.Context, userID string) (encrypted []byte, confirmed bool, err error) {
+	err = s.pool.QueryRow(ctx,
+		`SELECT secret_encrypted, confirmed FROM totp_secrets WHERE user_id = $1::uuid`,
+		userID).Scan(&encrypted, &confirmed)
+	return encrypted, confirmed, mapErr(err)
+}
+
+// DeleteTOTP disables TOTP for a user (secret + recovery codes).
+func (s *Store) DeleteTOTP(ctx context.Context, userID string) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `DELETE FROM totp_recovery_codes WHERE user_id = $1::uuid`, userID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM totp_secrets WHERE user_id = $1::uuid`, userID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// AddRecoveryCodes stores hashed one-time recovery codes.
+func (s *Store) AddRecoveryCodes(ctx context.Context, userID string, hashes []string) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `DELETE FROM totp_recovery_codes WHERE user_id = $1::uuid`, userID); err != nil {
+		return err
+	}
+	for _, h := range hashes {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO totp_recovery_codes (user_id, code_hash) VALUES ($1::uuid, $2)`,
+			userID, h); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+// UseRecoveryCode marks a matching unused recovery code as used. It reports
+// whether a code was consumed.
+func (s *Store) UseRecoveryCode(ctx context.Context, userID, codeHash string) (bool, error) {
+	ct, err := s.pool.Exec(ctx, `
+		UPDATE totp_recovery_codes SET used_at = now()
+		WHERE user_id = $1::uuid AND code_hash = $2 AND used_at IS NULL`,
+		userID, codeHash)
+	if err != nil {
+		return false, err
+	}
+	return ct.RowsAffected() > 0, nil
+}
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+// CreateSession inserts a new session row.
+func (s *Store) CreateSession(ctx context.Context, id, userID, authMethod string, expiresAt time.Time) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO sessions (id, user_id, auth_method, expires_at)
+		VALUES ($1, $2::uuid, $3, $4)`,
+		id, userID, authMethod, expiresAt)
+	return err
+}
+
+// GetSession fetches a live (non-revoked, non-expired) session.
+func (s *Store) GetSession(ctx context.Context, id string) (Session, error) {
+	var sess Session
+	err := s.pool.QueryRow(ctx, `
+		SELECT id, user_id::text, auth_method, created_at, last_seen_at, expires_at, revoked_at
+		FROM sessions
+		WHERE id = $1 AND revoked_at IS NULL AND expires_at > now()`, id,
+	).Scan(&sess.ID, &sess.UserID, &sess.AuthMethod, &sess.CreatedAt,
+		&sess.LastSeenAt, &sess.ExpiresAt, &sess.RevokedAt)
+	return sess, mapErr(err)
+}
+
+// TouchSession updates last_seen_at.
+func (s *Store) TouchSession(ctx context.Context, id string) error {
+	_, err := s.pool.Exec(ctx,
+		`UPDATE sessions SET last_seen_at = now() WHERE id = $1`, id)
+	return err
+}
+
+// RevokeSession marks a session revoked (logout).
+func (s *Store) RevokeSession(ctx context.Context, id string) error {
+	_, err := s.pool.Exec(ctx,
+		`UPDATE sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, id)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// Activity log
+// ---------------------------------------------------------------------------
+
+// InsertActivity records an audit event.
+func (s *Store) InsertActivity(ctx context.Context, in ActivityInput) error {
+	detail := in.Detail
+	if detail == nil {
+		detail = map[string]any{}
+	}
+	blob, err := json.Marshal(detail)
+	if err != nil {
+		return err
+	}
+	outcome := in.Outcome
+	if outcome == "" {
+		outcome = "success"
+	}
+	var uid any
+	if in.UserID != nil {
+		uid = *in.UserID
+	}
+	_, err = s.pool.Exec(ctx, `
+		INSERT INTO activity_log
+			(user_id, username, event_type, auth_method, outcome, ip_hash, user_agent, detail)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8)`,
+		uid, in.Username, in.EventType, in.AuthMethod, outcome, in.IPHash, in.UserAgent, blob)
+	return err
+}
+
+// ListActivityForUser returns a user's most recent audit events.
+func (s *Store) ListActivityForUser(ctx context.Context, userID string, limit int) ([]Activity, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, user_id::text, username, event_type, auth_method, outcome,
+		       ip_hash, user_agent, detail, created_at
+		FROM activity_log
+		WHERE user_id = $1::uuid
+		ORDER BY created_at DESC
+		LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Activity
+	for rows.Next() {
+		var a Activity
+		if err := rows.Scan(&a.ID, &a.UserID, &a.Username, &a.EventType, &a.AuthMethod,
+			&a.Outcome, &a.IPHash, &a.UserAgent, &a.Detail, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// ---------------------------------------------------------------------------
+// Health check log
+// ---------------------------------------------------------------------------
+
+// InsertHealthCheck records the outcome of a readiness probe.
+func (s *Store) InsertHealthCheck(ctx context.Context, checkName, status string, latencyMs float64, detail string) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO health_check_log (check_name, status, latency_ms, detail)
+		VALUES ($1, $2, $3, $4)`,
+		checkName, status, latencyMs, detail)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// CSP reports
+// ---------------------------------------------------------------------------
+
+// InsertCSPReport persists a normalised CSP violation report.
+func (s *Store) InsertCSPReport(ctx context.Context, in CSPReportInput) error {
+	raw := in.Raw
+	if len(raw) == 0 {
+		raw = json.RawMessage("{}")
+	}
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO csp_reports
+			(document_uri, referrer, blocked_uri, violated_directive, effective_directive,
+			 original_policy, disposition, source_file, line_number, column_number,
+			 status_code, script_sample, ip_hash, user_agent, raw)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+		in.DocumentURI, in.Referrer, in.BlockedURI, in.ViolatedDirective, in.EffectiveDirective,
+		in.OriginalPolicy, in.Disposition, in.SourceFile, in.LineNumber, in.ColumnNumber,
+		in.StatusCode, in.ScriptSample, in.IPHash, in.UserAgent, []byte(raw))
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// CAPTCHA stats
+// ---------------------------------------------------------------------------
+
+// SyncCaptchaStats atomically folds one client batch into the user's aggregate
+// row, creating it on first sync. Totals accumulate; best_streak only ever
+// grows (GREATEST); current_streak is last-write-wins. The updated row is
+// returned so the client can reconcile its display with the server's truth.
+//
+// Every integer placeholder carries an explicit ::bigint cast. pgx v5 uses the
+// extended query protocol and, in its default statement-cache mode, sends the
+// Parse step without declared parameter types. Postgres then has to infer them
+// and the expression `$4 + $5` fails at plan time with
+// `ERROR: operator is not unique: unknown + unknown` — the statement can never
+// even execute, so the sync endpoint 500s on every request. Casting each
+// parameter pins the types and makes the statement plannable. (Placeholders
+// compared against a typed column, like `$1::uuid = user_id`, would be
+// inferable anyway, but we cast uniformly for clarity.)
+func (s *Store) SyncCaptchaStats(ctx context.Context, userID string, in CaptchaSyncInput) (CaptchaStats, error) {
+	st := CaptchaStats{UserID: userID}
+	err := s.pool.QueryRow(ctx, `
+		INSERT INTO captcha_stats
+			(user_id, best_streak, current_streak, total_solves, manual_solves, auto_solves, updated_at)
+		VALUES ($1::uuid, $2::bigint, $3::bigint, $4::bigint + $5::bigint, $4::bigint, $5::bigint, now())
+		ON CONFLICT (user_id) DO UPDATE SET
+			best_streak    = GREATEST(captcha_stats.best_streak, EXCLUDED.best_streak),
+			current_streak = EXCLUDED.current_streak,
+			total_solves   = captcha_stats.total_solves + $4::bigint + $5::bigint,
+			manual_solves  = captcha_stats.manual_solves + $4::bigint,
+			auto_solves    = captcha_stats.auto_solves + $5::bigint,
+			updated_at     = now()
+		RETURNING best_streak, current_streak, total_solves, manual_solves, auto_solves, updated_at`,
+		userID, in.BestStreak, in.CurrentStreak, in.ManualDelta, in.AutoDelta,
+	).Scan(&st.BestStreak, &st.CurrentStreak, &st.TotalSolves, &st.ManualSolves, &st.AutoSolves, &st.UpdatedAt)
+	return st, err
+}
+
+// GetCaptchaStats returns a user's aggregate row, or ErrNotFound if the user
+// has never synced.
+func (s *Store) GetCaptchaStats(ctx context.Context, userID string) (CaptchaStats, error) {
+	st := CaptchaStats{UserID: userID}
+	err := s.pool.QueryRow(ctx, `
+		SELECT best_streak, current_streak, total_solves, manual_solves, auto_solves, updated_at
+		FROM captcha_stats WHERE user_id = $1::uuid`, userID,
+	).Scan(&st.BestStreak, &st.CurrentStreak, &st.TotalSolves, &st.ManualSolves, &st.AutoSolves, &st.UpdatedAt)
+	return st, mapErr(err)
+}
+
+// DeleteCaptchaStats removes the user's aggregate row entirely (a true reset:
+// the user also disappears from the leaderboard until they play again).
+func (s *Store) DeleteCaptchaStats(ctx context.Context, userID string) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM captcha_stats WHERE user_id = $1::uuid`, userID)
+	return err
+}
+
+// captchaRankedCTE ranks every player once so the top-N query and the "where
+// am I" query cannot disagree on ordering. updated_at ASC breaks ties in
+// favour of whoever got there first.
+const captchaRankedCTE = `
+	SELECT user_id, best_streak, total_solves,
+	       RANK() OVER (ORDER BY best_streak DESC, total_solves DESC, updated_at ASC) AS rank
+	FROM captcha_stats`
+
+// CaptchaLeaderboard returns the top rows ordered by rank.
+func (s *Store) CaptchaLeaderboard(ctx context.Context, limit int) ([]CaptchaLeaderboardRow, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 10
+	}
+	rows, err := s.pool.Query(ctx, `
+		WITH ranked AS (`+captchaRankedCTE+`)
+		SELECT r.rank, r.user_id::text, u.username, u.display_name, r.best_streak, r.total_solves
+		FROM ranked r JOIN users u ON u.id = r.user_id
+		ORDER BY r.rank, u.username
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CaptchaLeaderboardRow
+	for rows.Next() {
+		var lr CaptchaLeaderboardRow
+		if err := rows.Scan(&lr.Rank, &lr.UserID, &lr.Username, &lr.DisplayName,
+			&lr.BestStreak, &lr.TotalSolves); err != nil {
+			return nil, err
+		}
+		out = append(out, lr)
+	}
+	return out, rows.Err()
+}
+
+// CaptchaRank returns the caller's own ranked row, or ErrNotFound if they have
+// never synced any stats.
+func (s *Store) CaptchaRank(ctx context.Context, userID string) (CaptchaLeaderboardRow, error) {
+	var lr CaptchaLeaderboardRow
+	err := s.pool.QueryRow(ctx, `
+		WITH ranked AS (`+captchaRankedCTE+`)
+		SELECT r.rank, r.user_id::text, u.username, u.display_name, r.best_streak, r.total_solves
+		FROM ranked r JOIN users u ON u.id = r.user_id
+		WHERE r.user_id = $1::uuid`, userID,
+	).Scan(&lr.Rank, &lr.UserID, &lr.Username, &lr.DisplayName, &lr.BestStreak, &lr.TotalSolves)
+	return lr, mapErr(err)
+}
+
+// ---------------------------------------------------------------------------
+// User preferences
+// ---------------------------------------------------------------------------
+
+// GetUserPref returns the stored value for a preference key, or ErrNotFound.
+func (s *Store) GetUserPref(ctx context.Context, userID, key string) (string, error) {
+	var v string
+	err := s.pool.QueryRow(ctx,
+		`SELECT value FROM user_prefs WHERE user_id = $1::uuid AND key = $2`,
+		userID, key).Scan(&v)
+	return v, mapErr(err)
+}
+
+// SetUserPref upserts a preference value.
+func (s *Store) SetUserPref(ctx context.Context, userID, key, value string) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO user_prefs (user_id, key, value, updated_at)
+		VALUES ($1::uuid, $2, $3, now())
+		ON CONFLICT (user_id, key)
+		DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+		userID, key, value)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// Notes (public microblog)
+// ---------------------------------------------------------------------------
+
+// CreateNote inserts a note and returns it with author info attached, so the
+// client can render the new card without a second round trip.
+func (s *Store) CreateNote(ctx context.Context, userID, body string) (Note, error) {
+	var n Note
+	err := s.pool.QueryRow(ctx, `
+		WITH inserted AS (
+			INSERT INTO notes (user_id, body)
+			VALUES ($1::uuid, $2)
+			RETURNING id, user_id, body, created_at
+		)
+		SELECT i.id, i.user_id::text, u.username, u.display_name, i.body, i.created_at
+		FROM inserted i JOIN users u ON u.id = i.user_id`,
+		userID, body,
+	).Scan(&n.ID, &n.UserID, &n.Username, &n.DisplayName, &n.Body, &n.CreatedAt)
+	return n, err
+}
+
+// ListNotes returns up to limit notes newest-first. When beforeID > 0 only
+// notes with id < beforeID are returned — a stable cursor for "load older"
+// pagination (ids are monotonic, so the cursor never shifts under the reader
+// the way OFFSET would when new notes arrive).
+func (s *Store) ListNotes(ctx context.Context, beforeID int64, limit int) ([]Note, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT n.id, n.user_id::text, u.username, u.display_name, n.body, n.created_at
+		FROM notes n JOIN users u ON u.id = n.user_id
+		WHERE ($1::bigint = 0 OR n.id < $1)
+		ORDER BY n.id DESC
+		LIMIT $2`, beforeID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Note
+	for rows.Next() {
+		var n Note
+		if err := rows.Scan(&n.ID, &n.UserID, &n.Username, &n.DisplayName, &n.Body, &n.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// DeleteNote hard-deletes a note if and only if it belongs to userID, and
+// reports whether a row was actually removed. Ownership is enforced inside
+// the single SQL statement, so there is no read-then-delete race and callers
+// cannot distinguish "not found" from "not yours" (no existence oracle).
+func (s *Store) DeleteNote(ctx context.Context, id int64, userID string) (bool, error) {
+	ct, err := s.pool.Exec(ctx,
+		`DELETE FROM notes WHERE id = $1 AND user_id = $2::uuid`, id, userID)
+	if err != nil {
+		return false, err
+	}
+	return ct.RowsAffected() > 0, nil
+}
+
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
+
+func mapErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	return err
+}
+
+// normalizeUsername lowercases and trims a username for case-insensitive
+// comparison. Kept here so store lookups and inserts agree on the rule.
+func normalizeUsername(u string) string {
+	return toLowerTrim(u)
+}
+
+func toLowerTrim(s string) string {
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			r += 'a' - 'A'
+		}
+		out = append(out, r)
+	}
+	// trim spaces
+	start, end := 0, len(out)
+	for start < end && isSpace(out[start]) {
+		start++
+	}
+	for end > start && isSpace(out[end-1]) {
+		end--
+	}
+	return string(out[start:end])
+}
+
+func isSpace(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' }
+internal/config/config.go
+go
+// Package config is the single source of truth for every runtime setting.
+//
+// Everything the application can be tuned with is read here, from environment
+// variables, and nowhere else. No other package reads os.Getenv. This keeps
+// the "all configuration is central in one location" promise from the design
+// notes: to see everything GoTunnels can be configured with, read this file.
+package config
+
+import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// Config holds all resolved runtime settings for the API service.
+type Config struct {
+	// Identity -----------------------------------------------------------
+	InstanceID  string // unique per running instance; also an OTel resource attribute
+	ServiceName string // OTel service.name
+	Version     string // build version (set via -ldflags at build time)
+
+	// HTTP ---------------------------------------------------------------
+	HTTPAddr        string        // listen address, e.g. ":8080"
+	ShutdownTimeout time.Duration // graceful shutdown budget
+
+	// Database -----------------------------------------------------------
+	DatabaseURL      string
+	DBMaxConns       int32
+	DBMinConns       int32
+	DBConnectTimeout time.Duration
+
+	// Sessions -----------------------------------------------------------
+	SessionCookieName string
+	SessionTTL        time.Duration
+
+	// Secrets (generated per-instance by scripts/up.sh, never committed) -
+	ipHashPepper []byte   // used as sha256(pepper || ip)
+	totpAESKey   [32]byte // AES-256-GCM key for encrypting TOTP secrets at rest
+
+	// CORS ---------------------------------------------------------------
+	// Exact allowed origins. Because the browser talks to the API cross-origin
+	// (frontend tunnel URL != API tunnel URL) and sends credentials, we cannot
+	// use the "*" wildcard together with credentials; we echo an allowed origin.
+	CORSAllowedOrigins []string
+
+	// WebAuthn / passkeys -----------------------------------------------
+	RPID          string   // relying-party ID: the frontend's registrable domain
+	RPDisplayName string   // human-readable name shown by the authenticator
+	RPOrigins     []string // full origins the browser will present, e.g. https://x.trycloudflare.com
+
+	// Content Security Policy -------------------------------------------
+	// The header itself is emitted by Caddy on the frontend. These values let
+	// the API report what mode it believes is active and are surfaced on the
+	// health/info endpoint so the whole system agrees on one central policy.
+	CSPMode   string // "report-only" or "enforce"
+	CSPPolicy string // the policy string (informational mirror of Caddy's)
+
+	// Telemetry ----------------------------------------------------------
+	Telemetry TelemetryConfig
+
+	// Dev conveniences ---------------------------------------------------
+	Dev bool // when true, missing secrets are generated ephemerally with a warning
+}
+
+// TelemetryConfig captures OTLP/HTTP exporter settings. When Enabled is false
+// the service logs to stdout only and installs no-op trace/metric providers.
+type TelemetryConfig struct {
+	Enabled     bool
+	EndpointURL string            // full base URL, e.g. https://api.uptrace.dev
+	Headers     map[string]string // e.g. {"uptrace-dsn": "..."}
+	Insecure    bool              // allow http:// (in-cluster collectors)
+	Compression string            // "gzip" or ""
+
+	// MetricsTemporality mirrors OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+	// ("delta", "cumulative", or "lowmemory"; normalized to lowercase). Uptrace
+	// prefers delta temporality, so that is the default.
+	MetricsTemporality string
+	// MetricsHistogram mirrors OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION
+	// ("base2_exponential_bucket_histogram" or "explicit_bucket_histogram";
+	// normalized to lowercase). Exponential histograms compress better and give
+	// Uptrace more accurate percentiles, so they are the default.
+	MetricsHistogram string
+}
+
+// Load reads and validates configuration from the environment.
+func Load() (*Config, error) {
+	c := &Config{
+		InstanceID:         getenv("GOTUNNELS_INSTANCE_ID", defaultInstanceID()),
+		ServiceName:        getenv("OTEL_SERVICE_NAME", getenv("GOTUNNELS_SERVICE_NAME", "gotunnels-api")),
+		Version:            getenv("GOTUNNELS_VERSION", "dev"),
+		HTTPAddr:           getenv("GOTUNNELS_HTTP_ADDR", ":8080"),
+		ShutdownTimeout:    getdur("GOTUNNELS_SHUTDOWN_TIMEOUT", 15*time.Second),
+		DatabaseURL:        getenv("DATABASE_URL", ""),
+		DBMaxConns:         int32(getint("GOTUNNELS_DB_MAX_CONNS", 20)),
+		DBMinConns:         int32(getint("GOTUNNELS_DB_MIN_CONNS", 2)),
+		DBConnectTimeout:   getdur("GOTUNNELS_DB_CONNECT_TIMEOUT", 30*time.Second),
+		SessionCookieName:  getenv("GOTUNNELS_SESSION_COOKIE_NAME", "gotunnels_session"),
+		SessionTTL:         getdur("GOTUNNELS_SESSION_TTL", 24*time.Hour),
+		CORSAllowedOrigins: splitList(getenv("GOTUNNELS_CORS_ALLOWED_ORIGINS", "*")),
+		RPID:               getenv("GOTUNNELS_RP_ID", "localhost"),
+		RPDisplayName:      getenv("GOTUNNELS_RP_DISPLAY_NAME", "GoTunnels"),
+		RPOrigins:          splitList(getenv("GOTUNNELS_RP_ORIGINS", "http://localhost:8080")),
+		CSPMode:            getenv("GOTUNNELS_CSP_MODE", "report-only"),
+		CSPPolicy:          getenv("GOTUNNELS_CSP_POLICY", DefaultCSPPolicy),
+		Dev:                getbool("GOTUNNELS_DEV", false),
+	}
+
+	if err := c.resolveSecrets(); err != nil {
+		return nil, err
+	}
+	c.resolveTelemetry()
+
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// DefaultCSPPolicy locks everything to same-origin: no third-party scripts,
+// styles, images, fonts, media, or frames. Everything is self-hosted. It is
+// emitted in report-only mode by default (see the Caddyfile), so violations
+// are reported but nothing is blocked yet.
+const DefaultCSPPolicy = "default-src 'self'; " +
+	"script-src 'self'; " +
+	"style-src 'self'; " +
+	"img-src 'self'; " +
+	"font-src 'self'; " +
+	"connect-src 'self' https:; " +
+	"media-src 'self'; " +
+	"object-src 'none'; " +
+	"frame-src 'none'; " +
+	"frame-ancestors 'none'; " +
+	"base-uri 'self'; " +
+	"form-action 'self'"
+
+func (c *Config) resolveSecrets() error {
+	// IP hashing pepper.
+	if pepper := os.Getenv("GOTUNNELS_IP_HASH_PEPPER"); pepper != "" {
+		c.ipHashPepper = []byte(pepper)
+	} else if c.Dev {
+		c.ipHashPepper = mustRandom(32)
+	} else {
+		return fmt.Errorf("config: GOTUNNELS_IP_HASH_PEPPER is required (set GOTUNNELS_DEV=1 to auto-generate for local dev)")
+	}
+
+	// TOTP encryption key. Accept any string; derive a fixed 32-byte AES key
+	// via SHA-256 so operators can supply `openssl rand -base64 32` output
+	// without worrying about exact byte length.
+	if raw := os.Getenv("GOTUNNELS_TOTP_ENCRYPTION_KEY"); raw != "" {
+		c.totpAESKey = sha256.Sum256([]byte(raw))
+	} else if c.Dev {
+		c.totpAESKey = sha256.Sum256(mustRandom(32))
+	} else {
+		return fmt.Errorf("config: GOTUNNELS_TOTP_ENCRYPTION_KEY is required (set GOTUNNELS_DEV=1 to auto-generate for local dev)")
+	}
+	return nil
+}
+
+func (c *Config) resolveTelemetry() {
+	// Preference order:
+	//   1. UPTRACE_DSN (convenience) -> derive endpoint + uptrace-dsn header
+	//   2. OTEL_EXPORTER_OTLP_ENDPOINT (+ OTEL_EXPORTER_OTLP_HEADERS)
+	//   3. disabled (stdout logging, no-op traces/metrics)
+	//
+	// The two metrics knobs follow the OpenTelemetry spec's environment
+	// variables. Their spec values are UPPERCASE (e.g. DELTA,
+	// BASE2_EXPONENTIAL_BUCKET_HISTOGRAM) but we normalize to lowercase so
+	// comparisons elsewhere are simple and either casing works.
+	tc := TelemetryConfig{
+		Headers:     map[string]string{},
+		Compression: strings.ToLower(getenv("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip")),
+		MetricsTemporality: strings.ToLower(getenv(
+			"OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "delta")),
+		MetricsHistogram: strings.ToLower(getenv(
+			"OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION",
+			"base2_exponential_bucket_histogram")),
+	}
+
+	if dsn := os.Getenv("UPTRACE_DSN"); dsn != "" {
+		endpoint, insecure := endpointFromDSN(dsn)
+		tc.Enabled = true
+		tc.EndpointURL = endpoint
+		tc.Insecure = insecure
+		tc.Headers["uptrace-dsn"] = dsn
+	} else if ep := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); ep != "" {
+		tc.Enabled = true
+		tc.EndpointURL = ep
+		tc.Insecure = strings.HasPrefix(ep, "http://")
+		for k, v := range parseHeaders(os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")) {
+			tc.Headers[k] = v
+		}
+	}
+	c.Telemetry = tc
+}
+
+// Validate checks invariants that must hold before the server starts.
+func (c *Config) Validate() error {
+	if c.DatabaseURL == "" {
+		return fmt.Errorf("config: DATABASE_URL is required")
+	}
+	if c.HTTPAddr == "" {
+		return fmt.Errorf("config: GOTUNNELS_HTTP_ADDR is required")
+	}
+	if c.SessionTTL <= 0 {
+		return fmt.Errorf("config: GOTUNNELS_SESSION_TTL must be positive")
+	}
+	switch c.CSPMode {
+	case "report-only", "enforce":
+	default:
+		return fmt.Errorf("config: GOTUNNELS_CSP_MODE must be 'report-only' or 'enforce', got %q", c.CSPMode)
+	}
+	if len(c.RPOrigins) == 0 {
+		return fmt.Errorf("config: GOTUNNELS_RP_ORIGINS must contain at least one origin")
+	}
+	return nil
+}
+
+// IPHashPepper returns a copy-safe reference to the pepper bytes.
+func (c *Config) IPHashPepper() []byte { return c.ipHashPepper }
+
+// TOTPAESKey returns the 32-byte AES key for TOTP secret encryption.
+func (c *Config) TOTPAESKey() [32]byte { return c.totpAESKey }
+
+// CORSAllowsAny reports whether the wildcard "*" origin is configured.
+func (c *Config) CORSAllowsAny() bool {
+	for _, o := range c.CORSAllowedOrigins {
+		if o == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
+// small env helpers
+// ---------------------------------------------------------------------------
+
+func getenv(key, def string) string {
+	if v, ok := os.LookupEnv(key); ok && v != "" {
+		return v
+	}
+	return def
+}
+
+func getint(key string, def int) int {
+	if v, ok := os.LookupEnv(key); ok && v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
+			return n
+		}
+	}
+	return def
+}
+
+func getbool(key string, def bool) bool {
+	if v, ok := os.LookupEnv(key); ok && v != "" {
+		if b, err := strconv.ParseBool(strings.TrimSpace(v)); err == nil {
+			return b
+		}
+	}
+	return def
+}
+
+func getdur(key string, def time.Duration) time.Duration {
+	if v, ok := os.LookupEnv(key); ok && v != "" {
+		if d, err := time.ParseDuration(strings.TrimSpace(v)); err == nil {
+			return d
+		}
+	}
+	return def
+}
+
+// splitList parses a comma-or-space separated list, trimming empties.
+func splitList(s string) []string {
+	fields := strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ' ' || r == '\t' || r == '\n' })
+	out := make([]string, 0, len(fields))
+	for _, f := range fields {
+		f = strings.TrimSpace(f)
+		if f != "" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// parseHeaders parses OTEL_EXPORTER_OTLP_HEADERS ("k1=v1,k2=v2").
+func parseHeaders(s string) map[string]string {
+	out := map[string]string{}
+	for _, pair := range strings.Split(s, ",") {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+		k, v, ok := strings.Cut(pair, "=")
+		if !ok {
+			continue
+		}
+		out[strings.TrimSpace(k)] = strings.TrimSpace(v)
+	}
+	return out
+}
+
+// endpointFromDSN extracts the OTLP base endpoint from an Uptrace DSN of the
+// form "https://TOKEN@host[:port][/path]". Returns the base URL and whether it
+// is insecure (http).
+func endpointFromDSN(dsn string) (endpoint string, insecure bool) {
+	// Very small, dependency-free parse: scheme://[userinfo@]host
+	scheme := "https"
+	rest := dsn
+	if i := strings.Index(rest, "://"); i >= 0 {
+		scheme = rest[:i]
+		rest = rest[i+3:]
+	}
+	if at := strings.LastIndex(rest, "@"); at >= 0 {
+		rest = rest[at+1:]
+	}
+	// strip any path/query
+	if q := strings.IndexAny(rest, "/?"); q >= 0 {
+		rest = rest[:q]
+	}
+	return scheme + "://" + rest, scheme == "http"
+}
+
+// defaultInstanceID returns a stable-ish identifier used when the operator did
+// not supply one (mostly for bare `go run` during development).
+func defaultInstanceID() string {
+	if h, err := os.Hostname(); err == nil && h != "" {
+		return h
+	}
+	return "local-" + hex.EncodeToString(mustRandom(4))
+}
+
+func mustRandom(n int) []byte {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		panic("config: crypto/rand failed: " + err.Error())
+	}
+	return b
+}
+
+// DecodeKeyMaterial is a helper exposed for tests and tooling: it accepts hex,
+// base64 (std or url), or raw bytes and returns them. Unused by Load directly
+// but kept for completeness where callers want exact-length keys.
+func DecodeKeyMaterial(s string) ([]byte, error) {
+	s = strings.TrimSpace(s)
+	if b, err := hex.DecodeString(s); err == nil && len(s)%2 == 0 {
+		return b, nil
+	}
+	if b, err := base64.StdEncoding.DecodeString(s); err == nil {
+		return b, nil
+	}
+	if b, err := base64.RawURLEncoding.DecodeString(s); err == nil {
+		return b, nil
+	}
+	return []byte(s), nil
+}
+internal/config/config_test.go
+go
+package config
+
+import (
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestLoad_RequiresDatabaseURL(t *testing.T) {
+	t.Setenv("GOTUNNELS_DEV", "1") // auto-generate secrets
+	// DATABASE_URL deliberately unset.
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error when DATABASE_URL is missing")
+	}
+}
+
+func TestLoad_RequiresSecretsWhenNotDev(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x/y")
+	t.Setenv("GOTUNNELS_DEV", "0")
+	// no pepper / totp key
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error when secrets are missing and not in dev mode")
+	}
+}
+
+func TestLoad_DevGeneratesSecrets(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.IPHashPepper()) == 0 {
+		t.Error("expected a generated IP hash pepper in dev mode")
+	}
+	var zero [32]byte
+	if c.TOTPAESKey() == zero {
+		t.Error("expected a non-zero TOTP AES key in dev mode")
+	}
+	if c.CSPMode != "report-only" {
+		t.Errorf("expected default CSP mode report-only, got %q", c.CSPMode)
+	}
+	if !strings.Contains(c.CSPPolicy, "default-src 'self'") {
+		t.Errorf("default CSP policy should lock to self, got %q", c.CSPPolicy)
+	}
+}
+
+func TestLoad_TOTPKeyDerivedDeterministically(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_IP_HASH_PEPPER", "pepper")
+	t.Setenv("GOTUNNELS_TOTP_ENCRYPTION_KEY", "the-same-secret")
+
+	c1, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c1.TOTPAESKey() != c2.TOTPAESKey() {
+		t.Error("TOTP key derivation must be deterministic for a given secret")
+	}
+}
+
+func TestValidate_CSPMode(t *testing.T) {
+	c := &Config{
+		DatabaseURL: "x",
+		HTTPAddr:    ":8080",
+		SessionTTL:  time.Hour,
+		RPOrigins:   []string{"http://localhost"},
+		CSPMode:     "nonsense",
+	}
+	if err := c.Validate(); err == nil {
+		t.Fatal("expected invalid CSP mode to fail validation")
+	}
+	c.CSPMode = "enforce"
+	if err := c.Validate(); err != nil {
+		t.Fatalf("enforce should be valid: %v", err)
+	}
+}
+
+func TestSplitList(t *testing.T) {
+	cases := map[string][]string{
+		"a,b,c":            {"a", "b", "c"},
+		"a b c":            {"a", "b", "c"},
+		" a , b ,, c ":     {"a", "b", "c"},
+		"https://x https:": {"https://x", "https:"},
+		"":                 {},
+	}
+	for in, want := range cases {
+		got := splitList(in)
+		if len(got) != len(want) {
+			t.Errorf("splitList(%q) len = %d, want %d (%v)", in, len(got), len(want), got)
+			continue
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("splitList(%q)[%d] = %q, want %q", in, i, got[i], want[i])
+			}
+		}
+	}
+}
+
+func TestParseHeaders(t *testing.T) {
+	h := parseHeaders("uptrace-dsn=https://tok@api.uptrace.dev,x-extra = val ")
+	if h["uptrace-dsn"] != "https://tok@api.uptrace.dev" {
+		t.Errorf("unexpected dsn header: %q", h["uptrace-dsn"])
+	}
+	if h["x-extra"] != "val" {
+		t.Errorf("unexpected x-extra header: %q", h["x-extra"])
+	}
+}
+
+func TestEndpointFromDSN(t *testing.T) {
+	cases := []struct {
+		dsn          string
+		wantEndpoint string
+		wantInsecure bool
+	}{
+		{"https://TOKEN@api.uptrace.dev?grpc=4317", "https://api.uptrace.dev", false},
+		{"https://TOKEN@api.uptrace.dev:443/v1", "https://api.uptrace.dev:443", false},
+		{"http://token@localhost:14318", "http://localhost:14318", true},
+	}
+	for _, tc := range cases {
+		ep, insecure := endpointFromDSN(tc.dsn)
+		if ep != tc.wantEndpoint {
+			t.Errorf("endpointFromDSN(%q) endpoint = %q, want %q", tc.dsn, ep, tc.wantEndpoint)
+		}
+		if insecure != tc.wantInsecure {
+			t.Errorf("endpointFromDSN(%q) insecure = %v, want %v", tc.dsn, insecure, tc.wantInsecure)
+		}
+	}
+}
+
+func TestResolveTelemetry_DisabledByDefault(t *testing.T) {
+	// Ensure a clean env for the OTLP vars.
+	t.Setenv("UPTRACE_DSN", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+	c := &Config{}
+	c.resolveTelemetry()
+	if c.Telemetry.Enabled {
+		t.Error("telemetry should be disabled when no endpoint/DSN is configured")
+	}
+}
+
+func TestResolveTelemetry_UptraceDSN(t *testing.T) {
+	t.Setenv("UPTRACE_DSN", "https://secret@api.uptrace.dev?grpc=4317")
+	c := &Config{}
+	c.resolveTelemetry()
+	if !c.Telemetry.Enabled {
+		t.Fatal("telemetry should be enabled with an Uptrace DSN")
+	}
+	if c.Telemetry.EndpointURL != "https://api.uptrace.dev" {
+		t.Errorf("endpoint = %q", c.Telemetry.EndpointURL)
+	}
+	if c.Telemetry.Headers["uptrace-dsn"] == "" {
+		t.Error("expected uptrace-dsn header to be set")
+	}
+}
+
+func TestResolveTelemetry_MetricsDefaults(t *testing.T) {
+	// Uptrace-friendly defaults must hold even when the OTEL_* metrics vars
+	// are entirely absent: delta temporality + base2 exponential histograms
+	// + gzip compression.
+	t.Setenv("UPTRACE_DSN", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_COMPRESSION", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION", "")
+	c := &Config{}
+	c.resolveTelemetry()
+	if got := c.Telemetry.Compression; got != "gzip" {
+		t.Errorf("default compression = %q, want gzip", got)
+	}
+	if got := c.Telemetry.MetricsTemporality; got != "delta" {
+		t.Errorf("default temporality = %q, want delta", got)
+	}
+	if got := c.Telemetry.MetricsHistogram; got != "base2_exponential_bucket_histogram" {
+		t.Errorf("default histogram aggregation = %q, want base2_exponential_bucket_histogram", got)
+	}
+}
+
+func TestResolveTelemetry_MetricsOverrides(t *testing.T) {
+	// The OTel spec documents UPPERCASE values (DELTA, CUMULATIVE,
+	// BASE2_EXPONENTIAL_BUCKET_HISTOGRAM...); we must accept them and
+	// normalize to lowercase.
+	t.Setenv("UPTRACE_DSN", "https://secret@api.uptrace.dev")
+	t.Setenv("OTEL_EXPORTER_OTLP_COMPRESSION", "NONE")
+	t.Setenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "CUMULATIVE")
+	t.Setenv("OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION", "EXPLICIT_BUCKET_HISTOGRAM")
+	c := &Config{}
+	c.resolveTelemetry()
+	if got := c.Telemetry.Compression; got != "none" {
+		t.Errorf("compression = %q, want none", got)
+	}
+	if got := c.Telemetry.MetricsTemporality; got != "cumulative" {
+		t.Errorf("temporality = %q, want cumulative", got)
+	}
+	if got := c.Telemetry.MetricsHistogram; got != "explicit_bucket_histogram" {
+		t.Errorf("histogram aggregation = %q, want explicit_bucket_histogram", got)
+	}
+}
+
+func TestGetHelpers(t *testing.T) {
+	t.Setenv("X_INT", "42")
+	if getint("X_INT", 0) != 42 {
+		t.Error("getint failed")
+	}
+	if getint("X_MISSING", 7) != 7 {
+		t.Error("getint default failed")
+	}
+	t.Setenv("X_BOOL", "true")
+	if !getbool("X_BOOL", false) {
+		t.Error("getbool failed")
+	}
+	t.Setenv("X_DUR", "250ms")
+	if getdur("X_DUR", 0) != 250*time.Millisecond {
+		t.Error("getdur failed")
+	}
+}
+internal/telemetry/telemetry.go
+go
+// Package telemetry wires the vendor-neutral OpenTelemetry Go SDK for all three
+// signals (traces, metrics, logs) and exports them over OTLP/HTTP.
+//
+// We deliberately never import any Uptrace SDK. Uptrace (or any OTLP backend)
+// is configured purely via a DSN / endpoint, so swapping backends is a config
+// change, not a code change.
+//
+// Logs are always written to stdout as JSON (so `podman logs` is useful) and,
+// when an OTLP endpoint is configured, additionally shipped to the collector
+// via the OpenTelemetry log bridge. When no endpoint is configured, traces and
+// metrics use no-op providers and only stdout logging remains.
+package telemetry
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/kusl/GoTunnels/internal/config"
+
+	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	otellog "go.opentelemetry.io/otel/log/global"
+	"go.opentelemetry.io/otel/propagation"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+)
+
+// scopeName is the instrumentation scope for logs/traces/metrics we emit
+// directly (as opposed to via otelhttp instrumentation).
+const scopeName = "github.com/kusl/GoTunnels"
+
+// Providers bundles what the application needs after setup.
+type Providers struct {
+	Logger   *slog.Logger
+	shutdown []func(context.Context) error
+}
+
+// Shutdown flushes and stops all providers. Safe to call once during teardown.
+func (p *Providers) Shutdown(ctx context.Context) error {
+	var errs []error
+	for i := len(p.shutdown) - 1; i >= 0; i-- {
+		if err := p.shutdown[i](ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// Setup initializes telemetry from configuration. The returned Providers always
+// has a usable Logger, even on partial failure.
+func Setup(ctx context.Context, cfg *config.Config) (*Providers, error) {
+	p := &Providers{}
+
+	// stdout logging is always on.
+	stdoutHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})
+
+	if !cfg.Telemetry.Enabled {
+		p.Logger = slog.New(stdoutHandler).With(
+			slog.String("service.name", cfg.ServiceName),
+			slog.String("service.instance.id", cfg.InstanceID),
+		)
+		p.Logger.Info("telemetry disabled: logging to stdout only, no-op traces/metrics")
+		return p, nil
+	}
+
+	res, err := buildResource(ctx, cfg)
+	if err != nil {
+		// A resource failure is not fatal; fall back to stdout logging.
+		l := slog.New(stdoutHandler)
+		l.Error("telemetry: failed to build resource; continuing with stdout logging", slog.Any("err", err))
+		p.Logger = l
+		return p, nil
+	}
+
+	// ---- Traces -------------------------------------------------------
+	traceExp, err := otlptracehttp.New(ctx, traceHTTPOpts(cfg)...)
+	if err != nil {
+		return fallback(stdoutHandler, cfg, err), nil
+	}
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(traceExp),
+		sdktrace.WithResource(res),
+	)
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{}, propagation.Baggage{},
+	))
+	p.shutdown = append(p.shutdown, tp.Shutdown)
+
+	// ---- Metrics ------------------------------------------------------
+	metricExp, err := otlpmetrichttp.New(ctx, metricHTTPOpts(cfg)...)
+	if err != nil {
+		return fallback(stdoutHandler, cfg, err), nil
+	}
+	mp := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExp,
+			sdkmetric.WithInterval(30*time.Second))),
+		sdkmetric.WithResource(res),
+	)
+	otel.SetMeterProvider(mp)
+	p.shutdown = append(p.shutdown, mp.Shutdown)
+
+	// ---- Logs ---------------------------------------------------------
+	logExp, err := otlploghttp.New(ctx, logHTTPOpts(cfg)...)
+	if err != nil {
+		return fallback(stdoutHandler, cfg, err), nil
+	}
+	lp := sdklog.NewLoggerProvider(
+		sdklog.WithProcessor(sdklog.NewBatchProcessor(logExp)),
+		sdklog.WithResource(res),
+	)
+	otellog.SetLoggerProvider(lp)
+	p.shutdown = append(p.shutdown, lp.Shutdown)
+
+	// Fan out slog to BOTH stdout and the OTel log bridge.
+	otelHandler := otelslog.NewHandler(scopeName, otelslog.WithLoggerProvider(lp))
+	p.Logger = slog.New(NewMultiHandler(stdoutHandler, otelHandler)).With(
+		slog.String("service.name", cfg.ServiceName),
+		slog.String("service.instance.id", cfg.InstanceID),
+	)
+	p.Logger.Info("telemetry enabled",
+		slog.String("otlp.endpoint", cfg.Telemetry.EndpointURL),
+		slog.Bool("otlp.insecure", cfg.Telemetry.Insecure),
+		slog.String("otlp.compression", cfg.Telemetry.Compression),
+		slog.String("otlp.metrics.temporality", cfg.Telemetry.MetricsTemporality),
+		slog.String("otlp.metrics.histogram", cfg.Telemetry.MetricsHistogram),
+	)
+	return p, nil
+}
+
+func fallback(h slog.Handler, cfg *config.Config, cause error) *Providers {
+	l := slog.New(h).With(slog.String("service.name", cfg.ServiceName))
+	l.Error("telemetry: exporter setup failed; continuing with stdout logging", slog.Any("err", cause))
+	return &Providers{Logger: l}
+}
+
+func buildResource(ctx context.Context, cfg *config.Config) (*resource.Resource, error) {
+	return resource.New(ctx,
+		resource.WithFromEnv(),
+		resource.WithTelemetrySDK(),
+		resource.WithAttributes(
+			semconv.ServiceName(cfg.ServiceName),
+			semconv.ServiceVersion(cfg.Version),
+			semconv.ServiceInstanceID(cfg.InstanceID),
+		),
+	)
+}
+
+func traceHTTPOpts(cfg *config.Config) []otlptracehttp.Option {
+	opts := []otlptracehttp.Option{otlptracehttp.WithEndpointURL(cfg.Telemetry.EndpointURL)}
+	if cfg.Telemetry.Insecure {
+		opts = append(opts, otlptracehttp.WithInsecure())
+	}
+	if len(cfg.Telemetry.Headers) > 0 {
+		opts = append(opts, otlptracehttp.WithHeaders(cfg.Telemetry.Headers))
+	}
+	if cfg.Telemetry.Compression == "gzip" {
+		opts = append(opts, otlptracehttp.WithCompression(otlptracehttp.GzipCompression))
+	}
+	return opts
+}
+
+func metricHTTPOpts(cfg *config.Config) []otlpmetrichttp.Option {
+	opts := []otlpmetrichttp.Option{
+		otlpmetrichttp.WithEndpointURL(cfg.Telemetry.EndpointURL),
+		otlpmetrichttp.WithTemporalitySelector(temporalitySelector(cfg.Telemetry.MetricsTemporality)),
+		otlpmetrichttp.WithAggregationSelector(aggregationSelector(cfg.Telemetry.MetricsHistogram)),
+	}
+	if cfg.Telemetry.Insecure {
+		opts = append(opts, otlpmetrichttp.WithInsecure())
+	}
+	if len(cfg.Telemetry.Headers) > 0 {
+		opts = append(opts, otlpmetrichttp.WithHeaders(cfg.Telemetry.Headers))
+	}
+	if cfg.Telemetry.Compression == "gzip" {
+		opts = append(opts, otlpmetrichttp.WithCompression(otlpmetrichttp.GzipCompression))
+	}
+	return opts
+}
+
+// temporalitySelector maps OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+// (already lowercased by config) onto an SDK TemporalitySelector, following
+// the OTLP exporter spec:
+//
+//	delta:      Counter, ObservableCounter, Histogram -> delta; others cumulative
+//	lowmemory:  Counter, Histogram -> delta; others cumulative
+//	cumulative: everything cumulative (the SDK default)
+//
+// Uptrace prefers delta, which is our config default. Unknown values fall back
+// to the SDK default (cumulative) rather than failing startup.
+func temporalitySelector(pref string) sdkmetric.TemporalitySelector {
+	switch strings.ToLower(pref) {
+	case "delta":
+		return func(k sdkmetric.InstrumentKind) metricdata.Temporality {
+			switch k {
+			case sdkmetric.InstrumentKindCounter,
+				sdkmetric.InstrumentKindObservableCounter,
+				sdkmetric.InstrumentKindHistogram:
+				return metricdata.DeltaTemporality
+			default:
+				return metricdata.CumulativeTemporality
+			}
+		}
+	case "lowmemory":
+		return func(k sdkmetric.InstrumentKind) metricdata.Temporality {
+			switch k {
+			case sdkmetric.InstrumentKindCounter,
+				sdkmetric.InstrumentKindHistogram:
+				return metricdata.DeltaTemporality
+			default:
+				return metricdata.CumulativeTemporality
+			}
+		}
+	default: // "cumulative" or anything unrecognized
+		return sdkmetric.DefaultTemporalitySelector
+	}
+}
+
+// aggregationSelector maps OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION
+// (already lowercased by config) onto an SDK AggregationSelector. With
+// base2_exponential_bucket_histogram (our default, and what Uptrace
+// recommends), Histogram instruments use auto-scaling exponential buckets
+// (MaxSize 160 / MaxScale 20, the SDK's own defaults for this aggregation)
+// instead of fixed explicit boundaries; every other instrument kind keeps the
+// SDK default aggregation.
+func aggregationSelector(hist string) sdkmetric.AggregationSelector {
+	if strings.ToLower(hist) != "base2_exponential_bucket_histogram" {
+		return sdkmetric.DefaultAggregationSelector
+	}
+	return func(k sdkmetric.InstrumentKind) sdkmetric.Aggregation {
+		if k == sdkmetric.InstrumentKindHistogram {
+			return sdkmetric.AggregationBase2ExponentialHistogram{
+				MaxSize:  160,
+				MaxScale: 20,
+			}
+		}
+		return sdkmetric.DefaultAggregationSelector(k)
+	}
+}
+
+func logHTTPOpts(cfg *config.Config) []otlploghttp.Option {
+	opts := []otlploghttp.Option{otlploghttp.WithEndpointURL(cfg.Telemetry.EndpointURL)}
+	if cfg.Telemetry.Insecure {
+		opts = append(opts, otlploghttp.WithInsecure())
+	}
+	if len(cfg.Telemetry.Headers) > 0 {
+		opts = append(opts, otlploghttp.WithHeaders(cfg.Telemetry.Headers))
+	}
+	if cfg.Telemetry.Compression == "gzip" {
+		opts = append(opts, otlploghttp.WithCompression(otlploghttp.GzipCompression))
+	}
+	return opts
+}
+scripts/lib.sh
+bash
+#!/usr/bin/env bash
+# scripts/lib.sh — shared helpers sourced by the other scripts and by CI.
+# Keeping logic here (not in the GitHub Actions YAML) is deliberate: the same
+# code runs on a laptop and in CI.
+
+# ---------------------------------------------------------------------------
+# logging
+# ---------------------------------------------------------------------------
+if [ -t 2 ]; then
+  _c_reset=$'\033[0m'; _c_dim=$'\033[2m'; _c_grn=$'\033[32m'; _c_ylw=$'\033[33m'; _c_red=$'\033[31m'; _c_cyn=$'\033[36m'
+else
+  _c_reset=; _c_dim=; _c_grn=; _c_ylw=; _c_red=; _c_cyn=
+fi
+log()  { printf '%s[gotunnels]%s %s\n' "$_c_cyn" "$_c_reset" "$*" >&2; }
+ok()   { printf '%s[gotunnels]%s %s%s%s\n' "$_c_cyn" "$_c_reset" "$_c_grn" "$*" "$_c_reset" >&2; }
+warn() { printf '%s[gotunnels]%s %s%s%s\n' "$_c_cyn" "$_c_reset" "$_c_ylw" "$*" "$_c_reset" >&2; }
+err()  { printf '%s[gotunnels]%s %s%s%s\n' "$_c_cyn" "$_c_reset" "$_c_red" "$*" "$_c_reset" >&2; }
+die()  { err "$*"; exit 1; }
+
+# Repo root = parent of this scripts/ directory.
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$LIB_DIR/.." && pwd)"
+
+# ---------------------------------------------------------------------------
+# container runtime + compose detection
+# ---------------------------------------------------------------------------
+# Sets:
+#   CR      -> container runtime binary (podman|docker) for logs/cp/inspect
+#   COMPOSE -> the compose invocation (may be two words, used unquoted)
+detect_runtime() {
+  if [ -n "${CR:-}" ] && [ -n "${COMPOSE:-}" ]; then return 0; fi
+  if command -v podman >/dev/null 2>&1; then
+    CR=podman
+    if podman compose version >/dev/null 2>&1; then
+      COMPOSE="podman compose"
+    elif command -v podman-compose >/dev/null 2>&1; then
+      COMPOSE="podman-compose"
+    else
+      die "podman found but neither 'podman compose' nor 'podman-compose' is available"
+    fi
+  elif command -v docker >/dev/null 2>&1; then
+    CR=docker
+    if docker compose version >/dev/null 2>&1; then
+      COMPOSE="docker compose"
+    else
+      die "docker found but 'docker compose' is not available"
+    fi
+  else
+    die "no container runtime found (need podman or docker)"
+  fi
+  export CR COMPOSE
+  log "using runtime: $CR / compose: $COMPOSE"
+}
+
+# dc: run a compose command against the repo compose file. COMPOSE may be two
+# words ("podman compose" / "docker compose"); it is expanded unquoted so it
+# splits into separate arguments. These scripts run under a strict
+# IFS=$'\n\t' (no space), which would otherwise keep "podman compose" as one
+# nonexistent command — so restore a normal IFS locally just for the split.
+dc() {
+  local IFS=$' \t\n'
+  # shellcheck disable=SC2086
+  $COMPOSE -f "$REPO_ROOT/compose.yaml" "$@"
+}
+
+# ---------------------------------------------------------------------------
+# secrets + env
+# ---------------------------------------------------------------------------
+gen_secret() {
+  local bytes="${1:-32}"
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -base64 "$bytes" | tr -d '\n' | tr '+/' '-_' | tr -d '='
+  else
+    head -c "$bytes" /dev/urandom | base64 | tr -d '\n' | tr '+/' '-_' | tr -d '='
+  fi
+}
+
+ENV_FILE="$REPO_ROOT/.env"
+
+# set_env_var KEY VALUE — idempotently upsert KEY=VALUE in .env.
+set_env_var() {
+  local key="$1" val="$2"
+  touch "$ENV_FILE"
+  if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+    # Replace in place; use a temp file to stay portable across sed variants.
+    grep -v "^${key}=" "$ENV_FILE" > "$ENV_FILE.tmp"
+    mv "$ENV_FILE.tmp" "$ENV_FILE"
+  fi
+  printf '%s=%s\n' "$key" "$val" >> "$ENV_FILE"
+}
+
+# ensure_env — create .env with fresh secrets if absent, then load it.
+ensure_env() {
+  if [ ! -f "$ENV_FILE" ]; then
+    log "generating fresh .env with per-instance secrets"
+    cat > "$ENV_FILE" <<EOF
+GOTUNNELS_INSTANCE_ID=${GOTUNNELS_INSTANCE_ID:-default}
+GOTUNNELS_VERSION=${GOTUNNELS_VERSION:-dev}
+POSTGRES_USER=gotunnels
+POSTGRES_DB=gotunnels
+POSTGRES_PASSWORD=$(gen_secret 24)
+GOTUNNELS_IP_HASH_PEPPER=$(gen_secret 32)
+GOTUNNELS_TOTP_ENCRYPTION_KEY=$(gen_secret 32)
+GOTUNNELS_RP_ID=localhost
+GOTUNNELS_RP_DISPLAY_NAME=GoTunnels
+GOTUNNELS_RP_ORIGINS=http://localhost:8080
+GOTUNNELS_CORS_ALLOWED_ORIGINS=*
+GOTUNNELS_CSP_HEADER_NAME=Content-Security-Policy-Report-Only
+GOTUNNELS_CSP_MODE=report-only
+GOTUNNELS_CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+UPTRACE_DSN=${UPTRACE_DSN:-}
+OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS:-}
+OTEL_EXPORTER_OTLP_COMPRESSION=${OTEL_EXPORTER_OTLP_COMPRESSION:-gzip}
+OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=${OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE:-delta}
+OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=${OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION:-base2_exponential_bucket_histogram}
+OTEL_SERVICE_NAME=gotunnels-api
+GOTUNNELS_DEV=false
+EOF
+    ok "wrote $ENV_FILE (gitignored)"
+  else
+    log "using existing $ENV_FILE"
+  fi
+
+  # Persist any telemetry settings the CALLER exported in their shell into
+  # .env BEFORE load_env runs. Order matters: an existing .env with an empty
+  # `UPTRACE_DSN=` line would otherwise clobber `export UPTRACE_DSN=...` from
+  # the invoking shell (load_env re-exports the empty value over it) and
+  # telemetry silently turns off. That is exactly the trap in
+  # `export UPTRACE_DSN=… ; bash scripts/up.sh` against an older .env — the
+  # only visible symptom is nothing ever arriving at the backend. Persisting
+  # here also means the DSN survives into future runs without re-exporting.
+  local _k _v
+  for _k in UPTRACE_DSN \
+            OTEL_EXPORTER_OTLP_ENDPOINT \
+            OTEL_EXPORTER_OTLP_HEADERS \
+            OTEL_EXPORTER_OTLP_COMPRESSION \
+            OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE \
+            OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION; do
+    _v="${!_k:-}"
+    if [ -n "$_v" ]; then
+      set_env_var "$_k" "$_v"
+    fi
+  done
+
+  load_env
+}
+
+# load_env — export every non-comment KEY=VALUE from .env into the environment
+# so compose ${VAR} substitution and the scripts both see them.
+load_env() {
+  [ -f "$ENV_FILE" ] || return 0
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
+}
+
+# reset_runtime_env — return the tunnel-derived keys to their bootstrap
+# defaults at the start of every run. Quick Tunnel hostnames are ephemeral, so
+# whatever up.sh wrote into .env on the LAST run is guaranteed stale on this
+# one. Left in place, those stale values become the API's CORS allow-list and
+# passkey RP if anything starts the api container before step 6 re-derives
+# them — which is precisely the CORS-on-signup failure that deleting .env
+# "fixed" (a fresh .env happens to default to `*`). Resetting the three keys
+# to the same permissive bootstrap values a fresh .env would carry makes
+# deleting .env unnecessary and, unlike deletion, preserves the generated
+# secrets (Postgres password, pepper, TOTP key) and any persisted DSN.
+reset_runtime_env() {
+  set_env_var GOTUNNELS_RP_ID localhost
+  set_env_var GOTUNNELS_RP_ORIGINS http://localhost:8080
+  set_env_var GOTUNNELS_CORS_ALLOWED_ORIGINS '*'
+  # load_env has usually already run by the time this is called; re-export so
+  # the current shell (and compose var substitution) sees the fresh values,
+  # not the stale ones .env held a moment ago.
+  export GOTUNNELS_RP_ID=localhost
+  export GOTUNNELS_RP_ORIGINS=http://localhost:8080
+  export GOTUNNELS_CORS_ALLOWED_ORIGINS='*'
+  log "reset tunnel-derived env (RP_ID / RP_ORIGINS / CORS) to bootstrap defaults"
+}
+
+# ---------------------------------------------------------------------------
+# project name (instance isolation)
+# ---------------------------------------------------------------------------
+# Resolves a compose project name. Precedence: $1 arg > $GOTUNNELS_PROJECT >
+# $GOTUNNELS_INSTANCE_ID (if not 'default') > generated random.
+resolve_project() {
+  local p="${1:-}"
+  if [ -z "$p" ]; then p="${GOTUNNELS_PROJECT:-}"; fi
+  if [ -z "$p" ] && [ -n "${GOTUNNELS_INSTANCE_ID:-}" ] && [ "${GOTUNNELS_INSTANCE_ID}" != "default" ]; then
+    p="gotunnels-${GOTUNNELS_INSTANCE_ID}"
+  fi
+  if [ -z "$p" ]; then p="gotunnels-$(gen_secret 4 | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9' | cut -c1-6)"; fi
+  # compose project names must be lowercase alnum/dash/underscore.
+  p="$(printf '%s' "$p" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')"
+  echo "$p"
+}
+
+# ---------------------------------------------------------------------------
+# health + tunnel discovery
+# ---------------------------------------------------------------------------
+# cid_of project service — the container id for <service> in <project>, or ""
+# if there is none.
+#
+# We resolve the id straight from the container runtime ($CR) by label, NOT via
+# `<compose> ps -q <service>`, because that compose path is broken here: on
+# Fedora `podman compose` shells out to the external `podman-compose` provider
+# (that's the ">>>> Executing external compose provider" banner), and
+# podman-compose's `ps` subcommand is not docker-compatible — it accepts NO
+# service argument and filters only by the project label. So
+# `<compose> ps -q db` either errors on the stray `db` token (non-zero, empty
+# stdout) or lists *every* container in the project; it never returns db's id
+# specifically. That is the "no container id resolved for 'db'" we hit even
+# though the container had been created.
+#
+# Every compose implementation we support — docker compose, podman compose, and
+# podman-compose — stamps each container with the docker-compat labels
+# `com.docker.compose.project` and `com.docker.compose.service`, so filtering on
+# both with the runtime's own `ps` returns exactly the one container we mean.
+#
+# BEST-EFFORT / MUST NEVER FAIL. Callers run under `set -euo pipefail` and
+# capture this with a bare assignment (`cid="$(cid_of …)"`), whose exit status
+# is that of this pipeline. `sed -n '1p'` prints the first id while still
+# draining the rest of the stream (no early pipe close → no SIGPIPE back to
+# `ps`), and the trailing `|| true` swallows any non-zero exit so errexit can't
+# abort the caller. `-a` is intentional: it also matches a crashed/exited
+# container so the error paths below can still read its logs.
+cid_of() { # project service
+  "$CR" ps -aq \
+    --filter "label=com.docker.compose.project=$1" \
+    --filter "label=com.docker.compose.service=$2" \
+    2>/dev/null | sed -n '1p' || true
+}
+
+# health_status cid — the container's healthcheck status, or "" when it has
+# none. The `{{if .State.Health}}` guard stops Go's template engine from
+# printing the literal "<no value>" for a container without a healthcheck, so
+# "no healthcheck" and "not reported yet" both read as the empty string.
+health_status() { # cid
+  [ -n "${1:-}" ] || return 0
+  $CR inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$1" 2>/dev/null || true
+}
+
+# wait_healthy project service timeout [probe-cmd...] — block until <service> is
+# actually ready, up to <timeout> seconds.
+#
+# Why this is more than a poll of `.State.Health.Status`:
+#   podman-compose *does* translate compose's `healthcheck:` into podman
+#   `--health-cmd` / `--health-interval` flags, so the container is created WITH
+#   a healthcheck. But podman drives the *periodic* re-check from a per-container
+#   systemd timer, and in a rootless / plain-shell session that timer frequently
+#   never fires — so `.State.Health.Status` sits at "starting" forever even
+#   though Postgres accepted connections within a second or two. Passively
+#   waiting on that field therefore always times out here (this is exactly the
+#   "'db' did not become healthy in 120s" we kept hitting).
+#
+# So each second we accept readiness from whichever of these fires first:
+#   1. passive status == "healthy"      — docker (its daemon runs the checks),
+#                                          or podman if the timer *is* firing.
+#   2. `podman healthcheck run` exit 0   — runs the container's OWN healthcheck
+#                                          command once, on demand, with no timer
+#                                          involved (podman only). Bonus: it also
+#                                          updates the recorded status, so
+#                                          `podman ps` shows "healthy" afterward.
+#   3. the caller's probe, exit 0        — run as `$CR exec <cid> <probe...>`;
+#                                          the ultimate fallback that depends on
+#                                          nothing but the container running. For
+#                                          db we pass `pg_isready …`.
+# If no probe is given, only 1 and 2 are used.
+wait_healthy() { # project service timeout_seconds [probe-cmd...]
+  local project="$1" svc="$2" timeout="${3:-90}"
+  shift 3 2>/dev/null || true
+  local i cid status st hs
+  log "waiting for '$svc' to become ready (up to ${timeout}s)"
+  for i in $(seq 1 "$timeout"); do
+    cid="$(cid_of "$project" "$svc")"
+    if [ -n "$cid" ]; then
+      status="$(health_status "$cid")"
+      if [ "$status" = "healthy" ]; then ok "'$svc' is healthy"; return 0; fi
+      if [ "$CR" = "podman" ] && "$CR" healthcheck run "$cid" >/dev/null 2>&1; then
+        ok "'$svc' is healthy"; return 0
+      fi
+      if [ "$#" -gt 0 ] && "$CR" exec "$cid" "$@" >/dev/null 2>&1; then
+        ok "'$svc' is ready"; return 0
+      fi
+    fi
+    sleep 1
+  done
+  # Don't fail with a bare timeout — surface the container's real state and its
+  # recent logs so a genuine Postgres problem (bad config, crash loop, wrong
+  # password) is visible instead of being hidden behind "did not become ready".
+  err "'$svc' did not become ready in ${timeout}s"
+  if [ -n "${cid:-}" ]; then
+    st="$($CR inspect --format '{{.State.Status}}' "$cid" 2>/dev/null || echo '?')"
+    hs="$(health_status "$cid")"; [ -n "$hs" ] || hs='(none)'
+    err "  container: state=$st health=$hs id=$(printf '%.12s' "$cid")"
+    err "  recent '$svc' logs ($CR logs --tail 40 $svc):"
+    "$CR" logs --tail 40 "$cid" 2>&1 | sed 's/^/    /' >&2 || true
+  else
+    err "  no container id resolved for '$svc' — was it created? (check: dc -p $project ps)"
+  fi
+  return 1
+}
+
+poll_tunnel_url() { # project service timeout_seconds
+  local project="$1" svc="$2" timeout="${3:-60}" i cid url
+  for i in $(seq 1 "$timeout"); do
+    cid="$(cid_of "$project" "$svc")"
+    if [ -n "$cid" ]; then
+      # `|| true` is required: before the URL is logged, `grep` matches nothing
+      # and exits 1; once it matches, `head -n1` SIGPIPE-s `grep`. Under
+      # `pipefail` either would make this bare assignment abort the caller via
+      # errexit — so neutralize the pipeline's exit status here.
+      url="$($CR logs "$cid" 2>&1 | grep -Eo 'https://[a-z0-9._-]+\.trycloudflare\.com' | head -n1 || true)"
+      if [ -n "$url" ]; then echo "$url"; return 0; fi
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+# wait_for_log project service pattern timeout — poll container logs for a regex.
+#
+# The grep must DRAIN the whole log stream: `grep -E … >/dev/null`, NOT
+# `grep -Eq`. With -q grep exits at the first match, the runtime's `logs`
+# process takes SIGPIPE (exit 141), and under `pipefail` the pipeline — and so
+# this `if` condition — reports failure even though the pattern WAS present.
+# That inverted every success into a miss, which is why up.sh printed "did not
+# observe API listening log yet" on every run while the API was in fact
+# serving. Same failure family as cid_of / poll_tunnel_url above; keeping grep
+# reading to EOF lets `logs` exit 0. A genuine no-match still exits 1 and the
+# loop just polls again.
+wait_for_log() {
+  local project="$1" svc="$2" pat="$3" timeout="${4:-60}" i cid
+  for i in $(seq 1 "$timeout"); do
+    cid="$(cid_of "$project" "$svc")"
+    if [ -n "$cid" ] && "$CR" logs "$cid" 2>&1 | grep -E -- "$pat" >/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+host_of_url() { # https://x.y.z/... -> x.y.z
+  printf '%s' "$1" | sed -E 's#^[a-z]+://##; s#/.*$##'
+}
+
+write_frontend_config() { # project api_url
+  local project="$1" api_url="$2" cid tmp
+  cid="$(cid_of "$project" frontend)"
+  [ -n "$cid" ] || { err "frontend container not found; cannot write config.json"; return 1; }
+  tmp="$(mktemp)"
+  cat > "$tmp" <<EOF
+{
+  "apiBase": "${api_url}",
+  "instanceId": "${GOTUNNELS_INSTANCE_ID:-default}",
+  "generatedAt": "$(date --iso-8601=seconds 2>/dev/null || date)"
+}
+EOF
+  $CR cp "$tmp" "${cid}:/srv/config.json"
+  rm -f "$tmp"
+  ok "wrote config.json into frontend container"
+}
+scripts/up.sh
+bash
+#!/usr/bin/env bash
+# scripts/up.sh — bring the whole stack up, in the staged order that lets the
+# frontend and API each get a Quick Tunnel URL and lets the API be configured
+# with the correct WebAuthn RP ID / CORS origin (both derived from the
+# frontend's runtime URL). Safe to run for multiple instances concurrently by
+# passing a distinct project name.
+#
+# Usage:
+#   scripts/up.sh [project-name]
+#
+# Environment:
+#   GOTUNNELS_PROJECT / GOTUNNELS_INSTANCE_ID  alternative ways to name the run
+#   UPTRACE_DSN                                optional telemetry DSN
+#   GOTUNNELS_TUNNEL_LOG_WAIT                  seconds to wait before printing
+#                                              the tunnel URL log lines (def 60)
+
+set -euo pipefail
+IFS=$'\n\t'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+detect_runtime
+ensure_env
+# Quick Tunnel URLs are ephemeral: whatever last run wrote into .env for
+# RP_ID / RP_ORIGINS / CORS is stale now. Reset them to bootstrap defaults so
+# nothing (including a dependency-started api container, see step 6) can boot
+# against a dead tunnel's origin. This removes the need to delete .env.
+reset_runtime_env
+
+PROJECT="$(resolve_project "${1:-}")"
+export GOTUNNELS_INSTANCE_ID="${GOTUNNELS_INSTANCE_ID:-$PROJECT}"
+set_env_var GOTUNNELS_INSTANCE_ID "$GOTUNNELS_INSTANCE_ID"
+log "project (instance): $PROJECT"
+
+# 1) Build images (API multi-stage build runs go mod tidy + go build).
+log "building images…"
+dc -p "$PROJECT" build
+
+# 2) Database first, wait until it actually accepts connections.
+#    We pass an explicit `pg_isready` probe so readiness does NOT hinge on
+#    podman's health *timer* firing (it often doesn't in a rootless shell) — see
+#    the long note on wait_healthy in lib.sh. 60s is plenty for a fresh volume.
+log "starting database…"
+dc -p "$PROJECT" up -d db
+wait_healthy "$PROJECT" db 60 \
+  pg_isready -U "${POSTGRES_USER:-gotunnels}" -d "${POSTGRES_DB:-gotunnels}" -q
+
+# 3) Frontend + its tunnel, WITHOUT pulling in the api dependency yet.
+log "starting frontend and its tunnel…"
+dc -p "$PROJECT" up -d --no-deps frontend cloudflared-frontend
+
+# 4) Discover the frontend's public URL.
+log "waiting for the frontend Quick Tunnel URL…"
+FRONTEND_URL="$(poll_tunnel_url "$PROJECT" cloudflared-frontend 90)" \
+  || die "timed out waiting for frontend tunnel URL (check: dc -p $PROJECT logs cloudflared-frontend)"
+FRONTEND_HOST="$(host_of_url "$FRONTEND_URL")"
+ok "frontend: $FRONTEND_URL"
+
+# 5) Configure WebAuthn RP + CORS from the frontend origin, persist, and export.
+set_env_var GOTUNNELS_RP_ID "$FRONTEND_HOST"
+set_env_var GOTUNNELS_RP_ORIGINS "$FRONTEND_URL"
+set_env_var GOTUNNELS_CORS_ALLOWED_ORIGINS "$FRONTEND_URL"
+export GOTUNNELS_RP_ID="$FRONTEND_HOST"
+export GOTUNNELS_RP_ORIGINS="$FRONTEND_URL"
+export GOTUNNELS_CORS_ALLOWED_ORIGINS="$FRONTEND_URL"
+
+# 6) Now start the API (with correct RP/CORS) and its tunnel.
+#
+#    podman-compose does NOT honor `--no-deps`: step 3's
+#    `up -d --no-deps frontend cloudflared-frontend` also created and started
+#    the api container (frontend depends_on api), freezing its environment
+#    with the pre-discovery values. A plain `up -d` here then hits "name
+#    already in use", keeps that stale container, and the API never sees the
+#    tunnel-derived GOTUNNELS_RP_ID / RP_ORIGINS / CORS_ALLOWED_ORIGINS just
+#    exported above — which is exactly the CORS-on-signup failure (and, worse,
+#    silently broken passkeys: RP ID stuck at its bootstrap value). So: if an
+#    api container already exists for this project, remove it and let compose
+#    recreate it with the current environment. Under docker compose (which
+#    honors --no-deps) no such container exists yet and this is a no-op.
+_stale_api_cid="$(cid_of "$PROJECT" api)"
+if [ -n "$_stale_api_cid" ]; then
+  warn "api container was pre-created by a dependency with pre-discovery env; recreating it"
+  "$CR" rm -f "$_stale_api_cid" >/dev/null 2>&1 || true
+fi
+log "starting API and its tunnel…"
+dc -p "$PROJECT" up -d --no-deps api cloudflared-api
+
+# 7) API readiness (best-effort) then discover its public URL.
+wait_for_log "$PROJECT" api 'http server listening' 60 || warn "did not observe API listening log yet"
+log "waiting for the API Quick Tunnel URL…"
+API_URL="$(poll_tunnel_url "$PROJECT" cloudflared-api 90)" \
+  || die "timed out waiting for API tunnel URL (check: dc -p $PROJECT logs cloudflared-api)"
+ok "api: $API_URL"
+
+# 8) Tell the frontend where the API lives (runtime config.json).
+write_frontend_config "$PROJECT" "$API_URL"
+
+# 9) Report.
+URLS_FILE="$REPO_ROOT/tunnel-urls.txt"
+{
+  echo "instance=$PROJECT"
+  echo "frontend=$FRONTEND_URL"
+  echo "api=$API_URL"
+} > "$URLS_FILE"
+
+echo >&2
+ok "GoTunnels is up."
+printf '  %sWeb app :%s %s\n' "$_c_grn" "$_c_reset" "$FRONTEND_URL" >&2
+printf '  %sAPI     :%s %s\n' "$_c_grn" "$_c_reset" "$API_URL" >&2
+printf '  %sInstance:%s %s (urls saved to tunnel-urls.txt)\n' "$_c_dim" "$_c_reset" "$PROJECT" >&2
+echo >&2
+log "tear down with: scripts/down.sh $PROJECT"
+
+# 10) Final check. Cloudflare Quick Tunnels can take a little while after the
+#     containers start to finish registering and become reachable. Give them a
+#     moment, then re-read the cloudflared container logs with the runtime
+#     ($CR, e.g. podman) and print the raw log line(s) that announce each
+#     https://<subdomain>.trycloudflare.com URL. That line is the signal the
+#     tunnel is live — and it is the exact line to copy/paste.
+#
+#     Override the pause with GOTUNNELS_TUNNEL_LOG_WAIT (seconds); set it to 0
+#     to skip waiting entirely.
+FINAL_WAIT="${GOTUNNELS_TUNNEL_LOG_WAIT:-60}"
+if [ "$FINAL_WAIT" -gt 0 ] 2>/dev/null; then
+  log "waiting ${FINAL_WAIT}s for the Quick Tunnels to settle, then printing their URL log lines…"
+  sleep "$FINAL_WAIT"
+fi
+
+echo >&2
+# "service|human label" pairs. An explicit for-loop list is not subject to IFS
+# word splitting, and the ${var%%|*} / ${var##*|} expansions do not use IFS
+# either, so this is safe under IFS=$'\n\t'.
+for _pair in "cloudflared-frontend|Web app" "cloudflared-api|API"; do
+  _svc="${_pair%%|*}"
+  _label="${_pair##*|}"
+  _cid="$(cid_of "$PROJECT" "$_svc")"
+  if [ -z "$_cid" ]; then
+    warn "$_label: container '$_svc' not found; cannot read its logs"
+    continue
+  fi
+  # grep exits non-zero when it matches nothing; '|| true' keeps that from
+  # tripping 'set -e' on this final, informational step.
+  _lines="$("$CR" logs "$_cid" 2>&1 | grep -E 'https://[a-z0-9._-]+\.trycloudflare\.com' || true)"
+  if [ -n "$_lines" ]; then
+    ok "$_label — tunnel URL (from: $CR logs $_svc):"
+    printf '%s\n' "$_lines" >&2
+  else
+    warn "$_label: no trycloudflare.com URL in '$_svc' logs yet (check: dc -p $PROJECT logs $_svc)"
+  fi
+  echo >&2
+done
+scripts/ci-container-test.sh (new file)
+bash
+#!/usr/bin/env bash
+# scripts/ci-container-test.sh — build the Containerfiles and exercise the real
+# stack (db + api + frontend, no Cloudflare tunnels) end to end over HTTP.
+#
+# This is the piece plain `scripts/test.sh` cannot cover: that the images
+# actually build, that compose wiring + env substitution is right, that
+# migrations run against real Postgres, and that the HTTP surface behaves —
+# including a regression test for the captcha sync 500 (`operator is not
+# unique: unknown + unknown`), which only ever reproduced against a real
+# Postgres because unit tests never hit the pgx extended protocol.
+#
+# Runs identically on a laptop and in GitHub Actions:
+#   bash scripts/ci-container-test.sh [project-name]     (default: gotunnels-ci)
+#
+# No host ports are published; all HTTP assertions run from a throwaway curl
+# container attached to the instance's compose network. The api image is
+# distroless (no shell), so an external HTTP driver is the only option anyway.
+
+set -euo pipefail
+IFS=$'\n\t'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pw
+Claude reached its max length for this message. Max effort can use excessive tokens resulting in hitting limits. Consider using a lower effort setting.
+
 
 Want to be notified when Claude responds?
+
 
 
 
@@ -1253,3 +3383,6 @@ Claude is AI and can make mistakes. Please double-check responses.
 
 
 
+58
+15
+26
