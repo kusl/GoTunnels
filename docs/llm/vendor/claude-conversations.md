@@ -38,3 +38,4 @@ export OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=BASE2_EXPONENTIA
 # Prefer delta temporality.
 export OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=DELTA
 ```
+You can see the code in `dump.txt` and my deployment at `virginia.txt`
