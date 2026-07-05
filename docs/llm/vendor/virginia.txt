@@ -268,4 +268,7 @@ a02ad819562f  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou..
 338c54d2d4e5  localhost/gotunnels-bbxp5g_frontend:latest     caddy run --confi...  About a minute ago  Up About a minute            80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-bbxp5g_frontend_1
 20e6f67ad51d  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou...  About a minute ago  Up About a minute                                                          gotunnels-bbxp5g_cloudflared-frontend_1
 840e159abe36  docker.io/cloudflare/cloudflared:latest        tunnel --no-autou...  About a minute ago  Up About a minute                                                          gotunnels-bbxp5g_cloudflared-api_1
-kushal@virginia:~/src/golang/GoTunnels$ 
+kushal@virginia:~/src/golang/GoTunnels$ exit
+logout
+Connection to virginia closed.
+kushal@fedora:~/src/golang/GoTunnels$ 
