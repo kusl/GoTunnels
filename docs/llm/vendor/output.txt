@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-05T10:29:51-04:00
+  Generated at   : 2026-07-06T02:36:09-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,12 +17,12 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : b4d1caeebb897da4594cd6777b4a0f0f768e6a65
-  Commit (short) : b4d1cae
-  Commit date    : 2026-07-05 10:29:48 -0400
-  Commit message : add prompt
+  Commit (full)  : fd88d04dc74ee02324cef70bea65ee73dab072fa
+  Commit (short) : fd88d04
+  Commit date    : 2026-07-06 02:35:59 -0400
+  Commit message : add claude response
   Remote origin  : git@github.com:kusl/GoTunnels.git
-  Files included : 92
+  Files included : 95
   Excluded path  : docs/llm/
   Excluded files : yarn.lock
 
@@ -424,7 +424,7 @@ FOOTER
 mv -f "$TMP_FILE" "$OUTPUT_FILE"
 
 ################################################################################
-# FILE TREE  (all 92 included files)
+# FILE TREE  (all 95 included files)
 ################################################################################
 .
 .
@@ -457,11 +457,14 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 │   │   ├── page-index.js
 │   │   ├── page-login.js
 │   │   ├── page-notes.js
+│   │   ├── page-passkeys.js
 │   │   ├── page-settings.js
 │   │   ├── page-signup.js
+│   │   ├── theme-boot.js
 │   │   └── webauthn.js
 │   ├── login.html
 │   ├── notes.html
+│   ├── passkeys.html
 │   ├── settings.html
 │   └── signup.html
 ├── .github
@@ -554,15 +557,15 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   File name:             main.go
   Relative path:         cmd/api/main.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/cmd/api/main.go
-  Size:                  4.3 KiB (4469 bytes)
-  Last modified:         2026-07-04 17:16:38.000000000 -0400
+  Size:                  5.3 KiB (5446 bytes)
+  Last modified:         2026-07-06 02:21:28.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406591
+  Inode:                 19816305
   Hard links:            1
   MIME type:             text/x-c
-  SHA-256:               33cb9a0c7ba8ae27ea3197c690e1f1a83f4a5572ad7890d4de2e7fa135e63337
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               e00ca973b9bb4a1213e31140e66c0ede8249da97ea35df1e7d572a29f32e954c
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // Command api is the GoTunnels backend entrypoint. It loads central
@@ -656,12 +659,21 @@ func run() error {
 	st := store.New(pool)
 	rec := activity.NewRecorder(st, cfg.IPHashPepper())
 
-	wa, err := auth.NewWebAuthn(cfg.RPID, cfg.RPDisplayName, cfg.RPOrigins)
+	// The relying-party provider validates the static RP config at boot and
+	// additionally derives per-origin relying parties for origins matching
+	// cfg.RPOriginPatterns — the fix for passkeys breaking when the tunnel
+	// hostname the browser sees differs from the one configured at startup.
+	rp, err := auth.NewRPProvider(auth.RPConfig{
+		RPID:           cfg.RPID,
+		RPDisplayName:  cfg.RPDisplayName,
+		RPOrigins:      cfg.RPOrigins,
+		OriginPatterns: cfg.RPOriginPatterns,
+	})
 	if err != nil {
 		return err
 	}
 
-	authHandlers := auth.NewHandlers(st, wa, rec, log, auth.Settings{
+	authHandlers := auth.NewHandlers(st, rp, rec, log, auth.Settings{
 		SessionTTL:   cfg.SessionTTL,
 		TOTPKey:      cfg.TOTPAESKey(),
 		Issuer:       cfg.RPDisplayName,
@@ -684,6 +696,16 @@ func run() error {
 	notesHandlers := notes.NewHandlers(st, log)
 	prefsHandlers := prefs.NewHandlers(st, log)
 
+	// Signup limiters: nil disables a guard (config maps a zero interval to
+	// "off"). PerInterval converts "one every N" into the limiter's rate/sec.
+	var signupIP, signupGlobal *httpx.RateLimiter
+	if cfg.SignupIPInterval > 0 {
+		signupIP = httpx.NewRateLimiter(config.PerInterval(cfg.SignupIPInterval), float64(cfg.SignupIPBurst))
+	}
+	if cfg.SignupGlobalInterval > 0 {
+		signupGlobal = httpx.NewRateLimiter(config.PerInterval(cfg.SignupGlobalInterval), float64(cfg.SignupGlobalBurst))
+	}
+
 	srv := server.New(server.Deps{
 		Config:         cfg,
 		Log:            log,
@@ -695,8 +717,10 @@ func run() error {
 		Notes:          notesHandlers,
 		Prefs:          prefsHandlers,
 		// One note every 2 seconds sustained, short bursts of 5, per user.
-		NotesRateLimiter: httpx.NewRateLimiter(0.5, 5),
-		Pepper:           cfg.IPHashPepper(),
+		NotesRateLimiter:    httpx.NewRateLimiter(0.5, 5),
+		SignupIPLimiter:     signupIP,
+		SignupGlobalLimiter: signupGlobal,
+		Pepper:              cfg.IPHashPepper(),
 	})
 
 	// Run the server and wait for either a serve error or a shutdown signal.
@@ -736,15 +760,15 @@ func run() error {
   File name:             compose.yaml
   Relative path:         compose.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/compose.yaml
-  Size:                  4.1 KiB (4222 bytes)
-  Last modified:         2026-07-05 05:29:43.120093587 -0400
+  Size:                  5.9 KiB (6058 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805972
+  Inode:                 19816306
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               04b94b25f444e96bc739672e37d373148c62c81826901b3e4a4bff9afbc9ddf5
-  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
+  SHA-256:               d13d2d3a4dbd627d5005eecfaf8e7f7b1e1ed51e568b68bb725c180202d0206e
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 # compose.yaml — the whole GoTunnels stack.
@@ -800,8 +824,22 @@ services:
       GOTUNNELS_RP_ID: "${GOTUNNELS_RP_ID:-localhost}"
       GOTUNNELS_RP_DISPLAY_NAME: "${GOTUNNELS_RP_DISPLAY_NAME:-GoTunnels}"
       GOTUNNELS_RP_ORIGINS: "${GOTUNNELS_RP_ORIGINS:-http://localhost:8080}"
+      # Origins matching these patterns may use passkeys even when they differ
+      # from GOTUNNELS_RP_ORIGINS: the relying party is derived per request
+      # (see internal/auth/passkey.go). Patterns gate WebAuthn only — never
+      # CORS, which stays pinned to the exact discovered origin.
+      GOTUNNELS_RP_ORIGIN_PATTERNS: "${GOTUNNELS_RP_ORIGIN_PATTERNS:-https://*.trycloudflare.com}"
       GOTUNNELS_CORS_ALLOWED_ORIGINS: "${GOTUNNELS_CORS_ALLOWED_ORIGINS:-*}"
       GOTUNNELS_CSP_MODE: "${GOTUNNELS_CSP_MODE:-report-only}"
+      # Account-creation rate limits (password signup and passkey-signup
+      # finish). An interval of 0 disables that guard.
+      GOTUNNELS_SIGNUP_IP_INTERVAL: "${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m}"
+      GOTUNNELS_SIGNUP_IP_BURST: "${GOTUNNELS_SIGNUP_IP_BURST:-1}"
+      GOTUNNELS_SIGNUP_GLOBAL_INTERVAL: "${GOTUNNELS_SIGNUP_GLOBAL_INTERVAL:-1m}"
+      GOTUNNELS_SIGNUP_GLOBAL_BURST: "${GOTUNNELS_SIGNUP_GLOBAL_BURST:-1}"
+      # OTel resource attribute host.name — scripts/up.sh exports the podman
+      # host's `hostname` so telemetry says which machine the stack runs on.
+      GOTUNNELS_HOST_NAME: "${GOTUNNELS_HOST_NAME:-}"
       # Telemetry: a single Uptrace (cloud or self-hosted) DSN, or OTLP env vars.
       UPTRACE_DSN: "${UPTRACE_DSN:-}"
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
@@ -817,8 +855,14 @@ services:
     build:
       context: .
       dockerfile: Containerfile.frontend
-    depends_on:
-      - api
+    # Deliberately NO depends_on here. The frontend is static files; it does
+    # not need the api at startup. More importantly, under podman a
+    # depends_on becomes a hard --requires link on the api *container*, which
+    # (a) made podman-compose pre-create the api during step 3 of up.sh with
+    # pre-discovery env, and (b) made the later `podman rm -f <api>` fail
+    # with "has dependent containers" — the API then silently kept
+    # RP_ID=localhost and CORS=*, which is exactly the state where everything
+    # works EXCEPT passkeys. See scripts/up.sh step 3/6 and virginia.txt.
     environment:
       GOTUNNELS_CSP_HEADER_NAME: "${GOTUNNELS_CSP_HEADER_NAME:-Content-Security-Policy-Report-Only}"
       GOTUNNELS_CSP_POLICY: "${GOTUNNELS_CSP_POLICY:-default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'}"
@@ -833,8 +877,10 @@ services:
 
   cloudflared-api:
     image: docker.io/cloudflare/cloudflared:latest
-    depends_on:
-      - api
+    # No depends_on for the same reason as the frontend service above:
+    # cloudflared retries its upstream connection, so start order does not
+    # matter, and a --requires link here would again block recreating the api
+    # container after tunnel discovery.
     command: ["tunnel", "--no-autoupdate", "--url", "http://api:8080"]
     restart: unless-stopped
 
@@ -1271,15 +1317,15 @@ also annotate their active span (batch sizes, note ids) so traces answer
   File name:             CONFIGURATION.md
   Relative path:         docs/CONFIGURATION.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/docs/CONFIGURATION.md
-  Size:                  5.5 KiB (5723 bytes)
-  Last modified:         2026-07-05 05:30:33.962945422 -0400
+  Size:                  7.0 KiB (7246 bytes)
+  Last modified:         2026-07-06 02:21:31.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805987
+  Inode:                 19816308
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               8c11c87c75097b1b4bf10245c09a5a4b5f4259d4e059999e0760d7bf414325f1
-  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
+  SHA-256:               bb6090bfb42e4dd7d6fc5ad7bc2574f56eeebceacae897b012e508dec89a6832
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 # Configuration
@@ -1344,7 +1390,24 @@ with a warning (fine for local hacking, never for anything real).
 | `GOTUNNELS_RP_ID` | `localhost` | WebAuthn Relying Party ID = the frontend's registrable domain. |
 | `GOTUNNELS_RP_DISPLAY_NAME` | `GoTunnels` | Human-readable RP name (also the TOTP issuer). |
 | `GOTUNNELS_RP_ORIGINS` | `http://localhost:8080` | Full origin(s) the browser presents (comma/space separated). |
+| `GOTUNNELS_RP_ORIGIN_PATTERNS` | `https://*.trycloudflare.com` | Origins matching any pattern may use passkeys even when not listed in `GOTUNNELS_RP_ORIGINS`; the relying party (RP ID + origin) is derived per request from the browser's own `Origin` header. `*.` matches exactly one DNS label. Patterns gate **WebAuthn only**, never CORS. Empty disables derivation. |
 | `GOTUNNELS_CORS_ALLOWED_ORIGINS` | `*` | Exact allowed origin(s), or `*`. Because credentials are used, `*` is echoed as the request origin rather than literally, and never treated as authorization. |
+
+## Signup rate limits
+
+Applied at the moment an account is actually created: `POST /api/signup` and
+the passkey-signup **finish** step. The begin step is deliberately unguarded
+so an abandoned or failed authenticator prompt never consumes a token. The
+per-IP guard runs before the global one, so a single noisy client is rejected
+before it can drain the bucket everyone shares. An interval of `0` disables
+that guard.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `GOTUNNELS_SIGNUP_IP_INTERVAL` | `5m` | Sustained rate: one signup per interval per (hashed) client IP. |
+| `GOTUNNELS_SIGNUP_IP_BURST` | `1` | Burst per IP (raise for e.g. a workshop behind one NAT). |
+| `GOTUNNELS_SIGNUP_GLOBAL_INTERVAL` | `1m` | Sustained rate: one signup per interval across the whole instance. |
+| `GOTUNNELS_SIGNUP_GLOBAL_BURST` | `1` | Burst across the whole instance. |
 
 ## Content Security Policy (central)
 
@@ -1380,6 +1443,7 @@ disabled (stdout logging only).
 | `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | `delta` | `delta`, `cumulative`, or `lowmemory` (spec casing like `DELTA` also accepted). Uptrace prefers delta. |
 | `OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION` | `base2_exponential_bucket_histogram` | Or `explicit_bucket_histogram`. Exponential buckets give Uptrace accurate percentiles at lower cost. |
 | `OTEL_SERVICE_NAME` / `GOTUNNELS_SERVICE_NAME` | `gotunnels-api` | OTel `service.name`. |
+| `GOTUNNELS_HOST_NAME` | (empty) | OTel resource attribute `host.name`. The SDK does not detect the host by default, which is why backends showed `host_name` as empty. `scripts/up.sh` sets it to the machine's `hostname`; when empty, the app falls back to the container's hostname. |
 
 ## Dev
 
@@ -1897,15 +1961,15 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   File name:             activity.html
   Relative path:         frontend/activity.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/activity.html
-  Size:                  1.6 KiB (1713 bytes)
-  Last modified:         2026-07-04 17:16:39.000000000 -0400
+  Size:                  1.7 KiB (1802 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406595
+  Inode:                 19816310
   Hard links:            1
   MIME type:             text/html
-  SHA-256:               e278842f4f2dc1e605079b81413fc4d11613aca36571b8eaeb73b7a21e009559
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               6fdc169985f8d7c70ce635e9a217734f9adb0c7647fe27b2763424fb095a0007
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 <!doctype html>
@@ -1915,6 +1979,7 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Activity · GoTunnels</title>
     <link rel="stylesheet" href="/css/style.css" />
+    <script src="/js/theme-boot.js"></script>
   </head>
   <body>
     <header class="topbar">
@@ -1922,6 +1987,7 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
         <span class="brand"><span class="dot"></span> GoTunnels</span>
         <nav class="mainnav">
           <a href="/">Home</a>
+          <a href="/passkeys">Passkeys</a>
           <a href="/notes" data-auth="in" class="hidden">Notes</a>
           <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
           <a href="/activity" data-auth="in" class="hidden">Activity</a>
@@ -2047,15 +2113,15 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   File name:             captcha.html
   Relative path:         frontend/captcha.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/captcha.html
-  Size:                  4.3 KiB (4466 bytes)
-  Last modified:         2026-07-04 17:16:39.000000000 -0400
+  Size:                  4.4 KiB (4555 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406596
+  Inode:                 19816311
   Hard links:            1
   MIME type:             text/html
-  SHA-256:               5eaae33958496a13d5dfffafb303b5602a730d78fd9354788f34e4d54326a520
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               f969ef0403452ae4d9a3d9ede6316a9ece2ed9840eb5e18f1724d118894b64e3
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 <!doctype html>
@@ -2065,6 +2131,7 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CAPTCHA · GoTunnels</title>
     <link rel="stylesheet" href="/css/style.css" />
+    <script src="/js/theme-boot.js"></script>
   </head>
   <body>
     <header class="topbar">
@@ -2072,6 +2139,7 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
         <span class="brand"><span class="dot"></span> GoTunnels</span>
         <nav class="mainnav">
           <a href="/">Home</a>
+          <a href="/passkeys">Passkeys</a>
           <a href="/notes" data-auth="in" class="hidden">Notes</a>
           <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
           <a href="/activity" data-auth="in" class="hidden">Activity</a>
@@ -2176,23 +2244,31 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   File name:             style.css
   Relative path:         frontend/css/style.css
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/css/style.css
-  Size:                  15.0 KiB (15428 bytes)
-  Last modified:         2026-07-04 17:16:39.000000000 -0400
+  Size:                  21.7 KiB (22239 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406598
+  Inode:                 19816313
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               5e6145766b47c3a6624941e9f99f3318402306d618edfd3af6bf8fd91983d799
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               d24ff34625eceed69bfda6ae051fb0669cdb86edd1badfd7d86e380ac18b91ef
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 /* GoTunnels frontend styles.
-   Aesthetic: a quiet, instrument-panel dark theme. One accent (signal green),
-   a monospace face for data, a clean sans for prose. No third-party fonts —
-   everything is a system font stack so the strict self-only CSP holds. */
+   Aesthetic: a quiet, instrument-panel look. One accent, a monospace face for
+   data, a clean sans for prose. No third-party fonts — everything is a system
+   font stack so the strict self-only CSP holds.
+
+   THEMES: every color in the UI comes from the custom properties below.
+   :root carries the default (dark) palette; html[data-theme="..."] blocks
+   override the same variables for the other themes. theme-boot.js stamps the
+   attribute before first paint, common.js provides the picker. "system"
+   follows prefers-color-scheme (dark falls through to :root, light gets the
+   light palette via the media query at the end of the theme section). */
 
 :root {
+  color-scheme: dark;
   --bg: #0d1117;
   --bg-elev: #151b23;
   --bg-elev-2: #1b232d;
@@ -2204,11 +2280,133 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   --accent: #3fb950;
   --accent-dim: #2ea043;
   --accent-glow: rgba(63, 185, 80, 0.15);
+  --on-accent: #04140a;
   --danger: #f85149;
   --warn: #d29922;
+  --ok-text: #7ee787;
+  --ok-soft-bg: rgba(126, 231, 135, 0.12);
+  --danger-soft-bg: rgba(248, 81, 73, 0.1);
+  --danger-soft-border: #5a2d2d;
+  --danger-soft-text: #ff9d97;
+  --warn-soft-bg: rgba(210, 153, 34, 0.08);
+  --warn-soft-border: #5a4a1d;
+  --warn-text: #e3b341;
   --radius: 10px;
   --mono: ui-monospace, "SF Mono", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ---- theme: light (GitHub-light inspired) ---- */
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f8fa;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #eef1f4;
+  --border: #d0d7de;
+  --border-bright: #afb8c1;
+  --text: #1f2328;
+  --text-dim: #57606a;
+  --text-faint: #6e7781;
+  --accent: #1a7f37;
+  --accent-dim: #2da44e;
+  --accent-glow: rgba(26, 127, 55, 0.12);
+  --on-accent: #ffffff;
+  --danger: #cf222e;
+  --warn: #9a6700;
+  --ok-text: #1a7f37;
+  --ok-soft-bg: rgba(26, 127, 55, 0.1);
+  --danger-soft-bg: rgba(207, 34, 46, 0.08);
+  --danger-soft-border: #f0b8b4;
+  --danger-soft-text: #cf222e;
+  --warn-soft-bg: rgba(154, 103, 0, 0.08);
+  --warn-soft-border: #e5d0a1;
+  --warn-text: #9a6700;
+}
+
+/* ---- theme: solarized dark ---- */
+html[data-theme="solarized-dark"] {
+  color-scheme: dark;
+  --bg: #002b36;
+  --bg-elev: #073642;
+  --bg-elev-2: #0a4050;
+  --border: #1f4a56;
+  --border-bright: #37616d;
+  --text: #eee8d5;
+  --text-dim: #93a1a1;
+  --text-faint: #657b83;
+  --accent: #859900;
+  --accent-dim: #6f8000;
+  --accent-glow: rgba(133, 153, 0, 0.16);
+  --on-accent: #002b36;
+  --danger: #dc322f;
+  --warn: #b58900;
+  --ok-text: #b0c94a;
+  --ok-soft-bg: rgba(133, 153, 0, 0.14);
+  --danger-soft-bg: rgba(220, 50, 47, 0.12);
+  --danger-soft-border: #6b2f2e;
+  --danger-soft-text: #ef8683;
+  --warn-soft-bg: rgba(181, 137, 0, 0.1);
+  --warn-soft-border: #6b5a1d;
+  --warn-text: #cfa430;
+}
+
+/* ---- theme: solarized light ---- */
+html[data-theme="solarized-light"] {
+  color-scheme: light;
+  --bg: #fdf6e3;
+  --bg-elev: #eee8d5;
+  --bg-elev-2: #e4ddc8;
+  --border: #d3cbb7;
+  --border-bright: #b8ae95;
+  --text: #073642;
+  --text-dim: #586e75;
+  --text-faint: #839496;
+  --accent: #6f8000;
+  --accent-dim: #859900;
+  --accent-glow: rgba(133, 153, 0, 0.18);
+  --on-accent: #fdf6e3;
+  --danger: #dc322f;
+  --warn: #b58900;
+  --ok-text: #5c6f00;
+  --ok-soft-bg: rgba(133, 153, 0, 0.14);
+  --danger-soft-bg: rgba(220, 50, 47, 0.1);
+  --danger-soft-border: #e5b1ac;
+  --danger-soft-text: #b52d2a;
+  --warn-soft-bg: rgba(181, 137, 0, 0.12);
+  --warn-soft-border: #d9c68d;
+  --warn-text: #8f6d00;
+}
+
+/* ---- theme: system, when the OS asks for light ----
+   (system + OS-dark simply falls through to :root above.)
+   Plain CSS cannot alias a variable block, so this duplicates the light
+   palette; keep it byte-identical with html[data-theme="light"]. */
+@media (prefers-color-scheme: light) {
+  html[data-theme="system"] {
+    color-scheme: light;
+    --bg: #f6f8fa;
+    --bg-elev: #ffffff;
+    --bg-elev-2: #eef1f4;
+    --border: #d0d7de;
+    --border-bright: #afb8c1;
+    --text: #1f2328;
+    --text-dim: #57606a;
+    --text-faint: #6e7781;
+    --accent: #1a7f37;
+    --accent-dim: #2da44e;
+    --accent-glow: rgba(26, 127, 55, 0.12);
+    --on-accent: #ffffff;
+    --danger: #cf222e;
+    --warn: #9a6700;
+    --ok-text: #1a7f37;
+    --ok-soft-bg: rgba(26, 127, 55, 0.1);
+    --danger-soft-bg: rgba(207, 34, 46, 0.08);
+    --danger-soft-border: #f0b8b4;
+    --danger-soft-text: #cf222e;
+    --warn-soft-bg: rgba(154, 103, 0, 0.08);
+    --warn-soft-border: #e5d0a1;
+    --warn-text: #9a6700;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -2263,10 +2461,27 @@ header.topbar {
   background: var(--accent);
   box-shadow: 0 0 0 4px var(--accent-glow);
 }
-nav.mainnav { display: flex; gap: 18px; margin-left: auto; font-size: 14px; }
+nav.mainnav { display: flex; gap: 18px; margin-left: auto; font-size: 14px; flex-wrap: wrap; }
 nav.mainnav a { color: var(--text-dim); }
 nav.mainnav a.active { color: var(--text); }
 nav.mainnav a:hover { color: var(--text); text-decoration: none; }
+
+/* Theme picker (injected by common.js into .topbar-inner). */
+select.theme-select {
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: var(--mono);
+  background: var(--bg);
+  color: var(--text-dim);
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  cursor: pointer;
+}
+select.theme-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
 
 /* ---- layout ---- */
 main {
@@ -2337,12 +2552,12 @@ button:hover { border-color: var(--accent); }
 button.primary {
   background: var(--accent-dim);
   border-color: var(--accent);
-  color: #04140a;
+  color: var(--on-accent);
   font-weight: 600;
 }
 button.primary:hover { background: var(--accent); }
 button.ghost { background: transparent; }
-button.danger { color: var(--danger); border-color: #5a2d2d; }
+button.danger { color: var(--danger); border-color: var(--danger-soft-border); }
 button.danger:hover { border-color: var(--danger); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
@@ -2353,9 +2568,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 /* ---- messages ---- */
 .msg { border-radius: 8px; padding: 10px 12px; margin: 14px 0; font-size: 14px; display: none; }
 .msg.show { display: block; }
-.msg.error { background: rgba(248, 81, 73, 0.1); border: 1px solid #5a2d2d; color: #ff9d97; }
-.msg.ok { background: var(--accent-glow); border: 1px solid var(--accent-dim); color: #7ee787; }
-.msg.info { background: rgba(210, 153, 34, 0.08); border: 1px solid #5a4a1d; color: #e3b341; }
+.msg.error { background: var(--danger-soft-bg); border: 1px solid var(--danger-soft-border); color: var(--danger-soft-text); }
+.msg.ok { background: var(--accent-glow); border: 1px solid var(--accent-dim); color: var(--ok-text); }
+.msg.info { background: var(--warn-soft-bg); border: 1px solid var(--warn-soft-border); color: var(--warn-text); }
 
 /* ---- data table ---- */
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -2364,8 +2579,8 @@ th { color: var(--text-faint); font-weight: 500; text-transform: uppercase; lett
 td { font-family: var(--mono); color: var(--text-dim); }
 td.hash { color: var(--text-faint); word-break: break-all; max-width: 260px; }
 .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-family: var(--mono); border: 1px solid var(--border-bright); }
-.tag.success { color: #7ee787; border-color: var(--accent-dim); }
-.tag.failure { color: #ff9d97; border-color: #5a2d2d; }
+.tag.success { color: var(--ok-text); border-color: var(--accent-dim); }
+.tag.failure { color: var(--danger-soft-text); border-color: var(--danger-soft-border); }
 
 /* ---- misc ---- */
 .kv { display: grid; grid-template-columns: 140px 1fr; gap: 8px 16px; font-size: 14px; }
@@ -2377,14 +2592,16 @@ pre.codes {
   border: 1px dashed var(--border-bright);
   border-radius: 8px;
   padding: 14px;
-  color: #7ee787;
+  color: var(--ok-text);
   font-size: 14px;
   line-height: 1.9;
   white-space: pre-wrap;
   word-break: break-all;
 }
 .hint { color: var(--text-faint); font-size: 12px; margin-top: 6px; }
+.hint.over { color: var(--danger); font-weight: 600; }
 .hidden { display: none !important; }
+/* The QR quiet zone must stay white in every theme or scanners struggle. */
 .qr { background: #fff; padding: 12px; border-radius: 8px; display: inline-block; margin-top: 8px; }
 .qr img { display: block; width: 180px; height: 180px; }
 .status-pill { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
@@ -2402,6 +2619,7 @@ pre.codes {
     width: 100%;
     justify-content: space-between;
   }
+  select.theme-select { align-self: flex-end; }
 
   /* Transform the activity table into cards. Scoped to .activity-table so
      other tables (e.g. the CAPTCHA leaderboard) keep their tabular layout
@@ -2613,9 +2831,9 @@ dialog.confirm-dialog .dialog-actions { display: flex; justify-content: flex-end
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 .cell.fb-correct {
-  background: rgba(126, 231, 135, 0.15);
-  border-color: #7ee787;
-  color: #7ee787;
+  background: var(--ok-soft-bg);
+  border-color: var(--ok-text);
+  color: var(--ok-text);
 }
 .cell.fb-missed {
   border-color: var(--warn);
@@ -2623,7 +2841,7 @@ dialog.confirm-dialog .dialog-actions { display: flex; justify-content: flex-end
   color: var(--warn);
 }
 .cell.fb-wrong {
-  background: rgba(248, 81, 73, 0.15);
+  background: var(--danger-soft-bg);
   border-color: var(--danger);
   color: var(--danger);
 }
@@ -2704,11 +2922,74 @@ details.leaderboard .lb-table { margin-top: 16px; }
 .feed-head {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 .feed-head h2 { margin-bottom: 0; }
+.feed-tools { display: flex; align-items: center; gap: 12px; }
 .feed { margin-top: 12px; }
+
+/* Author filter: a <details> dropdown with checkboxes, no JS framework, no
+   inline styles (the strict CSP forbids them). */
+details.author-filter { position: relative; }
+details.author-filter summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: var(--text-dim);
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: var(--bg-elev);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+details.author-filter summary::-webkit-details-marker { display: none; }
+details.author-filter summary::after { content: " ▾"; color: var(--text-faint); }
+details.author-filter[open] summary { border-color: var(--accent); color: var(--text); }
+.author-filter-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius);
+  padding: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+.author-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.author-option:hover { background: var(--bg-elev-2); }
+.author-option input[type="checkbox"] {
+  accent-color: var(--accent);
+  margin: 0;
+  flex-shrink: 0;
+}
+.author-option .author-meta {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+hr.author-sep { border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
 
 .note-card {
   background: var(--bg-elev);
@@ -2776,12 +3057,30 @@ details.leaderboard .lb-table { margin-top: 16px; }
   border-radius: 999px;
   background: var(--accent-dim);
   border-color: var(--accent);
-  color: #04140a;
+  color: var(--on-accent);
   font-weight: 600;
   font-size: 13px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
 }
 .new-pill:hover { background: var(--accent); }
+
+/* ---- Passkeys explainer page ---- */
+.steps { padding-left: 22px; margin: 10px 0; }
+.steps li { margin: 9px 0; }
+.faq dt { font-weight: 600; margin-top: 14px; color: var(--text); }
+.faq dd { margin: 4px 0 0; color: var(--text-dim); }
+.csp-table td {
+  max-width: 280px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.csp-feed-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
 
 ################################################################################
@@ -2792,15 +3091,15 @@ details.leaderboard .lb-table { margin-top: 16px; }
   File name:             index.html
   Relative path:         frontend/index.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/index.html
-  Size:                  3.2 KiB (3337 bytes)
-  Last modified:         2026-07-04 17:16:39.000000000 -0400
+  Size:                  3.3 KiB (3426 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406599
+  Inode:                 19816314
   Hard links:            1
   MIME type:             text/html
-  SHA-256:               446fa239f850e08707a09f39965026c9ee5fa98ad3222d4f3d2905603ef15b8a
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               97c40c87dc77ff060ca2172db1d1eb5d45168f10e5c94f16ea2113e9b5e0381e
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 <!doctype html>
@@ -2810,6 +3109,7 @@ details.leaderboard .lb-table { margin-top: 16px; }
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>GoTunnels</title>
     <link rel="stylesheet" href="/css/style.css" />
+    <script src="/js/theme-boot.js"></script>
   </head>
   <body>
     <header class="topbar">
@@ -2817,6 +3117,7 @@ details.leaderboard .lb-table { margin-top: 16px; }
         <span class="brand"><span class="dot"></span> GoTunnels</span>
         <nav class="mainnav">
           <a href="/">Home</a>
+          <a href="/passkeys">Passkeys</a>
           <a href="/notes" data-auth="in" class="hidden">Notes</a>
           <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
           <a href="/activity" data-auth="in" class="hidden">Activity</a>
@@ -2892,15 +3193,15 @@ details.leaderboard .lb-table { margin-top: 16px; }
   File name:             api.js
   Relative path:         frontend/js/api.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/api.js
-  Size:                  3.9 KiB (4045 bytes)
-  Last modified:         2026-07-04 17:16:39.000000000 -0400
+  Size:                  4.4 KiB (4584 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406601
+  Inode:                 19816316
   Hard links:            1
   MIME type:             application/javascript
-  SHA-256:               aaea5303549b89033e6d13bdd99c3c023eca779f6541d6da5b57f8a5ad538d33
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               135a01d0f75f0119ffc4497cac1a5cdbef6eaaedbb23bcd36db2c12fcb65abf7
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // api.js — the single place browser code talks to the API.
@@ -2982,6 +3283,8 @@ export const Api = {
   me: () => apiFetch("/api/me"),
   activity: () => apiFetch("/api/activity"),
   info: () => apiFetch("/api/info"),
+  cspRecent: (limit) =>
+    apiFetch("/api/csp-reports/recent" + (limit ? "?limit=" + encodeURIComponent(limit) : "")),
 
   passkeyRegisterBegin: () => apiFetch("/api/passkey/register/begin", { method: "POST" }),
   passkeyRegisterFinish: (flow, body) =>
@@ -2989,6 +3292,9 @@ export const Api = {
   passkeyLoginBegin: (b) => apiFetch("/api/passkey/login/begin", { method: "POST", body: b }),
   passkeyLoginFinish: (flow, body) =>
     apiFetch("/api/passkey/login/finish?flow=" + encodeURIComponent(flow), { method: "POST", body }),
+  passkeySignupBegin: (b) => apiFetch("/api/passkey/signup/begin", { method: "POST", body: b }),
+  passkeySignupFinish: (flow, body) =>
+    apiFetch("/api/passkey/signup/finish?flow=" + encodeURIComponent(flow), { method: "POST", body }),
 
   totpEnroll: () => apiFetch("/api/totp/enroll", { method: "POST" }),
   totpConfirm: (b) => apiFetch("/api/totp/confirm", { method: "POST", body: b }),
@@ -3008,9 +3314,13 @@ export const Api = {
     const q = new URLSearchParams();
     if (params.before) q.set("before", String(params.before));
     if (params.limit) q.set("limit", String(params.limit));
+    if (Array.isArray(params.authors) && params.authors.length > 0) {
+      q.set("authors", params.authors.join(","));
+    }
     const qs = q.toString();
     return apiFetch("/api/notes" + (qs ? "?" + qs : ""));
   },
+  notesAuthors: () => apiFetch("/api/notes/authors"),
   noteCreate: (body) => apiFetch("/api/notes", { method: "POST", body: { body } }),
   noteDelete: (id) => apiFetch("/api/notes/" + encodeURIComponent(id), { method: "DELETE" }),
 };
@@ -3024,19 +3334,21 @@ export const Api = {
   File name:             common.js
   Relative path:         frontend/js/common.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/common.js
-  Size:                  1.5 KiB (1623 bytes)
-  Last modified:         2026-07-01 14:35:07.000000000 -0400
+  Size:                  4.2 KiB (4366 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805951
+  Inode:                 19816317
   Hard links:            1
   MIME type:             application/javascript
-  SHA-256:               79b4fc72aab02810b2ef39945e6db15ad3dbdfae1f86735978d8b5f56947924a
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               1c4b9b7d1bdb122dce5226b226b7b4c2c59450c6ed7bbfc9de4329e6f6a9c01a
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // common.js — shared helpers used by every page. Importing it also installs
-// the CSP violation reporter (via ./csp.js).
+// the CSP violation reporter (via ./csp.js) and the theme picker in the top
+// bar (theme-boot.js already applied the saved theme pre-paint; this module
+// adds the UI and, when signed in, syncs the choice to the account).
 
 import "./csp.js";
 import { Api, getToken } from "./api.js";
@@ -3096,6 +3408,81 @@ export async function renderAuthNav() {
   });
   return u;
 }
+
+/* =====================================================================
+   Theme
+   ===================================================================== */
+
+// Keep THEME_KEY and the value list in sync with theme-boot.js.
+export const THEME_KEY = "gotunnels_theme";
+export const THEMES = [
+  { value: "system", label: "System" },
+  { value: "dark", label: "Dark" },
+  { value: "light", label: "Light" },
+  { value: "solarized-dark", label: "Solarized dark" },
+  { value: "solarized-light", label: "Solarized light" },
+];
+
+const THEME_PREF_KEY = "ui.theme";
+
+// applyTheme stamps <html data-theme> and stores the choice locally so
+// theme-boot.js restores it pre-paint on the next page load. Unknown values
+// collapse to "system". Returns the theme actually applied.
+export function applyTheme(value) {
+  const theme = THEMES.some((t) => t.value === value) ? value : "system";
+  document.documentElement.setAttribute("data-theme", theme);
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // localStorage can be unavailable; the attribute still applies for now.
+  }
+  return theme;
+}
+
+function currentTheme() {
+  return document.documentElement.getAttribute("data-theme") || "system";
+}
+
+// initThemePicker injects a small <select> into the top bar on every page.
+// Local choice applies instantly; when signed in it is mirrored to the server
+// preference "ui.theme" so the theme follows the account across devices, and
+// at load the server value (if any) wins over the local copy.
+async function initThemePicker() {
+  const bar = document.querySelector(".topbar-inner");
+  if (!bar || bar.querySelector(".theme-select")) return;
+
+  const select = document.createElement("select");
+  select.className = "theme-select";
+  select.setAttribute("aria-label", "Color theme");
+  for (const t of THEMES) {
+    const opt = document.createElement("option");
+    opt.value = t.value;
+    opt.textContent = t.label;
+    select.appendChild(opt);
+  }
+  select.value = currentTheme();
+  select.addEventListener("change", () => {
+    const applied = applyTheme(select.value);
+    select.value = applied;
+    if (getToken()) {
+      Api.prefSet(THEME_PREF_KEY, applied).catch(() => {});
+    }
+  });
+  bar.appendChild(select);
+
+  if (!getToken()) return;
+  try {
+    const res = await Api.prefGet(THEME_PREF_KEY);
+    if (res && res.exists && res.value && res.value !== currentTheme()) {
+      applyTheme(res.value);
+      select.value = currentTheme();
+    }
+  } catch {
+    // Offline or session expired: local theme stands.
+  }
+}
+
+void initThemePicker();
 
 
 ################################################################################
@@ -4169,15 +4556,15 @@ main();
   File name:             page-notes.js
   Relative path:         frontend/js/page-notes.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-notes.js
-  Size:                  12.5 KiB (12902 bytes)
-  Last modified:         2026-07-04 17:16:39.000000000 -0400
+  Size:                  19.6 KiB (20168 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406603
+  Inode:                 19816318
   Hard links:            1
   MIME type:             application/javascript
-  SHA-256:               9dd9d8104d8504d13e3f5594803337139e12666be66e9d26705e2fa0ec657624
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               4ab9064807a2ac42d555146c8277a7a953d485cf018f4f0033608bc6a5449092
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // page-notes.js — the shared plain-text notes feed.
@@ -4197,6 +4584,12 @@ main();
 //     down to read — then they queue behind a "New notes ↑" pill so the feed
 //     does not jump under your thumb.
 //
+// The author filter is applied server-side (the ?authors= parameter), so the
+// pagination cursor, the page size, and the deletion-detection window all
+// operate on the filtered feed. Changing the filter resets the feed and
+// bumps a generation counter; any poll that was in flight for the previous
+// filter is discarded when it lands.
+//
 // Rendering is plain-text only by construction: note bodies are set with
 // textContent, never innerHTML, so nothing in a note can become markup, a
 // link, or a script.
@@ -4210,6 +4603,12 @@ const PAGE = 50;
 const MAX_CHARS = 500;
 const SCROLL_DEFER_PX = 200;
 
+// Where the author selection is remembered. The local copy makes the choice
+// instant on this device; the server preference makes it follow the account.
+const AUTHORS_LS_KEY = "gotunnels_notes_authors";
+const AUTHORS_PREF_KEY = "notes.authors";
+const MAX_AUTHOR_FILTER = 50; // mirrors the server's cap
+
 const msgEl = qs("#msg");
 const bodyEl = qs("#noteBody");
 const charCount = qs("#charCount");
@@ -4219,6 +4618,10 @@ const feedStatus = qs("#feedStatus");
 const newPill = qs("#newPill");
 const loadOlderBtn = qs("#loadOlder");
 const deleteDialog = qs("#deleteDialog");
+const authorFilter = qs("#authorFilter");
+const authorFilterLabel = qs("#authorFilterLabel");
+const authorAllCb = qs("#authorAll");
+const authorListEl = qs("#authorList");
 
 let me = null;
 
@@ -4236,6 +4639,12 @@ let pollTimer = null;
 let backoffMs = POLL_MS;
 let polling = false;
 let initialLoaded = false; // suppress "new" highlights on the very first fill
+
+// Empty array = everyone. Otherwise: user ids to show.
+let selectedAuthors = [];
+// Bumped whenever the filter changes; in-flight polls compare against it and
+// discard their response if it no longer matches.
+let feedGen = 0;
 
 /* =====================================================================
    Rendering
@@ -4390,6 +4799,156 @@ newPill.addEventListener("click", () => {
 });
 
 /* =====================================================================
+   Author filter
+   ===================================================================== */
+function sanitizeIds(v) {
+  if (!Array.isArray(v)) return [];
+  const uuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  return v
+    .filter((x) => typeof x === "string" && uuid.test(x))
+    .map((x) => x.toLowerCase())
+    .slice(0, MAX_AUTHOR_FILTER);
+}
+
+// loadSelection restores the saved author filter. The server preference (set
+// on any device) wins over the local copy; the local copy is the fallback for
+// a brand-new pref and keeps working offline.
+async function loadSelection() {
+  let local = [];
+  try {
+    const raw = localStorage.getItem(AUTHORS_LS_KEY);
+    if (raw) local = sanitizeIds(JSON.parse(raw));
+  } catch { /* corrupted or unavailable: ignore */ }
+  try {
+    const res = await Api.prefGet(AUTHORS_PREF_KEY);
+    if (res && res.exists && typeof res.value === "string" && res.value !== "") {
+      const server = sanitizeIds(JSON.parse(res.value));
+      try { localStorage.setItem(AUTHORS_LS_KEY, JSON.stringify(server)); } catch { /* ok */ }
+      return server;
+    }
+  } catch { /* offline or parse error: fall back to local */ }
+  return local;
+}
+
+function persistSelection() {
+  const payload = JSON.stringify(selectedAuthors);
+  try { localStorage.setItem(AUTHORS_LS_KEY, payload); } catch { /* ok */ }
+  Api.prefSet(AUTHORS_PREF_KEY, payload).catch(() => {});
+}
+
+function filterLabelText() {
+  if (selectedAuthors.length === 0) return "Everyone";
+  if (selectedAuthors.length === 1) {
+    const cb = authorListEl.querySelector('input[value="' + selectedAuthors[0] + '"]');
+    const name = cb && cb.dataset.name ? cb.dataset.name : "1 author";
+    return name;
+  }
+  return selectedAuthors.length + " authors";
+}
+
+function updateFilterLabel() {
+  authorFilterLabel.textContent = filterLabelText();
+}
+
+function readCheckboxes() {
+  const ids = [];
+  authorListEl.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    if (cb.checked) ids.push(cb.value);
+  });
+  return ids.slice(0, MAX_AUTHOR_FILTER);
+}
+
+function syncCheckboxes() {
+  const selected = new Set(selectedAuthors);
+  authorListEl.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    cb.checked = selected.has(cb.value);
+  });
+  authorAllCb.checked = selectedAuthors.length === 0;
+}
+
+function applySelection(ids) {
+  const next = sanitizeIds(ids);
+  const changed = JSON.stringify(next) !== JSON.stringify(selectedAuthors);
+  selectedAuthors = next;
+  syncCheckboxes();
+  updateFilterLabel();
+  if (changed) {
+    persistSelection();
+    resetFeed();
+  }
+}
+
+function renderAuthorOptions(authors) {
+  authorListEl.textContent = "";
+  for (const a of authors) {
+    const label = document.createElement("label");
+    label.className = "author-option";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = a.user_id;
+    cb.dataset.name = a.display_name || a.username;
+    const name = document.createElement("span");
+    name.textContent = a.display_name || a.username;
+    const meta = document.createElement("span");
+    meta.className = "author-meta";
+    meta.textContent = "@" + a.username + " · " + a.notes;
+    label.append(cb, name, meta);
+    authorListEl.appendChild(label);
+  }
+  syncCheckboxes();
+  updateFilterLabel();
+}
+
+async function refreshAuthors() {
+  try {
+    const res = await Api.notesAuthors();
+    renderAuthorOptions((res && res.authors) || []);
+  } catch {
+    // The dropdown just stays as it was; the feed itself is unaffected.
+  }
+}
+
+authorAllCb.addEventListener("change", () => {
+  // Checking "Everyone" clears the specific selection; unchecking it with
+  // nothing selected would show nobody, so snap back to everyone.
+  applySelection([]);
+});
+
+authorListEl.addEventListener("change", () => {
+  applySelection(readCheckboxes());
+});
+
+// Refresh the author list (it changes as people post) each time the panel
+// opens, and close the panel when tapping anywhere outside it.
+authorFilter.addEventListener("toggle", () => {
+  if (authorFilter.open) void refreshAuthors();
+});
+document.addEventListener("click", (e) => {
+  if (authorFilter.open && !authorFilter.contains(e.target)) {
+    authorFilter.open = false;
+  }
+});
+
+// resetFeed clears everything on screen and starts over against the current
+// filter. The generation bump makes any in-flight poll discard itself.
+function resetFeed() {
+  feedGen++;
+  noteMap.clear();
+  nodeMap.clear();
+  pendingNew.clear();
+  feedEl.textContent = "";
+  oldestLoadedId = 0;
+  reachedEnd = false;
+  initialLoaded = false;
+  loadOlderBtn.classList.add("hidden");
+  updatePill();
+  if (pollTimer !== null) { clearTimeout(pollTimer); pollTimer = null; }
+  backoffMs = POLL_MS;
+  setStatus("loading…");
+  void pollOnce();
+}
+
+/* =====================================================================
    Polling with reconciliation
    ===================================================================== */
 function setStatus(text) {
@@ -4399,8 +4958,10 @@ function setStatus(text) {
 async function pollOnce() {
   if (polling) return;
   polling = true;
+  const gen = feedGen;
   try {
-    const res = await Api.notesList({ limit: PAGE });
+    const res = await Api.notesList({ limit: PAGE, authors: selectedAuthors });
+    if (gen !== feedGen) return; // filter changed while in flight: discard
     const fetched = (res && res.notes) || [];
     backoffMs = POLL_MS;
     setStatus(document.visibilityState === "visible" ? "live" : "paused");
@@ -4442,6 +5003,7 @@ async function pollOnce() {
     initialLoaded = true;
     clearMsg(msgEl);
   } catch (err) {
+    if (gen !== feedGen) return;
     if (err && err.status === 401) {
       location.href = "/login";
       return;
@@ -4450,7 +5012,13 @@ async function pollOnce() {
     setStatus("reconnecting…");
   } finally {
     polling = false;
-    scheduleNextPoll();
+    if (gen !== feedGen) {
+      // This cycle was for a stale filter; poll again right away for the
+      // current one instead of waiting out a timer.
+      void pollOnce();
+    } else {
+      scheduleNextPoll();
+    }
   }
 }
 
@@ -4482,8 +5050,10 @@ document.addEventListener("visibilitychange", () => {
    ===================================================================== */
 loadOlderBtn.addEventListener("click", async () => {
   loadOlderBtn.disabled = true;
+  const gen = feedGen;
   try {
-    const res = await Api.notesList({ before: oldestLoadedId, limit: PAGE });
+    const res = await Api.notesList({ before: oldestLoadedId, limit: PAGE, authors: selectedAuthors });
+    if (gen !== feedGen) return; // filter changed while loading: discard
     const older = (res && res.notes) || [];
     for (const n of older) {
       if (!noteMap.has(n.id)) noteMap.set(n.id, n);
@@ -4507,9 +5077,22 @@ loadOlderBtn.addEventListener("click", async () => {
 /* =====================================================================
    Composer
    ===================================================================== */
+// countChars counts what the server counts: Unicode code points, not UTF-16
+// units. "👨‍👩‍👧" is several code points but even more UTF-16 units, which is
+// exactly why the old maxlength attribute (which counts UTF-16 units) could
+// block typing while the visible counter still showed room to spare.
+function countChars(s) {
+  return [...s].length;
+}
+
 function updateCharCount() {
-  // Count what the server counts: unicode code points, not UTF-16 units.
-  charCount.textContent = [...bodyEl.value].length + " / " + MAX_CHARS;
+  const n = countChars(bodyEl.value);
+  const over = n > MAX_CHARS;
+  charCount.textContent = n + " / " + MAX_CHARS;
+  charCount.classList.toggle("over", over);
+  // Soft limit: typing and pasting are never blocked mid-thought; the Post
+  // button simply stays off until the note fits. The server re-validates.
+  postBtn.disabled = over || bodyEl.value.trim() === "";
 }
 bodyEl.addEventListener("input", updateCharCount);
 
@@ -4517,6 +5100,10 @@ postBtn.addEventListener("click", async () => {
   const text = bodyEl.value.trim();
   if (!text) {
     showMsg(msgEl, "Write something first.");
+    return;
+  }
+  if (countChars(text) > MAX_CHARS) {
+    showMsg(msgEl, "Notes are capped at " + MAX_CHARS + " characters — trim it a little.");
     return;
   }
   postBtn.disabled = true;
@@ -4528,7 +5115,6 @@ postBtn.addEventListener("click", async () => {
       if (oldestLoadedId === 0) oldestLoadedId = res.note.id;
     }
     bodyEl.value = "";
-    updateCharCount();
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (err) {
     if (err && err.status === 401) { location.href = "/login"; return; }
@@ -4538,7 +5124,7 @@ postBtn.addEventListener("click", async () => {
       showMsg(msgEl, err.message || "Could not post the note.");
     }
   } finally {
-    postBtn.disabled = false;
+    updateCharCount(); // re-enables Post exactly when the content allows it
   }
 });
 
@@ -4581,11 +5167,117 @@ async function boot() {
   if (!me) return; // redirected to /login
 
   updateCharCount();
+
+  selectedAuthors = await loadSelection();
+  await refreshAuthors(); // also syncs checkboxes + label to the selection
+
   setStatus("loading…");
   await pollOnce(); // initial load; also schedules the next poll
 }
 
 void boot();
+
+
+################################################################################
+# FILE: frontend/js/page-passkeys.js
+################################################################################
+
+--- METADATA ---
+  File name:             page-passkeys.js
+  Relative path:         frontend/js/page-passkeys.js
+  Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-passkeys.js
+  Size:                  2.5 KiB (2585 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 19816319
+  Hard links:            1
+  MIME type:             application/javascript
+  SHA-256:               8dafbd0f9047d5765742578c402ff0159aa00a362d4714f051f2a0a3b3bbc762
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+
+--- CONTENT ---
+// page-passkeys.js — drives the public passkeys explainer page.
+//
+// Two dynamic bits, both optional-feeling by design (the page reads fine even
+// if the API is briefly unreachable):
+//   1. The "this deployment right now" panel: fills in the hostname the
+//      browser is on, which is exactly the Relying Party ID your passkeys
+//      here are bound to.
+//   2. The CSP transparency table: fetches the public, sanitised feed of
+//      recent Content-Security-Policy violation reports and renders it —
+//      with textContent only, since every field is attacker-suppliable text.
+
+import { qs, highlightNav, renderAuthNav } from "./common.js";
+import { Api } from "./api.js";
+import { supported } from "./webauthn.js";
+
+function fmtWhen(iso) {
+  const d = new Date(iso);
+  return Number.isFinite(d.getTime()) ? d.toLocaleString() : iso;
+}
+
+function fillDeploymentPanel() {
+  const rpEl = qs("#rpIdNow");
+  if (rpEl) rpEl.textContent = location.hostname;
+  const supEl = qs("#passkeySupport");
+  if (supEl) {
+    supEl.textContent = supported()
+      ? "This browser supports passkeys."
+      : "This browser does not appear to support passkeys.";
+  }
+}
+
+function renderCSPRow(r) {
+  const tr = document.createElement("tr");
+  const cells = [
+    fmtWhen(r.created_at),
+    r.effective_directive || r.violated_directive || "",
+    r.blocked_uri || "",
+    r.disposition || "",
+  ];
+  for (const text of cells) {
+    const td = document.createElement("td");
+    td.textContent = text; // never innerHTML: these strings come from reports
+    tr.appendChild(td);
+  }
+  return tr;
+}
+
+async function loadCSPFeed() {
+  const tbody = qs("#cspRows");
+  const status = qs("#cspStatus");
+  if (!tbody) return;
+  try {
+    const res = await Api.cspRecent(50);
+    const rows = (res && res.reports) || [];
+    tbody.textContent = "";
+    if (rows.length === 0) {
+      if (status) status.textContent = "No violations reported yet — a clean sheet.";
+      return;
+    }
+    for (const r of rows) tbody.appendChild(renderCSPRow(r));
+    if (status) status.textContent = "Showing the " + rows.length + " most recent reports.";
+  } catch (err) {
+    if (status) status.textContent = "Could not load the report feed right now.";
+  }
+}
+
+async function main() {
+  highlightNav();
+  await renderAuthNav();
+  fillDeploymentPanel();
+  const reloadBtn = qs("#cspReload");
+  if (reloadBtn) {
+    reloadBtn.addEventListener("click", () => {
+      reloadBtn.disabled = true;
+      void loadCSPFeed().finally(() => { reloadBtn.disabled = false; });
+    });
+  }
+  await loadCSPFeed();
+}
+
+void main();
 
 
 ################################################################################
@@ -4730,19 +5422,20 @@ main();
   File name:             page-signup.js
   Relative path:         frontend/js/page-signup.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-signup.js
-  Size:                  964 B (964 bytes)
-  Last modified:         2026-07-01 14:35:27.000000000 -0400
+  Size:                  2.3 KiB (2360 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805956
+  Inode:                 19816320
   Hard links:            1
   MIME type:             application/javascript
-  SHA-256:               646b72f0a605263c69482731efad76dc90835679db1e1badb27cc76c69c80c7d
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               607e6328a2f2c463d8ded1477413e8ec9955a7b4a558be1ef59e5946ca7d6b85
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 import { highlightNav, renderAuthNav, qs, showMsg, clearMsg } from "./common.js";
 import { Api, setToken } from "./api.js";
+import { signupPasskey, supported } from "./webauthn.js";
 
 async function main() {
   highlightNav();
@@ -4751,6 +5444,12 @@ async function main() {
   const form = qs("#signup-form");
   const msg = qs("#msg");
   const btn = qs("#submit");
+  const passkeyBtn = qs("#passkey-signup");
+
+  if (passkeyBtn && !supported()) {
+    passkeyBtn.disabled = true;
+    passkeyBtn.title = "This browser does not support passkeys";
+  }
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -4775,9 +5474,87 @@ async function main() {
       btn.disabled = false;
     }
   });
+
+  // Passkey-first signup: same username/display-name fields, no password at
+  // all. The account is only created after the authenticator produces a
+  // credential, so cancelling the browser prompt creates nothing.
+  if (passkeyBtn) {
+    passkeyBtn.addEventListener("click", async () => {
+      clearMsg(msg);
+      const username = qs("#username").value.trim();
+      const displayName = qs("#display_name").value.trim();
+      if (!username) {
+        showMsg(msg, "Pick a username first, then create your passkey.", "info");
+        return;
+      }
+      passkeyBtn.disabled = true;
+      try {
+        const res = await signupPasskey(username, displayName);
+        setToken(res.token);
+        showMsg(msg, "Account created with a passkey. Redirecting…", "ok");
+        setTimeout(() => (location.href = "/settings"), 600);
+      } catch (err) {
+        if (err && err.name === "NotAllowedError") {
+          showMsg(msg, "Passkey prompt was cancelled — nothing was created.", "info");
+        } else {
+          showMsg(msg, err.message || "Passkey signup failed", "error");
+        }
+        passkeyBtn.disabled = false;
+      }
+    });
+  }
 }
 
 main();
+
+
+################################################################################
+# FILE: frontend/js/theme-boot.js
+################################################################################
+
+--- METADATA ---
+  File name:             theme-boot.js
+  Relative path:         frontend/js/theme-boot.js
+  Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/theme-boot.js
+  Size:                  1006 B (1006 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 19816321
+  Hard links:            1
+  MIME type:             application/javascript
+  SHA-256:               f15e6dabb778b1204fe5b99ea07e0cdb08c5cd6ed2ef0c4c4b1687c169ec5fbd
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+
+--- CONTENT ---
+// theme-boot.js — applies the saved color theme before first paint.
+//
+// This is deliberately a tiny CLASSIC script (not a module) loaded in <head>:
+// classic scripts block parsing, so the data-theme attribute is set before the
+// browser paints anything and there is no flash of the wrong theme. Everything
+// else about theming (the picker UI, server sync) lives in common.js; this
+// file only reads localStorage and stamps <html data-theme="...">.
+//
+// Keep the key and the value list in sync with THEMES in common.js.
+(function () {
+  "use strict";
+  var KEY = "gotunnels_theme";
+  var VALID = {
+    system: true,
+    dark: true,
+    light: true,
+    "solarized-dark": true,
+    "solarized-light": true,
+  };
+  var theme = "system";
+  try {
+    var saved = localStorage.getItem(KEY);
+    if (saved && VALID[saved] === true) theme = saved;
+  } catch (e) {
+    // localStorage can throw (privacy modes); the default is fine.
+  }
+  document.documentElement.setAttribute("data-theme", theme);
+})();
 
 
 ################################################################################
@@ -4788,15 +5565,15 @@ main();
   File name:             webauthn.js
   Relative path:         frontend/js/webauthn.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/webauthn.js
-  Size:                  3.2 KiB (3285 bytes)
-  Last modified:         2026-07-01 14:34:51.000000000 -0400
+  Size:                  3.8 KiB (3929 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805950
+  Inode:                 19816322
   Hard links:            1
   MIME type:             application/javascript
-  SHA-256:               f8ff0f6fbcb57bbba086f16356fc418ce6786d7ba063d7df0b6cd54daee9cb3e
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               e2c03f123000d85d25fd97cdad41a306b5b859019eb8c42c94576a6df2063737
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // webauthn.js — passkey (WebAuthn) ceremonies.
@@ -4899,6 +5676,17 @@ export async function loginPasskey(username) {
   return Api.passkeyLoginFinish(begin.flow_id, encodeAssertion(cred));
 }
 
+// signupPasskey creates a brand-new account whose only credential is a
+// passkey (no password anywhere), and returns the session response. The
+// account only comes into existence server-side once the authenticator has
+// produced a credential; cancelling the browser prompt creates nothing.
+export async function signupPasskey(username, displayName) {
+  const begin = await Api.passkeySignupBegin({ username, display_name: displayName });
+  const publicKey = prepCreation(begin.options.publicKey);
+  const cred = await navigator.credentials.create({ publicKey });
+  return Api.passkeySignupFinish(begin.flow_id, encodeAttestation(cred));
+}
+
 
 ################################################################################
 # FILE: frontend/login.html
@@ -4908,15 +5696,15 @@ export async function loginPasskey(username) {
   File name:             login.html
   Relative path:         frontend/login.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/login.html
-  Size:                  2.0 KiB (2140 bytes)
-  Last modified:         2026-07-04 17:16:39.000000000 -0400
+  Size:                  2.1 KiB (2229 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406604
+  Inode:                 19816323
   Hard links:            1
   MIME type:             text/html
-  SHA-256:               84c57be6ef144075e0dd24aeb29b3424becb80f8019e91594e8e2b193dc596ee
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               f3e9332b50932943b36b946d7a4aa6968fed35af782f1304d30f4e7c71a38040
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 <!doctype html>
@@ -4926,6 +5714,7 @@ export async function loginPasskey(username) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Log in · GoTunnels</title>
     <link rel="stylesheet" href="/css/style.css" />
+    <script src="/js/theme-boot.js"></script>
   </head>
   <body>
     <header class="topbar">
@@ -4933,6 +5722,7 @@ export async function loginPasskey(username) {
         <span class="brand"><span class="dot"></span> GoTunnels</span>
         <nav class="mainnav">
           <a href="/">Home</a>
+          <a href="/passkeys">Passkeys</a>
           <a href="/notes" data-auth="in" class="hidden">Notes</a>
           <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
           <a href="/activity" data-auth="in" class="hidden">Activity</a>
@@ -4990,15 +5780,15 @@ export async function loginPasskey(username) {
   File name:             notes.html
   Relative path:         frontend/notes.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/notes.html
-  Size:                  2.6 KiB (2757 bytes)
-  Last modified:         2026-07-04 17:16:39.000000000 -0400
+  Size:                  3.2 KiB (3366 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406605
+  Inode:                 19816324
   Hard links:            1
   MIME type:             text/html
-  SHA-256:               9ed54ad2e46a8f29db108d43adaa67de51b8792c43b1f709f20baf6413766890
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               7259d2d054d1c691a5b8a17877b79797150be739e53b8c1b0459a3d055dea49b
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 <!doctype html>
@@ -5008,6 +5798,7 @@ export async function loginPasskey(username) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Notes · GoTunnels</title>
     <link rel="stylesheet" href="/css/style.css" />
+    <script src="/js/theme-boot.js"></script>
   </head>
   <body>
     <header class="topbar">
@@ -5015,6 +5806,7 @@ export async function loginPasskey(username) {
         <span class="brand"><span class="dot"></span> GoTunnels</span>
         <nav class="mainnav">
           <a href="/">Home</a>
+          <a href="/passkeys">Passkeys</a>
           <a href="/notes" data-auth="in" class="hidden">Notes</a>
           <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
           <a href="/activity" data-auth="in" class="hidden">Activity</a>
@@ -5037,7 +5829,7 @@ export async function loginPasskey(username) {
 
       <div class="card">
         <label for="noteBody">Write a note</label>
-        <textarea id="noteBody" rows="3" maxlength="500"
+        <textarea id="noteBody" rows="3"
           placeholder="Up to 500 characters of plain text…"></textarea>
         <div class="composer-foot">
           <span id="charCount" class="hint">0 / 500</span>
@@ -5047,7 +5839,20 @@ export async function loginPasskey(username) {
 
       <div class="feed-head">
         <h2>Latest notes</h2>
-        <span id="feedStatus" class="status-pill" title="Auto-refresh status">live</span>
+        <div class="feed-tools">
+          <details id="authorFilter" class="author-filter">
+            <summary id="authorFilterLabel" title="Filter by author">Everyone</summary>
+            <div class="author-filter-panel">
+              <label class="author-option">
+                <input type="checkbox" id="authorAll" checked />
+                <span>Everyone</span>
+              </label>
+              <hr class="author-sep" />
+              <div id="authorList"></div>
+            </div>
+          </details>
+          <span id="feedStatus" class="status-pill" title="Auto-refresh status">live</span>
+        </div>
       </div>
 
       <button type="button" id="newPill" class="new-pill hidden">New notes ↑</button>
@@ -5080,6 +5885,249 @@ export async function loginPasskey(username) {
 
 
 ################################################################################
+# FILE: frontend/passkeys.html
+################################################################################
+
+--- METADATA ---
+  File name:             passkeys.html
+  Relative path:         frontend/passkeys.html
+  Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/passkeys.html
+  Size:                  9.5 KiB (9794 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 19816325
+  Hard links:            1
+  MIME type:             text/html
+  SHA-256:               28d24c607813da21df81f2c6fa7de1977e9e595bc6dfa5f3517ca923c5319b3d
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+
+--- CONTENT ---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Passkeys · GoTunnels</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <script src="/js/theme-boot.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="brand"><span class="dot"></span> GoTunnels</span>
+        <nav class="mainnav">
+          <a href="/">Home</a>
+          <a href="/passkeys">Passkeys</a>
+          <a href="/notes" data-auth="in" class="hidden">Notes</a>
+          <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
+          <a href="/activity" data-auth="in" class="hidden">Activity</a>
+          <a href="/settings" data-auth="in" class="hidden">Settings</a>
+          <a href="/login" data-auth="out">Log in</a>
+          <a href="/signup" data-auth="out">Sign up</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <h1>Passkeys, in plain English</h1>
+      <p class="lead">
+        This whole site is a throwaway sandbox that exists so you can poke at
+        passkeys (and a strict Content-Security-Policy) without risking
+        anything real. Here is what passkeys are, how this site uses them, and
+        some exercises to try on your phone.
+      </p>
+
+      <div class="card">
+        <h2>What a passkey actually is</h2>
+        <p>
+          A passkey is a pair of mathematically linked keys. The
+          <strong>private key</strong> never leaves your device (or your
+          platform's encrypted sync, like iCloud Keychain or Google Password
+          Manager). The <strong>public key</strong> is the only thing this
+          site ever stores. When you sign in, the site sends a fresh
+          random challenge; your device signs it with the private key after
+          you approve with Face&nbsp;ID, a fingerprint, or your device PIN; the
+          site checks the signature against the public key it stored. No
+          shared secret ever crosses the network, so there is nothing to
+          phish, leak, or reuse.
+        </p>
+        <p>
+          The part that quietly kills phishing: a passkey is
+          <strong>bound to the website's identity</strong> — its Relying
+          Party ID, essentially the hostname. Your browser simply will not
+          offer a passkey made for one site to a different site, no matter how
+          convincing the lookalike is. A password can be typed into the wrong
+          box; a passkey cannot.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>This deployment, right now</h2>
+        <dl class="kv">
+          <dt>RP ID (hostname)</dt>
+          <dd id="rpIdNow">…</dd>
+          <dt>Your browser</dt>
+          <dd id="passkeySupport">checking…</dd>
+        </dl>
+        <p class="hint">
+          Every <code>./scripts/up.sh</code> run gets a brand-new random
+          <code>*.trycloudflare.com</code> hostname, and passkeys made here
+          are bound to that hostname. When the stack is torn down, the
+          hostname is gone forever and every passkey bound to it becomes a
+          harmless orphan in your password manager — which is exactly what
+          makes this a safe playground. Delete them whenever you like.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>How this site implements them</h2>
+        <p>
+          The backend is Go with the <code>go-webauthn</code> library. A
+          ceremony ("begin") stores a short-lived server-side flow — it
+          expires after 10 minutes — and pins the exact browser origin that
+          started it; the "finish" step must complete against that same
+          origin. Registration asks your authenticator to create a
+          discoverable credential where supported, sign-in verifies the
+          signature and counter, and both paths record an entry you can see on
+          the <a href="/activity">Activity</a> page. Accounts can be created
+          with a passkey alone — no password ever exists for such an account —
+          or with a password to which you can add passkeys later from
+          <a href="/settings">Settings</a>.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Try it on your phone</h2>
+        <p>
+          <strong>iPhone (iOS 16+):</strong> passkeys live in iCloud Keychain.
+          Safari or Chrome will offer Face&nbsp;ID / Touch&nbsp;ID when this
+          site asks. Manage or delete them under
+          Settings&nbsp;→&nbsp;Passwords.
+        </p>
+        <p>
+          <strong>Android (9+):</strong> passkeys live in Google Password
+          Manager (or another manager you have set as the provider). Chrome
+          prompts with your fingerprint or screen lock. Manage them in
+          Settings&nbsp;→&nbsp;Passwords&nbsp;&amp;&nbsp;accounts.
+        </p>
+        <p>
+          <strong>Cross-device:</strong> on a desktop browser, choose
+          "use a phone or tablet" when prompted — you scan a QR code with the
+          phone that holds the passkey, and the two devices verify proximity
+          over Bluetooth before the phone signs. That proximity check is
+          another anti-phishing property: a remote attacker cannot relay it.
+        </p>
+        <h3>Sandbox exercises</h3>
+        <ol class="steps">
+          <li>
+            On your phone, open this site's <a href="/signup">signup page</a>
+            and create an account with
+            <strong>Create account with a passkey</strong> — pick any
+            username; there is no email step. Notice a password never existed.
+          </li>
+          <li>
+            Log out, then sign back in from the <a href="/login">login
+            page</a> with the passkey button. Watch how the prompt names this
+            exact hostname.
+          </li>
+          <li>
+            Open your device's password manager and find the passkey filed
+            under this deployment's hostname. This is where you would delete
+            it later.
+          </li>
+          <li>
+            If you have a laptop nearby: start a passkey login there, pick
+            "use a phone", and scan the QR with the phone that holds the
+            passkey. That is the cross-device flow.
+          </li>
+          <li>
+            Restart the stack (<code>./scripts/down.sh</code> then
+            <code>./scripts/up.sh</code>) and note the new hostname: the old
+            passkey is never offered here again, because the site identity
+            changed. That is origin binding doing its job.
+          </li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>Questions people actually ask</h2>
+        <dl class="faq">
+          <dt>Can I sign up with just a passkey — no password at all?</dt>
+          <dd>
+            Yes, here you can. The <a href="/signup">signup page</a> has a
+            passkey-only path: the account is created at the moment your
+            authenticator approves, with a passkey as its only credential.
+            Password login for such an account simply fails with the same
+            generic error as any wrong password, so its existence leaks
+            nothing.
+          </dd>
+          <dt>What if I lose the device holding my passkey?</dt>
+          <dd>
+            On real accounts you would rely on platform sync (iCloud/Google)
+            or a second registered credential. Here, losing it costs you a
+            demo account on a hostname that disappears at the next restart —
+            that is the point of the sandbox.
+          </dd>
+          <dt>Is my fingerprint or face sent to the site?</dt>
+          <dd>
+            Never. Biometrics only unlock the private key locally; the site
+            sees a signature, nothing biometric.
+          </dd>
+          <dt>Why does the passkey prompt sometimes not appear?</dt>
+          <dd>
+            Usually one of: the browser lacks support (see the panel above),
+            the page is not on HTTPS, or the passkey you are trying to use was
+            created for a different hostname — including this site's
+            <em>previous</em> tunnel hostname.
+          </dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <h2>Watch the CSP work — live</h2>
+        <p>
+          Every page here ships a strict Content-Security-Policy (only this
+          site's own files may load; no inline scripts or styles). When a
+          browser blocks something, it fires a violation report, and this
+          deployment stores them. Below is the public feed of the most recent
+          reports — sanitised (no IPs, no user agents, long fields truncated)
+          but real. Open your browser devtools, try to inject an inline
+          <code>&lt;style&gt;</code> or a third-party script on any page, and
+          your own violation should appear here within moments.
+        </p>
+        <div class="csp-feed-head">
+          <span id="cspStatus" class="status-pill">loading…</span>
+          <button type="button" id="cspReload" class="ghost btn-small">Reload</button>
+        </div>
+        <table class="csp-table">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Directive</th>
+              <th>Blocked</th>
+              <th>Disposition</th>
+            </tr>
+          </thead>
+          <tbody id="cspRows"></tbody>
+        </table>
+        <p class="hint">
+          "report" means the policy ran in report-only mode (nothing was
+          actually blocked); "enforce" means the browser refused to load it.
+        </p>
+      </div>
+    </main>
+
+    <footer class="foot">
+      GoTunnels · built with LLM assistance (see the README)
+    </footer>
+
+    <script type="module" src="/js/page-passkeys.js"></script>
+  </body>
+</html>
+
+
+################################################################################
 # FILE: frontend/settings.html
 ################################################################################
 
@@ -5087,15 +6135,15 @@ export async function loginPasskey(username) {
   File name:             settings.html
   Relative path:         frontend/settings.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/settings.html
-  Size:                  3.7 KiB (3876 bytes)
-  Last modified:         2026-07-04 17:16:39.000000000 -0400
+  Size:                  3.8 KiB (3965 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406606
+  Inode:                 19816326
   Hard links:            1
   MIME type:             text/html
-  SHA-256:               3adcbd344d1ccd531a04a2f6ef4a097da12b4c2a45ad3e126d6fa485451a78ad
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               b5a29a4ff74223be378de0cbb83d8f3e9e7d730547dd4fefdd99ab4ef085ca2b
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 <!doctype html>
@@ -5105,6 +6153,7 @@ export async function loginPasskey(username) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Settings · GoTunnels</title>
     <link rel="stylesheet" href="/css/style.css" />
+    <script src="/js/theme-boot.js"></script>
   </head>
   <body>
     <header class="topbar">
@@ -5112,6 +6161,7 @@ export async function loginPasskey(username) {
         <span class="brand"><span class="dot"></span> GoTunnels</span>
         <nav class="mainnav">
           <a href="/">Home</a>
+          <a href="/passkeys">Passkeys</a>
           <a href="/notes" data-auth="in" class="hidden">Notes</a>
           <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
           <a href="/activity" data-auth="in" class="hidden">Activity</a>
@@ -5212,15 +6262,15 @@ export async function loginPasskey(username) {
   File name:             signup.html
   Relative path:         frontend/signup.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/signup.html
-  Size:                  2.2 KiB (2276 bytes)
-  Last modified:         2026-07-04 17:16:39.000000000 -0400
+  Size:                  2.8 KiB (2929 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406607
+  Inode:                 19816327
   Hard links:            1
   MIME type:             text/html
-  SHA-256:               ed8049fce58b7e01eccebcd555680d064c136c72a2799037d8b784f01bf77e2c
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               90decbd7ff83c15ae4ddc412111a5d3c8c4fba93c51c2d8d2d847612126a1cb3
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 <!doctype html>
@@ -5230,6 +6280,7 @@ export async function loginPasskey(username) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sign up · GoTunnels</title>
     <link rel="stylesheet" href="/css/style.css" />
+    <script src="/js/theme-boot.js"></script>
   </head>
   <body>
     <header class="topbar">
@@ -5237,6 +6288,7 @@ export async function loginPasskey(username) {
         <span class="brand"><span class="dot"></span> GoTunnels</span>
         <nav class="mainnav">
           <a href="/">Home</a>
+          <a href="/passkeys">Passkeys</a>
           <a href="/notes" data-auth="in" class="hidden">Notes</a>
           <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
           <a href="/activity" data-auth="in" class="hidden">Activity</a>
@@ -5264,13 +6316,24 @@ export async function loginPasskey(username) {
           <label for="password">Password</label>
           <input id="password" type="password" autocomplete="new-password" required
                  placeholder="at least 8 characters" />
-          <p class="hint">A password is always set as a fallback. You can add a passkey afterwards.</p>
+          <p class="hint">Only needed for the button below. Prefer no password at all? Use the passkey option instead.</p>
 
           <div class="btn-row">
-            <button id="submit" class="primary" type="submit">Create account</button>
+            <button id="submit" class="primary" type="submit">Create account with a password</button>
             <a href="/login"><button class="ghost" type="button">I already have an account</button></a>
           </div>
         </form>
+
+        <div class="divider">or</div>
+
+        <button id="passkey-signup" class="primary" type="button">Create account with a passkey</button>
+        <p class="hint">
+          No password is created — your only credential is a passkey stored on
+          this device (or synced by your platform). Fill in the username above
+          first; the account only comes into existence once your
+          authenticator approves. Curious how this works?
+          <a href="/passkeys">Read the passkeys explainer</a>.
+        </p>
       </div>
     </main>
 
@@ -5799,15 +6862,15 @@ func TestClientIPFallsBackToRemoteAddr(t *testing.T) {
   File name:             handlers.go
   Relative path:         internal/auth/handlers.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/handlers.go
-  Size:                  22.6 KiB (23186 bytes)
-  Last modified:         2026-07-01 09:24:40.000000000 -0400
+  Size:                  31.8 KiB (32573 bytes)
+  Last modified:         2026-07-06 02:21:29.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17806007
+  Inode:                 19816330
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               c04f8cec6d7d949ace8ba63d73d6123c43fe5281f5191174ed124bf85fb0da07
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               dff34c4eb03f6cc2a1ae7186d055e14c91beda9a82f9746379d9d4ee459399e1
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 package auth
@@ -5818,11 +6881,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 
 	"github.com/kusl/GoTunnels/internal/activity"
@@ -5843,21 +6908,25 @@ type Settings struct {
 // Handlers bundles dependencies for the auth HTTP endpoints.
 type Handlers struct {
 	store *store.Store
-	wa    *webauthn.WebAuthn
+	rp    *RPProvider
 	rec   *activity.Recorder
 	log   *slog.Logger
 	set   Settings
 }
 
-// NewHandlers builds the auth handler set.
-func NewHandlers(s *store.Store, wa *webauthn.WebAuthn, rec *activity.Recorder, log *slog.Logger, set Settings) *Handlers {
+// NewHandlers builds the auth handler set. The RPProvider (rather than a
+// single *webauthn.WebAuthn) is what lets passkey ceremonies bind to the
+// origin the browser actually presents instead of whatever origin happened to
+// be configured when the process booted — the root cause of the classic
+// "requested RPID did not match the origin" error behind a rotating tunnel.
+func NewHandlers(s *store.Store, rp *RPProvider, rec *activity.Recorder, log *slog.Logger, set Settings) *Handlers {
 	if set.FlowTTL <= 0 {
 		set.FlowTTL = 10 * time.Minute
 	}
 	if set.CookieName == "" {
 		set.CookieName = "gotunnels_session"
 	}
-	return &Handlers{store: s, wa: wa, rec: rec, log: log, set: set}
+	return &Handlers{store: s, rp: rp, rec: rec, log: log, set: set}
 }
 
 // ---------------------------------------------------------------------------
@@ -5960,8 +7029,9 @@ type sessionResponse struct {
 // signup / login / logout / me / activity
 // ---------------------------------------------------------------------------
 
-// Signup creates an account with a password (the always-present fallback
-// credential) and immediately establishes a session.
+// Signup creates an account with a password and immediately establishes a
+// session. (Password is one of two ways in — see PasskeySignupBegin/Finish
+// for the passwordless path.)
 func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 	var req signupRequest
 	if !decodeJSON(w, r, &req) {
@@ -5994,6 +7064,10 @@ func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := h.store.CreateUser(r.Context(), req.Username, req.DisplayName)
 	if err != nil {
+		if store.IsUniqueViolation(err) {
+			httpx.WriteError(w, http.StatusConflict, "username already taken")
+			return
+		}
 		h.serverError(w, r, "signup: create user", err)
 		return
 	}
@@ -6021,6 +7095,7 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := h.store.GetPasswordHash(r.Context(), user.ID)
 	if err != nil {
+		// Passkey-only accounts have no password row; same generic answer.
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -6096,17 +7171,24 @@ func (h *Handlers) PasskeyRegisterBegin(w http.ResponseWriter, r *http.Request) 
 		httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
+	wa, origin, err := h.rp.ForRequest(r)
+	if err != nil {
+		h.record(r, &user.ID, user.Username, "passkey_register", "passkey", "failure", map[string]any{"error": err.Error()})
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+		return
+	}
 	waUser, err := h.buildWAUser(r.Context(), user)
 	if err != nil {
 		h.serverError(w, r, "passkey: load user", err)
 		return
 	}
-	creation, sessionData, err := h.wa.BeginRegistration(waUser)
+	creation, sessionData, err := wa.BeginRegistration(waUser,
+		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred))
 	if err != nil {
 		h.serverError(w, r, "passkey: begin registration", err)
 		return
 	}
-	flowID, err := h.saveFlow(r.Context(), &user.ID, "register", sessionData)
+	flowID, err := h.saveFlow(r.Context(), &user.ID, "register", origin, nil, sessionData)
 	if err != nil {
 		h.serverError(w, r, "passkey: save flow", err)
 		return
@@ -6122,9 +7204,21 @@ func (h *Handlers) PasskeyRegisterFinish(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	flowID := r.URL.Query().Get("flow")
-	session, err := h.loadFlow(r.Context(), flowID, "register", &user.ID)
+	env, err := h.loadFlow(r.Context(), flowID, "register", &user.ID)
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired registration flow")
+		return
+	}
+	sd, err := env.sessionData()
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "corrupt registration flow")
+		return
+	}
+	// Finish against the relying party pinned when the flow began, so begin
+	// and finish agree even if the Origin header were to change between them.
+	wa, err := h.rpForFlow(env)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
 		return
 	}
 	waUser, err := h.buildWAUser(r.Context(), user)
@@ -6132,7 +7226,7 @@ func (h *Handlers) PasskeyRegisterFinish(w http.ResponseWriter, r *http.Request)
 		h.serverError(w, r, "passkey: load user", err)
 		return
 	}
-	cred, err := h.wa.FinishRegistration(waUser, *session, r)
+	cred, err := wa.FinishRegistration(waUser, *sd, r)
 	if err != nil {
 		h.record(r, &user.ID, user.Username, "passkey_register", "passkey", "failure", map[string]any{"error": err.Error()})
 		httpx.WriteError(w, http.StatusBadRequest, "passkey registration failed")
@@ -6161,6 +7255,12 @@ func (h *Handlers) PasskeyLoginBegin(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
+	wa, origin, err := h.rp.ForRequest(r)
+	if err != nil {
+		h.record(r, nil, req.Username, "login", "passkey", "failure", map[string]any{"error": err.Error()})
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+		return
+	}
 	user, err := h.store.GetUserByUsername(r.Context(), strings.TrimSpace(req.Username))
 	if err != nil {
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
@@ -6175,12 +7275,12 @@ func (h *Handlers) PasskeyLoginBegin(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "no passkeys registered for this account")
 		return
 	}
-	assertion, sessionData, err := h.wa.BeginLogin(waUser)
+	assertion, sessionData, err := wa.BeginLogin(waUser)
 	if err != nil {
 		h.serverError(w, r, "passkey: begin login", err)
 		return
 	}
-	flowID, err := h.saveFlow(r.Context(), &user.ID, "login", sessionData)
+	flowID, err := h.saveFlow(r.Context(), &user.ID, "login", origin, nil, sessionData)
 	if err != nil {
 		h.serverError(w, r, "passkey: save flow", err)
 		return
@@ -6201,17 +7301,23 @@ func (h *Handlers) PasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
+	env := decodeFlowEnvelope(flow.SessionData)
+	sd, err := env.sessionData()
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "corrupt login flow")
+		return
+	}
+	wa, err := h.rpForFlow(env)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+		return
+	}
 	waUser, err := h.buildWAUser(r.Context(), user)
 	if err != nil {
 		h.serverError(w, r, "passkey: load user", err)
 		return
 	}
-	var sd webauthn.SessionData
-	if err := json.Unmarshal(flow.SessionData, &sd); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "corrupt login flow")
-		return
-	}
-	cred, err := h.wa.FinishLogin(waUser, sd, r)
+	cred, err := wa.FinishLogin(waUser, *sd, r)
 	if err != nil {
 		h.record(r, &user.ID, user.Username, "login", "passkey", "failure", map[string]any{"error": err.Error()})
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
@@ -6222,6 +7328,138 @@ func (h *Handlers) PasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = h.store.DeleteFlow(r.Context(), flowID)
 	h.record(r, &user.ID, user.Username, "login", "passkey", "success", nil)
+	h.issueSession(w, r, user, "passkey")
+}
+
+// ---------------------------------------------------------------------------
+// passkey-first signup (unauthenticated) — create an account with no password
+// ---------------------------------------------------------------------------
+
+type passkeySignupBeginRequest struct {
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+}
+
+// PasskeySignupBegin starts creating a brand-new account whose only credential
+// will be a passkey. No user row is written yet: a candidate user id is
+// generated here and carried inside the flow envelope, and the account only
+// comes into existence in PasskeySignupFinish after the authenticator has
+// actually produced a credential. Abandoned ceremonies therefore leave nothing
+// behind but an expiring row in webauthn_flows.
+func (h *Handlers) PasskeySignupBegin(w http.ResponseWriter, r *http.Request) {
+	var req passkeySignupBeginRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	req.Username = strings.TrimSpace(req.Username)
+	if !validUsername(req.Username) {
+		httpx.WriteError(w, http.StatusBadRequest, "username must be 3-32 chars: letters, digits, dot, dash, underscore")
+		return
+	}
+	// Fast-fail on an obviously taken name. The authoritative check is the
+	// unique index at Finish time, which also closes the begin/finish race.
+	exists, err := h.store.UsernameExists(r.Context(), req.Username)
+	if err != nil {
+		h.serverError(w, r, "passkey signup: check username", err)
+		return
+	}
+	if exists {
+		httpx.WriteError(w, http.StatusConflict, "username already taken")
+		return
+	}
+
+	wa, origin, err := h.rp.ForRequest(r)
+	if err != nil {
+		h.record(r, nil, req.Username, "signup", "passkey", "failure", map[string]any{"error": err.Error()})
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+		return
+	}
+
+	candidateID, err := newUUIDv4()
+	if err != nil {
+		h.serverError(w, r, "passkey signup: candidate id", err)
+		return
+	}
+	displayName := strings.TrimSpace(req.DisplayName)
+	if displayName == "" {
+		displayName = req.Username
+	}
+
+	// A transient user object: satisfies webauthn.User for the ceremony
+	// without existing in the database.
+	waUser := &WebAuthnUser{User: store.User{ID: candidateID, Username: req.Username, DisplayName: displayName}}
+	creation, sessionData, err := wa.BeginRegistration(waUser,
+		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred))
+	if err != nil {
+		h.serverError(w, r, "passkey signup: begin registration", err)
+		return
+	}
+	flowID, err := h.saveFlow(r.Context(), nil, "signup", origin, &signupFlowData{
+		UserID:      candidateID,
+		Username:    req.Username,
+		DisplayName: displayName,
+	}, sessionData)
+	if err != nil {
+		h.serverError(w, r, "passkey signup: save flow", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"flow_id": flowID, "options": creation})
+}
+
+// PasskeySignupFinish verifies the new credential and only then creates the
+// account (passwordless) and starts a session.
+func (h *Handlers) PasskeySignupFinish(w http.ResponseWriter, r *http.Request) {
+	flowID := r.URL.Query().Get("flow")
+	flow, err := h.loadFlowAny(r.Context(), flowID, "signup")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired signup flow")
+		return
+	}
+	env := decodeFlowEnvelope(flow.SessionData)
+	if env.Signup == nil {
+		httpx.WriteError(w, http.StatusBadRequest, "corrupt signup flow")
+		return
+	}
+	sd, err := env.sessionData()
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "corrupt signup flow")
+		return
+	}
+	wa, err := h.rpForFlow(env)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+		return
+	}
+
+	candidate := store.User{
+		ID:          env.Signup.UserID,
+		Username:    env.Signup.Username,
+		DisplayName: env.Signup.DisplayName,
+	}
+	waUser := &WebAuthnUser{User: candidate}
+	cred, err := wa.FinishRegistration(waUser, *sd, r)
+	if err != nil {
+		h.record(r, nil, candidate.Username, "signup", "passkey", "failure", map[string]any{"error": err.Error()})
+		httpx.WriteError(w, http.StatusBadRequest, "passkey signup failed")
+		return
+	}
+
+	user, err := h.store.CreateUserWithID(r.Context(), candidate.ID, candidate.Username, candidate.DisplayName)
+	if err != nil {
+		if store.IsUniqueViolation(err) {
+			h.record(r, nil, candidate.Username, "signup", "passkey", "failure", map[string]any{"reason": "username_taken"})
+			httpx.WriteError(w, http.StatusConflict, "username already taken")
+			return
+		}
+		h.serverError(w, r, "passkey signup: create user", err)
+		return
+	}
+	if err := h.store.AddWebAuthnCredential(r.Context(), user.ID, cred); err != nil {
+		h.serverError(w, r, "passkey signup: store credential", err)
+		return
+	}
+	_ = h.store.DeleteFlow(r.Context(), flowID)
+	h.record(r, &user.ID, user.Username, "signup", "passkey", "success", nil)
 	h.issueSession(w, r, user, "passkey")
 }
 
@@ -6321,6 +7559,56 @@ func (h *Handlers) TOTPDisable(w http.ResponseWriter, r *http.Request) {
 	}
 	h.record(r, &user.ID, user.Username, "totp_disable", "totp", "success", nil)
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "totp_disabled"})
+}
+
+// ---------------------------------------------------------------------------
+// flow envelope — what actually goes into webauthn_flows.session_data
+// ---------------------------------------------------------------------------
+
+// flowEnvelope wraps the go-webauthn ceremony state with the origin the flow
+// was created for (so begin and finish always agree on the relying party) and,
+// for passkey-first signup, the candidate account that will be created only if
+// the ceremony succeeds.
+type flowEnvelope struct {
+	V       int             `json:"v"`
+	Origin  string          `json:"origin,omitempty"`
+	Signup  *signupFlowData `json:"signup,omitempty"`
+	Session json.RawMessage `json:"session"`
+}
+
+// signupFlowData is the not-yet-created account carried through a passkey
+// signup ceremony.
+type signupFlowData struct {
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+}
+
+// decodeFlowEnvelope reads a stored flow blob. Flows written before the
+// envelope existed stored the bare webauthn.SessionData; those are wrapped
+// on the fly (with no pinned origin, which resolves to the static relying
+// party) so in-flight ceremonies survive an upgrade.
+func decodeFlowEnvelope(blob []byte) flowEnvelope {
+	var env flowEnvelope
+	if err := json.Unmarshal(blob, &env); err == nil && len(env.Session) > 0 {
+		return env
+	}
+	return flowEnvelope{V: 0, Session: json.RawMessage(blob)}
+}
+
+// sessionData unpacks the library's ceremony state.
+func (e flowEnvelope) sessionData() (*webauthn.SessionData, error) {
+	var sd webauthn.SessionData
+	if err := json.Unmarshal(e.Session, &sd); err != nil {
+		return nil, err
+	}
+	return &sd, nil
+}
+
+// rpForFlow resolves the relying party a flow was pinned to when it began.
+func (h *Handlers) rpForFlow(env flowEnvelope) (*webauthn.WebAuthn, error) {
+	wa, _, err := h.rp.ForOrigin(env.Origin)
+	return wa, err
 }
 
 // ---------------------------------------------------------------------------
@@ -6437,8 +7725,12 @@ func (h *Handlers) verifySecondFactor(ctx context.Context, userID, code string) 
 	return used
 }
 
-func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind string, sd *webauthn.SessionData) (string, error) {
-	blob, err := json.Marshal(sd)
+func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind, origin string, signup *signupFlowData, sd *webauthn.SessionData) (string, error) {
+	sess, err := json.Marshal(sd)
+	if err != nil {
+		return "", err
+	}
+	blob, err := json.Marshal(flowEnvelope{V: 1, Origin: origin, Signup: signup, Session: sess})
 	if err != nil {
 		return "", err
 	}
@@ -6459,21 +7751,17 @@ func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind string, sd
 	return id, nil
 }
 
-func (h *Handlers) loadFlow(ctx context.Context, id, kind string, expectUser *string) (*webauthn.SessionData, error) {
+func (h *Handlers) loadFlow(ctx context.Context, id, kind string, expectUser *string) (flowEnvelope, error) {
 	flow, err := h.loadFlowAny(ctx, id, kind)
 	if err != nil {
-		return nil, err
+		return flowEnvelope{}, err
 	}
 	if expectUser != nil {
 		if flow.UserID == nil || *flow.UserID != *expectUser {
-			return nil, errors.New("auth: flow does not belong to user")
+			return flowEnvelope{}, errors.New("auth: flow does not belong to user")
 		}
 	}
-	var sd webauthn.SessionData
-	if err := json.Unmarshal(flow.SessionData, &sd); err != nil {
-		return nil, err
-	}
-	return &sd, nil
+	return decodeFlowEnvelope(flow.SessionData), nil
 }
 
 func (h *Handlers) loadFlowAny(ctx context.Context, id, kind string) (store.Flow, error) {
@@ -6531,6 +7819,21 @@ func newFlowID() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// newUUIDv4 generates an RFC 4122 version 4 UUID string. Kept local (like the
+// store's id::text convention) to avoid pulling in a UUID dependency for the
+// one place the application, rather than Postgres, must mint an id: the
+// passkey-signup candidate user, which has to exist as a WebAuthn user handle
+// before any row exists in the database.
+func newUUIDv4() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // RFC 4122 variant
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
+}
+
 // decodeJSON reads a size-limited JSON body into dst, writing a 400 on failure.
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MiB
@@ -6569,22 +7872,24 @@ func validUsername(u string) bool {
   File name:             handlers_test.go
   Relative path:         internal/auth/handlers_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/handlers_test.go
-  Size:                  2.0 KiB (2085 bytes)
-  Last modified:         2026-07-01 09:24:54.000000000 -0400
+  Size:                  4.3 KiB (4496 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17806015
+  Inode:                 19816331
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               08faaa25f54033ea9aefacd00ec05a7b8ee1dd918608f090220601f6ebb3cf79
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               70065018664c2dd83d554c495bca74997939d987abbde01bc2d647b68bcc3406
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 package auth
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -6662,6 +7967,78 @@ func TestExtractToken(t *testing.T) {
 	}
 }
 
+func TestFlowEnvelopeRoundTrip(t *testing.T) {
+	sess := json.RawMessage(`{"challenge":"abc","user_id":"aWQ="}`)
+	env := flowEnvelope{
+		V:       1,
+		Origin:  "https://tart-panda.trycloudflare.com",
+		Signup:  &signupFlowData{UserID: "11111111-2222-4333-8444-555555555555", Username: "alice", DisplayName: "Alice"},
+		Session: sess,
+	}
+	blob, err := json.Marshal(env)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	got := decodeFlowEnvelope(blob)
+	if got.V != 1 || got.Origin != env.Origin {
+		t.Fatalf("roundtrip lost header fields: %+v", got)
+	}
+	if got.Signup == nil || got.Signup.Username != "alice" || got.Signup.UserID != env.Signup.UserID {
+		t.Fatalf("roundtrip lost signup data: %+v", got.Signup)
+	}
+	if string(got.Session) != string(sess) {
+		t.Fatalf("roundtrip changed session blob: %s", got.Session)
+	}
+}
+
+func TestDecodeFlowEnvelopeLegacyBlob(t *testing.T) {
+	// Flows stored before the envelope existed were the bare
+	// webauthn.SessionData JSON. They must wrap on the fly with no pinned
+	// origin (which resolves to the static relying party).
+	legacy := []byte(`{"challenge":"xyz","user_id":"aWQ=","expires":"0001-01-01T00:00:00Z"}`)
+	env := decodeFlowEnvelope(legacy)
+	if env.Origin != "" {
+		t.Fatalf("legacy blob must carry no origin, got %q", env.Origin)
+	}
+	if env.Signup != nil {
+		t.Fatal("legacy blob must carry no signup data")
+	}
+	if string(env.Session) != string(legacy) {
+		t.Fatalf("legacy blob must become the session verbatim, got %s", env.Session)
+	}
+	if _, err := env.sessionData(); err != nil {
+		t.Fatalf("legacy session must still unpack: %v", err)
+	}
+}
+
+func TestDecodeFlowEnvelopeGarbage(t *testing.T) {
+	env := decodeFlowEnvelope([]byte("not json at all"))
+	if string(env.Session) != "not json at all" {
+		t.Fatalf("garbage should be preserved as the session blob, got %q", env.Session)
+	}
+	if _, err := env.sessionData(); err == nil {
+		t.Fatal("unpacking a garbage session must error")
+	}
+}
+
+func TestNewUUIDv4(t *testing.T) {
+	seen := map[string]bool{}
+	re := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+	for i := 0; i < 64; i++ {
+		id, err := newUUIDv4()
+		if err != nil {
+			t.Fatalf("newUUIDv4: %v", err)
+		}
+		if !re.MatchString(id) {
+			t.Fatalf("id %q is not a canonical v4 uuid", id)
+		}
+		if seen[id] {
+			t.Fatalf("duplicate uuid generated: %s", id)
+		}
+		seen[id] = true
+	}
+}
+
 
 ################################################################################
 # FILE: internal/auth/passkey.go
@@ -6671,28 +8048,34 @@ func TestExtractToken(t *testing.T) {
   File name:             passkey.go
   Relative path:         internal/auth/passkey.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/passkey.go
-  Size:                  1.4 KiB (1472 bytes)
-  Last modified:         2026-07-01 09:00:03.000000000 -0400
+  Size:                  6.5 KiB (6713 bytes)
+  Last modified:         2026-07-06 02:21:29.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17806010
+  Inode:                 19816332
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               ec0d4a746a850423c13314fceb24ee38423a00e32f1f88f93ee6bf6e01a457d2
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               300a87bbc9bbab9a30c4a17982710883421d63bd54e64d102e005875744e6226
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 package auth
 
 import (
+	"fmt"
+	"net/http"
+	"strings"
+	"sync"
+
 	"github.com/go-webauthn/webauthn/webauthn"
 
+	"github.com/kusl/GoTunnels/internal/httpx"
 	"github.com/kusl/GoTunnels/internal/store"
 )
 
 // NewWebAuthn builds a WebAuthn relying party from configuration. RPID is the
 // frontend's registrable domain and RPOrigins are the full origins the browser
-// will present (both are discovered at startup for Cloudflare Quick Tunnels).
+// will present.
 func NewWebAuthn(rpID, rpDisplayName string, rpOrigins []string) (*webauthn.WebAuthn, error) {
 	return webauthn.New(&webauthn.Config{
 		RPID:          rpID,
@@ -6700,6 +8083,151 @@ func NewWebAuthn(rpID, rpDisplayName string, rpOrigins []string) (*webauthn.WebA
 		RPOrigins:     rpOrigins,
 	})
 }
+
+// ---------------------------------------------------------------------------
+// Per-request relying party
+// ---------------------------------------------------------------------------
+
+// RPConfig configures an RPProvider.
+type RPConfig struct {
+	// RPID / RPDisplayName / RPOrigins are the statically configured relying
+	// party (what scripts/up.sh discovers at startup). They remain the
+	// fallback for requests that carry no Origin header.
+	RPID          string
+	RPDisplayName string
+	RPOrigins     []string
+	// OriginPatterns are wildcard origins (see httpx.MatchOriginPattern) that
+	// are additionally allowed to act as the relying party, with the RP ID
+	// derived from the request's Origin host. This is what keeps passkeys
+	// working when a Cloudflare Quick Tunnel hostname rotates or a container
+	// booted before tunnel discovery: the browser tells us its origin, and if
+	// that origin matches a trusted pattern we build the RP around it.
+	//
+	// Security note: deriving the RP from the Origin is safe here because
+	// WebAuthn credentials are scoped to the RP ID by the authenticator
+	// itself. A page on attacker.trycloudflare.com can only ever exercise
+	// credentials created for attacker.trycloudflare.com — it cannot assert
+	// a credential registered for your-frontend.trycloudflare.com. The same
+	// is NOT true of CORS-with-credentials, which is why these patterns are
+	// not fed into the CORS allow-list.
+	OriginPatterns []string
+}
+
+// maxDerivedRPs bounds the per-origin cache so a client spraying many
+// pattern-matching Origin values cannot grow memory without limit.
+const maxDerivedRPs = 256
+
+// RPProvider hands out *webauthn.WebAuthn instances appropriate for a given
+// request origin: the static instance for configured origins, or a derived,
+// cached instance for origins matching a trusted wildcard pattern.
+type RPProvider struct {
+	displayName   string
+	static        *webauthn.WebAuthn
+	staticDefault string
+	staticOrigins map[string]struct{}
+	patterns      []string
+
+	mu       sync.Mutex
+	byOrigin map[string]*webauthn.WebAuthn
+}
+
+// NewRPProvider validates the static configuration and prepares the provider.
+func NewRPProvider(cfg RPConfig) (*RPProvider, error) {
+	static, err := NewWebAuthn(cfg.RPID, cfg.RPDisplayName, cfg.RPOrigins)
+	if err != nil {
+		return nil, err
+	}
+	statics := make(map[string]struct{}, len(cfg.RPOrigins))
+	for _, o := range cfg.RPOrigins {
+		statics[strings.ToLower(strings.TrimSpace(o))] = struct{}{}
+	}
+	def := ""
+	if len(cfg.RPOrigins) > 0 {
+		def = cfg.RPOrigins[0]
+	}
+	return &RPProvider{
+		displayName:   cfg.RPDisplayName,
+		static:        static,
+		staticDefault: def,
+		staticOrigins: statics,
+		patterns:      cfg.OriginPatterns,
+		byOrigin:      map[string]*webauthn.WebAuthn{},
+	}, nil
+}
+
+// Static returns the boot-time configured relying party.
+func (p *RPProvider) Static() *webauthn.WebAuthn { return p.static }
+
+// ForRequest resolves the relying party for an incoming HTTP request from its
+// Origin header. Requests without an Origin header (curl, tests) fall back to
+// the static configuration.
+func (p *RPProvider) ForRequest(r *http.Request) (*webauthn.WebAuthn, string, error) {
+	return p.ForOrigin(r.Header.Get("Origin"))
+}
+
+// ForOrigin resolves the relying party for a browser origin. It returns the
+// instance, the canonical origin it is bound to (persist this with the flow so
+// begin and finish agree even if the header changes between them), and an
+// error when the origin is neither configured nor pattern-trusted.
+func (p *RPProvider) ForOrigin(origin string) (*webauthn.WebAuthn, string, error) {
+	origin = strings.ToLower(strings.TrimSpace(origin))
+	if origin == "" {
+		return p.static, p.staticDefault, nil
+	}
+	if _, ok := p.staticOrigins[origin]; ok {
+		return p.static, origin, nil
+	}
+	for _, pat := range p.patterns {
+		if httpx.MatchOriginPattern(pat, origin) {
+			wa, err := p.derived(origin)
+			if err != nil {
+				return nil, "", err
+			}
+			return wa, origin, nil
+		}
+	}
+	return nil, "", fmt.Errorf("auth: origin %q is not an allowed WebAuthn relying party", origin)
+}
+
+func (p *RPProvider) derived(origin string) (*webauthn.WebAuthn, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if wa, ok := p.byOrigin[origin]; ok {
+		return wa, nil
+	}
+	rpID := hostOfOrigin(origin)
+	if rpID == "" {
+		return nil, fmt.Errorf("auth: cannot derive RP ID from origin %q", origin)
+	}
+	wa, err := NewWebAuthn(rpID, p.displayName, []string{origin})
+	if err != nil {
+		return nil, err
+	}
+	if len(p.byOrigin) >= maxDerivedRPs {
+		p.byOrigin = map[string]*webauthn.WebAuthn{}
+	}
+	p.byOrigin[origin] = wa
+	return wa, nil
+}
+
+// hostOfOrigin extracts the bare host (no scheme, no port) from an origin.
+// The RP ID must be a domain, never host:port.
+func hostOfOrigin(origin string) string {
+	if i := strings.Index(origin, "://"); i >= 0 {
+		origin = origin[i+3:]
+	}
+	if i := strings.IndexByte(origin, '/'); i >= 0 {
+		origin = origin[:i]
+	}
+	if i := strings.LastIndexByte(origin, ':'); i >= 0 {
+		origin = origin[:i]
+	}
+	return origin
+}
+
+// ---------------------------------------------------------------------------
+// webauthn.User adapter
+// ---------------------------------------------------------------------------
 
 // WebAuthnUser adapts an application user and its registered credentials to the
 // webauthn.User interface the go-webauthn library expects.
@@ -6735,20 +8263,22 @@ func (u *WebAuthnUser) WebAuthnCredentials() []webauthn.Credential { return u.Cr
   File name:             passkey_test.go
   Relative path:         internal/auth/passkey_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/passkey_test.go
-  Size:                  1.0 KiB (1073 bytes)
-  Last modified:         2026-07-01 09:00:10.000000000 -0400
+  Size:                  5.0 KiB (5202 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17806011
+  Inode:                 19816333
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               ead3a085ae8155a9d7cccdc9589ed8fd5237aa6d83759671bb2ad03e109c6cdc
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               2c2f7591af55521fbab7393eed8ae3c63a209da84d93963782be7c76d555e00a
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 package auth
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/kusl/GoTunnels/internal/store"
@@ -6784,6 +8314,138 @@ func TestNewWebAuthnValid(t *testing.T) {
 	}
 	if w == nil {
 		t.Fatal("expected non-nil WebAuthn")
+	}
+}
+
+func testRPProvider(t *testing.T) *RPProvider {
+	t.Helper()
+	p, err := NewRPProvider(RPConfig{
+		RPID:           "localhost",
+		RPDisplayName:  "GoTunnels",
+		RPOrigins:      []string{"http://localhost:8080"},
+		OriginPatterns: []string{"https://*.trycloudflare.com"},
+	})
+	if err != nil {
+		t.Fatalf("NewRPProvider: %v", err)
+	}
+	return p
+}
+
+func TestRPProviderEmptyOriginFallsBackToStatic(t *testing.T) {
+	p := testRPProvider(t)
+	wa, origin, err := p.ForOrigin("")
+	if err != nil {
+		t.Fatalf("ForOrigin(\"\"): %v", err)
+	}
+	if wa != p.Static() {
+		t.Fatal("empty origin should return the static relying party")
+	}
+	if origin != "http://localhost:8080" {
+		t.Fatalf("canonical origin = %q, want the first static origin", origin)
+	}
+}
+
+func TestRPProviderStaticOriginUsesStaticInstance(t *testing.T) {
+	p := testRPProvider(t)
+	wa, origin, err := p.ForOrigin("HTTP://LOCALHOST:8080")
+	if err != nil {
+		t.Fatalf("ForOrigin(static): %v", err)
+	}
+	if wa != p.Static() {
+		t.Fatal("configured origin should return the static relying party")
+	}
+	if origin != "http://localhost:8080" {
+		t.Fatalf("canonical origin = %q, want lowercased static origin", origin)
+	}
+}
+
+func TestRPProviderDerivesForPatternMatch(t *testing.T) {
+	p := testRPProvider(t)
+	wa, origin, err := p.ForOrigin("https://Tart-Panda.TryCloudflare.com")
+	if err != nil {
+		t.Fatalf("ForOrigin(pattern): %v", err)
+	}
+	if wa == p.Static() {
+		t.Fatal("pattern-matched origin should get a derived relying party, not the static one")
+	}
+	if origin != "https://tart-panda.trycloudflare.com" {
+		t.Fatalf("canonical origin = %q, want lowercased request origin", origin)
+	}
+	if got := wa.Config.RPID; got != "tart-panda.trycloudflare.com" {
+		t.Fatalf("derived RPID = %q, want the origin host", got)
+	}
+	if len(wa.Config.RPOrigins) != 1 || wa.Config.RPOrigins[0] != "https://tart-panda.trycloudflare.com" {
+		t.Fatalf("derived RPOrigins = %v, want exactly the canonical origin", wa.Config.RPOrigins)
+	}
+}
+
+func TestRPProviderCachesDerivedInstances(t *testing.T) {
+	p := testRPProvider(t)
+	a, _, err := p.ForOrigin("https://same.trycloudflare.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _, err := p.ForOrigin("https://same.trycloudflare.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Fatal("same origin should reuse the cached derived instance")
+	}
+	c, _, err := p.ForOrigin("https://other.trycloudflare.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c == a {
+		t.Fatal("different origins must not share a derived instance")
+	}
+}
+
+func TestRPProviderRejectsUntrustedOrigin(t *testing.T) {
+	p := testRPProvider(t)
+	for _, origin := range []string{
+		"https://evil.example",
+		"http://a.trycloudflare.com",          // scheme downgrade
+		"https://a.b.trycloudflare.com",       // two labels
+		"https://trycloudflare.com",           // zero labels
+		"https://a.trycloudflare.com.evil.io", // suffix trick
+	} {
+		if _, _, err := p.ForOrigin(origin); err == nil {
+			t.Errorf("ForOrigin(%q) accepted, want rejection", origin)
+		}
+	}
+}
+
+func TestRPProviderForRequestReadsOriginHeader(t *testing.T) {
+	p := testRPProvider(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/passkey/login/begin", nil)
+	req.Header.Set("Origin", "https://from-header.trycloudflare.com")
+	wa, origin, err := p.ForRequest(req)
+	if err != nil {
+		t.Fatalf("ForRequest: %v", err)
+	}
+	if origin != "https://from-header.trycloudflare.com" {
+		t.Fatalf("canonical origin = %q", origin)
+	}
+	if wa.Config.RPID != "from-header.trycloudflare.com" {
+		t.Fatalf("RPID = %q", wa.Config.RPID)
+	}
+}
+
+func TestHostOfOrigin(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"https://a.trycloudflare.com", "a.trycloudflare.com"},
+		{"http://localhost:8080", "localhost"},
+		{"https://x.example:8443", "x.example"},
+		{"", ""},
+		// hostOfOrigin is a plain extractor by design: validation happens
+		// earlier (MatchOriginPattern), so a scheme-less string passes through.
+		{"not-an-origin", "not-an-origin"},
+	}
+	for _, tc := range cases {
+		if got := hostOfOrigin(tc.in); got != tc.want {
+			t.Errorf("hostOfOrigin(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }
 
@@ -7823,15 +9485,15 @@ func TestClamp(t *testing.T) {
   File name:             config.go
   Relative path:         internal/config/config.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/config.go
-  Size:                  12.6 KiB (12944 bytes)
-  Last modified:         2026-07-05 05:29:08.656567891 -0400
+  Size:                  15.3 KiB (15670 bytes)
+  Last modified:         2026-07-06 02:21:29.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17806004
+  Inode:                 19816335
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               25d99d440065d081256ea6ff5479bdc4480f96cb976b95d3cb416a07eb846699
-  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
+  SHA-256:               9ef2272639edfa87e6bebb7f9344c7870f55e336e64f7f25fa6aa1ad2d35d5b5
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // Package config is the single source of truth for every runtime setting.
@@ -7889,6 +9551,33 @@ type Config struct {
 	RPID          string   // relying-party ID: the frontend's registrable domain
 	RPDisplayName string   // human-readable name shown by the authenticator
 	RPOrigins     []string // full origins the browser will present, e.g. https://x.trycloudflare.com
+	// RPOriginPatterns lets the WebAuthn relying party be derived per request
+	// from the browser's Origin header when it matches one of these wildcard
+	// patterns (e.g. "https://*.trycloudflare.com"). Quick Tunnel hostnames
+	// rotate, and container env can go stale (see docs/ARCHITECTURE.md), so
+	// this makes passkeys self-healing instead of frozen at boot time. The
+	// patterns gate only the WebAuthn RP derivation — they are deliberately
+	// NOT added to the CORS allow-list, because CORS + credentials must stay
+	// pinned to the one real frontend origin.
+	RPOriginPatterns []string
+
+	// Signup rate limits --------------------------------------------------
+	// Account creation is limited much harder than ordinary API traffic:
+	// one signup per SignupIPInterval per client IP (hashed), and one per
+	// SignupGlobalInterval across the whole instance. A zero interval
+	// disables that limiter. Bursts allow small clusters (a classroom
+	// behind one NAT can raise SignupIPBurst).
+	SignupIPInterval     time.Duration
+	SignupIPBurst        int
+	SignupGlobalInterval time.Duration
+	SignupGlobalBurst    int
+
+	// Telemetry host identity ---------------------------------------------
+	// HostName becomes the OTel resource attribute host.name. Inside a
+	// container os.Hostname() is the container ID, so scripts/up.sh passes
+	// the real machine's hostname through this variable. Empty means "let
+	// the SDK detect it" (which yields the container hostname).
+	HostName string
 
 	// Content Security Policy -------------------------------------------
 	// The header itself is emitted by Caddy on the frontend. These values let
@@ -7927,24 +9616,30 @@ type TelemetryConfig struct {
 // Load reads and validates configuration from the environment.
 func Load() (*Config, error) {
 	c := &Config{
-		InstanceID:         getenv("GOTUNNELS_INSTANCE_ID", defaultInstanceID()),
-		ServiceName:        getenv("OTEL_SERVICE_NAME", getenv("GOTUNNELS_SERVICE_NAME", "gotunnels-api")),
-		Version:            getenv("GOTUNNELS_VERSION", "dev"),
-		HTTPAddr:           getenv("GOTUNNELS_HTTP_ADDR", ":8080"),
-		ShutdownTimeout:    getdur("GOTUNNELS_SHUTDOWN_TIMEOUT", 15*time.Second),
-		DatabaseURL:        getenv("DATABASE_URL", ""),
-		DBMaxConns:         int32(getint("GOTUNNELS_DB_MAX_CONNS", 20)),
-		DBMinConns:         int32(getint("GOTUNNELS_DB_MIN_CONNS", 2)),
-		DBConnectTimeout:   getdur("GOTUNNELS_DB_CONNECT_TIMEOUT", 30*time.Second),
-		SessionCookieName:  getenv("GOTUNNELS_SESSION_COOKIE_NAME", "gotunnels_session"),
-		SessionTTL:         getdur("GOTUNNELS_SESSION_TTL", 24*time.Hour),
-		CORSAllowedOrigins: splitList(getenv("GOTUNNELS_CORS_ALLOWED_ORIGINS", "*")),
-		RPID:               getenv("GOTUNNELS_RP_ID", "localhost"),
-		RPDisplayName:      getenv("GOTUNNELS_RP_DISPLAY_NAME", "GoTunnels"),
-		RPOrigins:          splitList(getenv("GOTUNNELS_RP_ORIGINS", "http://localhost:8080")),
-		CSPMode:            getenv("GOTUNNELS_CSP_MODE", "report-only"),
-		CSPPolicy:          getenv("GOTUNNELS_CSP_POLICY", DefaultCSPPolicy),
-		Dev:                getbool("GOTUNNELS_DEV", false),
+		InstanceID:           getenv("GOTUNNELS_INSTANCE_ID", defaultInstanceID()),
+		ServiceName:          getenv("OTEL_SERVICE_NAME", getenv("GOTUNNELS_SERVICE_NAME", "gotunnels-api")),
+		Version:              getenv("GOTUNNELS_VERSION", "dev"),
+		HTTPAddr:             getenv("GOTUNNELS_HTTP_ADDR", ":8080"),
+		ShutdownTimeout:      getdur("GOTUNNELS_SHUTDOWN_TIMEOUT", 15*time.Second),
+		DatabaseURL:          getenv("DATABASE_URL", ""),
+		DBMaxConns:           int32(getint("GOTUNNELS_DB_MAX_CONNS", 20)),
+		DBMinConns:           int32(getint("GOTUNNELS_DB_MIN_CONNS", 2)),
+		DBConnectTimeout:     getdur("GOTUNNELS_DB_CONNECT_TIMEOUT", 30*time.Second),
+		SessionCookieName:    getenv("GOTUNNELS_SESSION_COOKIE_NAME", "gotunnels_session"),
+		SessionTTL:           getdur("GOTUNNELS_SESSION_TTL", 24*time.Hour),
+		CORSAllowedOrigins:   splitList(getenv("GOTUNNELS_CORS_ALLOWED_ORIGINS", "*")),
+		RPID:                 getenv("GOTUNNELS_RP_ID", "localhost"),
+		RPDisplayName:        getenv("GOTUNNELS_RP_DISPLAY_NAME", "GoTunnels"),
+		RPOrigins:            splitList(getenv("GOTUNNELS_RP_ORIGINS", "http://localhost:8080")),
+		RPOriginPatterns:     splitList(getenv("GOTUNNELS_RP_ORIGIN_PATTERNS", "https://*.trycloudflare.com")),
+		SignupIPInterval:     getdur("GOTUNNELS_SIGNUP_IP_INTERVAL", 5*time.Minute),
+		SignupIPBurst:        getint("GOTUNNELS_SIGNUP_IP_BURST", 1),
+		SignupGlobalInterval: getdur("GOTUNNELS_SIGNUP_GLOBAL_INTERVAL", time.Minute),
+		SignupGlobalBurst:    getint("GOTUNNELS_SIGNUP_GLOBAL_BURST", 1),
+		HostName:             getenv("GOTUNNELS_HOST_NAME", ""),
+		CSPMode:              getenv("GOTUNNELS_CSP_MODE", "report-only"),
+		CSPPolicy:            getenv("GOTUNNELS_CSP_POLICY", DefaultCSPPolicy),
+		Dev:                  getbool("GOTUNNELS_DEV", false),
 	}
 
 	if err := c.resolveSecrets(); err != nil {
@@ -8054,7 +9749,26 @@ func (c *Config) Validate() error {
 	if len(c.RPOrigins) == 0 {
 		return fmt.Errorf("config: GOTUNNELS_RP_ORIGINS must contain at least one origin")
 	}
+	if c.SignupIPInterval < 0 || c.SignupGlobalInterval < 0 {
+		return fmt.Errorf("config: signup rate-limit intervals must not be negative")
+	}
+	if c.SignupIPInterval > 0 && c.SignupIPBurst < 1 {
+		return fmt.Errorf("config: GOTUNNELS_SIGNUP_IP_BURST must be >= 1 when the IP limiter is enabled")
+	}
+	if c.SignupGlobalInterval > 0 && c.SignupGlobalBurst < 1 {
+		return fmt.Errorf("config: GOTUNNELS_SIGNUP_GLOBAL_BURST must be >= 1 when the global limiter is enabled")
+	}
 	return nil
+}
+
+// PerInterval converts "one event per d" into a token-bucket rate in events
+// per second. A non-positive interval yields 0, which callers treat as "this
+// limiter is disabled".
+func PerInterval(d time.Duration) float64 {
+	if d <= 0 {
+		return 0
+	}
+	return 1 / d.Seconds()
 }
 
 // IPHashPepper returns a copy-safe reference to the pepper bytes.
@@ -8205,15 +9919,15 @@ func DecodeKeyMaterial(s string) ([]byte, error) {
   File name:             config_test.go
   Relative path:         internal/config/config_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/config_test.go
-  Size:                  4.7 KiB (4900 bytes)
-  Last modified:         2026-07-01 08:50:30.000000000 -0400
+  Size:                  8.0 KiB (8289 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17806003
+  Inode:                 19816336
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               ce86378edcf0fa9f84c6414170d73423b9c4e87b51603354c35d4231f622abad
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               facb0e055fb34d0ad7e2d2b9e9bdf232f36d3e6964084c365ca9f69b90091865
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 package config
@@ -8395,6 +10109,120 @@ func TestGetHelpers(t *testing.T) {
 	}
 }
 
+func TestLoad_SignupLimitDefaults(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.SignupIPInterval != 5*time.Minute || c.SignupIPBurst != 1 {
+		t.Fatalf("ip defaults = (%v, %d), want (5m, 1)", c.SignupIPInterval, c.SignupIPBurst)
+	}
+	if c.SignupGlobalInterval != time.Minute || c.SignupGlobalBurst != 1 {
+		t.Fatalf("global defaults = (%v, %d), want (1m, 1)", c.SignupGlobalInterval, c.SignupGlobalBurst)
+	}
+}
+
+func TestLoad_SignupLimitOverridesAndDisable(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	t.Setenv("GOTUNNELS_SIGNUP_IP_INTERVAL", "30s")
+	t.Setenv("GOTUNNELS_SIGNUP_IP_BURST", "3")
+	t.Setenv("GOTUNNELS_SIGNUP_GLOBAL_INTERVAL", "0")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.SignupIPInterval != 30*time.Second || c.SignupIPBurst != 3 {
+		t.Fatalf("ip override = (%v, %d)", c.SignupIPInterval, c.SignupIPBurst)
+	}
+	if c.SignupGlobalInterval != 0 {
+		t.Fatalf("global interval = %v, want 0 (disabled)", c.SignupGlobalInterval)
+	}
+}
+
+func TestValidate_SignupBurstMustBePositiveWhenEnabled(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	t.Setenv("GOTUNNELS_SIGNUP_IP_BURST", "0")
+	if _, err := Load(); err == nil {
+		t.Fatal("burst 0 with a non-zero interval should fail validation")
+	}
+}
+
+func TestLoad_RPOriginPatternsDefault(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.RPOriginPatterns) != 1 || c.RPOriginPatterns[0] != "https://*.trycloudflare.com" {
+		t.Fatalf("patterns = %v, want the trycloudflare default", c.RPOriginPatterns)
+	}
+}
+
+func TestLoad_RPOriginPatternsOverrideAndClear(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	t.Setenv("GOTUNNELS_RP_ORIGIN_PATTERNS", "https://*.a.example, https://*.b.example")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.RPOriginPatterns) != 2 || c.RPOriginPatterns[0] != "https://*.a.example" || c.RPOriginPatterns[1] != "https://*.b.example" {
+		t.Fatalf("patterns = %v", c.RPOriginPatterns)
+	}
+
+	t.Setenv("GOTUNNELS_RP_ORIGIN_PATTERNS", " ")
+	c2, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c2.RPOriginPatterns) != 0 {
+		t.Fatalf("blank override should clear patterns, got %v", c2.RPOriginPatterns)
+	}
+}
+
+func TestLoad_HostName(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.HostName != "" {
+		t.Fatalf("default host name = %q, want empty (SDK fallback)", c.HostName)
+	}
+	t.Setenv("GOTUNNELS_HOST_NAME", "virginia")
+	c2, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c2.HostName != "virginia" {
+		t.Fatalf("host name = %q, want virginia", c2.HostName)
+	}
+}
+
+func TestPerInterval(t *testing.T) {
+	cases := []struct {
+		in   time.Duration
+		want float64
+	}{
+		{time.Second, 1},
+		{time.Minute, 1.0 / 60.0},
+		{5 * time.Minute, 1.0 / 300.0},
+		{0, 0},
+		{-time.Second, 0},
+	}
+	for _, tc := range cases {
+		if got := PerInterval(tc.in); got != tc.want {
+			t.Errorf("PerInterval(%v) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}
+
 
 ################################################################################
 # FILE: internal/csp/csp.go
@@ -8404,15 +10232,15 @@ func TestGetHelpers(t *testing.T) {
   File name:             csp.go
   Relative path:         internal/csp/csp.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/csp/csp.go
-  Size:                  8.9 KiB (9174 bytes)
-  Last modified:         2026-07-01 09:01:56.000000000 -0400
+  Size:                  11.4 KiB (11733 bytes)
+  Last modified:         2026-07-06 02:21:29.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17806017
+  Inode:                 19816338
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               3e663092b9716a53296aedffe4d74a5b1204b3f7e7bcafa1256da52534f19c0b
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               4ff4d2478ebb51758563b4bf2ee11d53c9225d6ddffdc09bea36fe779c1f8b75
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // Package csp accepts Content-Security-Policy violation reports in the three
@@ -8428,9 +10256,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/kusl/GoTunnels/internal/activity"
+	"github.com/kusl/GoTunnels/internal/httpx"
 	"github.com/kusl/GoTunnels/internal/store"
 )
 
@@ -8693,6 +10523,71 @@ func readAll(r *http.Request, max int64) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(r.Body, max))
 }
 
+// ---------------------------------------------------------------------------
+// public transparency feed
+// ---------------------------------------------------------------------------
+
+const (
+	// recentDefaultLimit / recentMaxLimit bound the public feed page size.
+	recentDefaultLimit = 50
+	recentMaxLimit     = 200
+	// maxURILen / maxSampleLen cap how much of any reported string the public
+	// feed echoes back. Report fields are attacker-controlled input (anyone
+	// can POST to the report endpoint), so the public view truncates them:
+	// long enough to learn from, short enough that the feed cannot be abused
+	// as free hosting for kilobytes of arbitrary text.
+	maxURILen    = 200
+	maxSampleLen = 100
+)
+
+// Recent serves the newest CSP violations as a public, read-only feed for the
+// passkeys/security explainer page. Rows come from the store already stripped
+// of ip_hash, user_agent, original_policy, and the raw payload (see
+// store.CSPReportRow); this handler additionally truncates the free-text
+// fields. Publishing what the browser blocked teaches CSP by example without
+// revealing anything about who triggered a report.
+func (h *Handler) Recent(w http.ResponseWriter, r *http.Request) {
+	limit := recentDefaultLimit
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > recentMaxLimit {
+			httpx.WriteError(w, http.StatusBadRequest, "invalid limit")
+			return
+		}
+		limit = n
+	}
+	rows, err := h.store.ListRecentCSPReports(r.Context(), limit)
+	if err != nil {
+		h.log.ErrorContext(r.Context(), "csp: list recent", slog.String("error", err.Error()))
+		httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if rows == nil {
+		rows = []store.CSPReportRow{}
+	}
+	for i := range rows {
+		rows[i].DocumentURI = truncateRunes(rows[i].DocumentURI, maxURILen)
+		rows[i].BlockedURI = truncateRunes(rows[i].BlockedURI, maxURILen)
+		rows[i].SourceFile = truncateRunes(rows[i].SourceFile, maxURILen)
+		rows[i].ScriptSample = truncateRunes(rows[i].ScriptSample, maxSampleLen)
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"reports": rows})
+}
+
+// truncateRunes shortens s to at most n characters (code points), appending an
+// ellipsis when it cut something. Rune-aware so it never splits a multi-byte
+// UTF-8 sequence into mojibake.
+func truncateRunes(s string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[:n]) + "…"
+}
+
 
 ################################################################################
 # FILE: internal/csp/csp_test.go
@@ -8702,20 +10597,28 @@ func readAll(r *http.Request, max int64) ([]byte, error) {
   File name:             csp_test.go
   Relative path:         internal/csp/csp_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/csp/csp_test.go
-  Size:                  4.2 KiB (4318 bytes)
-  Last modified:         2026-07-01 09:02:16.000000000 -0400
+  Size:                  5.9 KiB (6109 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17806018
+  Inode:                 19816339
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               1fe565d12c45aaf4dcf30186a146e1f0d9d6951b0366916e63f196d79b63e92b
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               50539f31c7cfaae020de3c606c072ca79ab848974a63d4b92f732b9eba2de94e
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 package csp
 
-import "testing"
+import (
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"unicode/utf8"
+)
 
 func TestNormalizeLegacy(t *testing.T) {
 	body := []byte(`{"csp-report":{
@@ -8849,6 +10752,56 @@ func TestFirstNonEmpty(t *testing.T) {
 	}
 	if firstNonEmpty("", "") != "" {
 		t.Fatal("expected empty when all empty")
+	}
+}
+
+func TestTruncateRunes(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		n    int
+		want string
+	}{
+		{"shorter passes through", "hello", 10, "hello"},
+		{"exactly n passes through", "hello", 5, "hello"},
+		{"ascii truncates with ellipsis", "hello world", 5, "hello…"},
+		{"multibyte counts runes not bytes", "ééééé", 5, "ééééé"},
+		{"multibyte truncates cleanly", "日本語テキスト", 3, "日本語…"},
+		{"zero yields empty", "anything", 0, ""},
+		{"negative yields empty", "anything", -1, ""},
+		{"empty stays empty", "", 5, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := truncateRunes(tc.in, tc.n); got != tc.want {
+				t.Fatalf("truncateRunes(%q, %d) = %q, want %q", tc.in, tc.n, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTruncateRunesNeverSplitsUTF8(t *testing.T) {
+	in := strings.Repeat("界", 300)
+	got := truncateRunes(in, maxURILen)
+	if !utf8.ValidString(got) {
+		t.Fatal("truncation produced invalid UTF-8")
+	}
+	if utf8.RuneCountInString(got) != maxURILen+1 { // +1 for the ellipsis
+		t.Fatalf("rune count = %d, want %d", utf8.RuneCountInString(got), maxURILen+1)
+	}
+}
+
+func TestRecentRejectsBadLimit(t *testing.T) {
+	// Limit validation runs before any store access, so a nil store is safe
+	// here and keeps this a pure unit test.
+	h := NewHandler(nil, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	for _, q := range []string{"limit=0", "limit=-1", "limit=201", "limit=abc"} {
+		req := httptest.NewRequest(http.MethodGet, "/api/csp-reports/recent?"+q, nil)
+		rec := httptest.NewRecorder()
+		h.Recent(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", q, rec.Code)
+		}
 	}
 }
 
@@ -9329,15 +11282,15 @@ func TestInfoHandler(t *testing.T) {
   File name:             middleware.go
   Relative path:         internal/httpx/middleware.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/httpx/middleware.go
-  Size:                  7.6 KiB (7799 bytes)
-  Last modified:         2026-07-04 17:16:37.000000000 -0400
+  Size:                  10.0 KiB (10304 bytes)
+  Last modified:         2026-07-06 02:21:29.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406613
+  Inode:                 19816341
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               2c2d3a22319c93689e9474e7121cfca199b206f336899682c82c029749537ad9
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               3f57a178e9d8467339b62cbdf8fdb6b117f1f5296646c2eef4c8a911d465ad55
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // Package httpx holds transport-level helpers and middleware that do not
@@ -9353,6 +11306,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -9383,6 +11337,11 @@ func Chain(h http.Handler, mws ...Middleware) http.Handler {
 // request Origin. Because the browser sends credentials (Bearer token flows
 // still trigger CORS), the wildcard cannot be combined with credentials, so we
 // echo a specific origin. When allowAny is true any non-empty Origin is echoed.
+//
+// Entries in allowed may be exact origins ("https://a.example") or wildcard
+// patterns with a single "*" standing in for exactly one DNS label in the
+// leftmost host position ("https://*.trycloudflare.com"). See
+// MatchOriginPattern for the precise rules.
 func OriginAllowed(allowed []string, allowAny bool, origin string) (echo string, ok bool) {
 	if origin == "" {
 		return "", false
@@ -9394,8 +11353,66 @@ func OriginAllowed(allowed []string, allowAny bool, origin string) (echo string,
 		if a == origin {
 			return origin, true
 		}
+		if strings.Contains(a, "*") && MatchOriginPattern(a, origin) {
+			return origin, true
+		}
 	}
 	return "", false
+}
+
+// MatchOriginPattern reports whether origin matches pattern. A pattern is an
+// origin whose host begins with "*." — the "*" stands for exactly one
+// non-empty DNS label (no dots), which is the shape Cloudflare Quick Tunnel
+// hostnames take (<random-words>.trycloudflare.com). Rules:
+//
+//   - schemes must match exactly (case-insensitive)
+//   - the origin must carry no path, port, userinfo, query, or fragment
+//   - "https://*.trycloudflare.com" matches "https://a-b-c.trycloudflare.com"
+//     but not "https://a.b.trycloudflare.com" (two labels), not
+//     "https://trycloudflare.com" (zero labels), and not
+//     "http://a.trycloudflare.com" (scheme mismatch)
+//
+// Patterns without a leading "*." only match exactly (case-insensitively).
+func MatchOriginPattern(pattern, origin string) bool {
+	pScheme, pHost, ok := splitOrigin(pattern)
+	if !ok {
+		return false
+	}
+	oScheme, oHost, ok := splitOrigin(origin)
+	if !ok {
+		return false
+	}
+	if pScheme != oScheme {
+		return false
+	}
+	if !strings.HasPrefix(pHost, "*.") {
+		return pHost == oHost
+	}
+	suffix := pHost[1:] // ".trycloudflare.com"
+	if !strings.HasSuffix(oHost, suffix) {
+		return false
+	}
+	label := oHost[:len(oHost)-len(suffix)]
+	if label == "" || strings.ContainsAny(label, ".:/") {
+		return false
+	}
+	return true
+}
+
+// splitOrigin lowercases and splits "scheme://host" (no path, port allowed as
+// part of host verbatim). It rejects anything with a path, query, fragment,
+// or userinfo — Origin headers never carry those.
+func splitOrigin(o string) (scheme, host string, ok bool) {
+	o = strings.ToLower(strings.TrimSpace(o))
+	i := strings.Index(o, "://")
+	if i <= 0 {
+		return "", "", false
+	}
+	scheme, host = o[:i], o[i+3:]
+	if host == "" || strings.ContainsAny(host, "/?#@ ") {
+		return "", "", false
+	}
+	return scheme, host, true
 }
 
 // CORS returns middleware that applies the origin policy and answers
@@ -9550,10 +11567,17 @@ func (rl *RateLimiter) Allow(key string) bool {
 // request (the provided keyFn, typically a hashed client IP). Rejected
 // requests receive 429.
 func (rl *RateLimiter) LimitByIP(keyFn func(*http.Request) string) Middleware {
+	return rl.LimitWith(keyFn, "rate limit exceeded")
+}
+
+// LimitWith is LimitByIP with a caller-supplied 429 message, so endpoints with
+// deliberately strict limits (e.g. signup) can tell the person what happened
+// and roughly when to retry.
+func (rl *RateLimiter) LimitWith(keyFn func(*http.Request) string, message string) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !rl.Allow(keyFn(r)) {
-				WriteError(w, http.StatusTooManyRequests, "rate limit exceeded")
+				WriteError(w, http.StatusTooManyRequests, message)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -9603,15 +11627,15 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64)
   File name:             middleware_test.go
   Relative path:         internal/httpx/middleware_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/httpx/middleware_test.go
-  Size:                  4.6 KiB (4808 bytes)
-  Last modified:         2026-07-01 09:03:23.000000000 -0400
+  Size:                  8.7 KiB (8944 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17806021
+  Inode:                 19816342
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               9310e55d020ce3ff4d6a6a4ffa15c7918426a1c713555be09ddbd94894d9495e
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               e593e7da0cbdc20404ff27fdf9db59d2e5dc8bdcd7bbf28d3761cf8fd6ebbc8c
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 package httpx
@@ -9783,6 +11807,102 @@ func TestWriteJSONAndError(t *testing.T) {
 	}
 }
 
+func TestMatchOriginPattern(t *testing.T) {
+	cases := []struct {
+		pattern, origin string
+		want            bool
+	}{
+		// The shape this exists for: Quick Tunnel hostnames.
+		{"https://*.trycloudflare.com", "https://tart-panda-tea-cup.trycloudflare.com", true},
+		{"https://*.trycloudflare.com", "https://A-B-C.TRYCLOUDFLARE.COM", true}, // case-insensitive
+		// Exactly one label: zero or two labels must not match.
+		{"https://*.trycloudflare.com", "https://trycloudflare.com", false},
+		{"https://*.trycloudflare.com", "https://a.b.trycloudflare.com", false},
+		// Scheme must match; http downgrade must not.
+		{"https://*.trycloudflare.com", "http://a.trycloudflare.com", false},
+		// Suffix tricks: the pattern's dot must be a real boundary.
+		{"https://*.trycloudflare.com", "https://eviltrycloudflare.com", false},
+		{"https://*.trycloudflare.com", "https://a.trycloudflare.com.evil.example", false},
+		// No path/port/userinfo/query in an Origin.
+		{"https://*.trycloudflare.com", "https://a.trycloudflare.com/path", false},
+		{"https://*.trycloudflare.com", "https://a.trycloudflare.com:8443", false},
+		{"https://*.trycloudflare.com", "https://user@a.trycloudflare.com", false},
+		// Non-wildcard patterns match exactly (case-insensitively) only.
+		{"https://app.example", "https://app.example", true},
+		{"https://app.example", "https://APP.EXAMPLE", true},
+		{"https://app.example", "https://other.example", false},
+		// Garbage patterns/origins never match.
+		{"", "https://a.trycloudflare.com", false},
+		{"https://*.trycloudflare.com", "", false},
+		{"not-an-origin", "https://a.trycloudflare.com", false},
+	}
+	for _, tc := range cases {
+		if got := MatchOriginPattern(tc.pattern, tc.origin); got != tc.want {
+			t.Errorf("MatchOriginPattern(%q, %q) = %v, want %v", tc.pattern, tc.origin, got, tc.want)
+		}
+	}
+}
+
+func TestOriginAllowedWildcardEntries(t *testing.T) {
+	allowed := []string{"https://exact.example", "https://*.trycloudflare.com"}
+	if echo, ok := OriginAllowed(allowed, false, "https://a-b.trycloudflare.com"); !ok || echo != "https://a-b.trycloudflare.com" {
+		t.Fatalf("wildcard entry should match and echo the request origin: %q %v", echo, ok)
+	}
+	if _, ok := OriginAllowed(allowed, false, "https://trycloudflare.com"); ok {
+		t.Fatal("apex must not match a *. pattern")
+	}
+	if echo, ok := OriginAllowed(allowed, false, "https://exact.example"); !ok || echo != "https://exact.example" {
+		t.Fatalf("exact entry should still match: %q %v", echo, ok)
+	}
+}
+
+func TestLimitWithMessageAndStatus(t *testing.T) {
+	rl := NewRateLimiter(0, 1) // no refill, single token
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	h := rl.LimitWith(func(*http.Request) string { return "k" }, "custom limit message")(next)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/signup", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first request status = %d, want 200", rec.Code)
+	}
+
+	rec2 := httptest.NewRecorder()
+	h.ServeHTTP(rec2, req)
+	if rec2.Code != http.StatusTooManyRequests {
+		t.Fatalf("second request status = %d, want 429", rec2.Code)
+	}
+	var body map[string]string
+	if err := json.Unmarshal(rec2.Body.Bytes(), &body); err != nil {
+		t.Fatalf("429 body not json: %v", err)
+	}
+	if body["error"] != "custom limit message" {
+		t.Fatalf("429 message = %q, want the caller-supplied one", body["error"])
+	}
+}
+
+func TestChainOrderOutermostFirst(t *testing.T) {
+	var order []string
+	mk := func(name string) Middleware {
+		return func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				order = append(order, name)
+				next.ServeHTTP(w, r)
+			})
+		}
+	}
+	h := Chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		order = append(order, "handler")
+	}), mk("outer"), mk("inner"))
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	if len(order) != 3 || order[0] != "outer" || order[1] != "inner" || order[2] != "handler" {
+		t.Fatalf("execution order = %v, want [outer inner handler]", order)
+	}
+}
+
 
 ################################################################################
 # FILE: internal/notes/notes.go
@@ -9792,15 +11912,15 @@ func TestWriteJSONAndError(t *testing.T) {
   File name:             notes.go
   Relative path:         internal/notes/notes.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/notes/notes.go
-  Size:                  6.9 KiB (7149 bytes)
-  Last modified:         2026-07-04 17:16:38.000000000 -0400
+  Size:                  9.0 KiB (9272 bytes)
+  Last modified:         2026-07-06 02:21:29.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406615
+  Inode:                 19816344
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               f96902c28d08b8b453c73f2c5bd698d622485e7838d04b412f63c10815d54c39
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               0fb27c570ccf79d755e2b4238a32a45958e3c0ef91d74ac9f67c34dc717c1e08
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // Package notes implements a deliberately plain public microblog: short
@@ -9904,8 +12024,13 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = n
 	}
+	authorIDs, problem := parseAuthors(r.URL.Query().Get("authors"))
+	if problem != "" {
+		httpx.WriteError(w, http.StatusBadRequest, problem)
+		return
+	}
 
-	rows, err := h.store.ListNotes(r.Context(), beforeID, limit)
+	rows, err := h.store.ListNotes(r.Context(), beforeID, limit, authorIDs)
 	if err != nil {
 		h.serverError(w, r, "notes: list", err)
 		return
@@ -9916,8 +12041,27 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	trace.SpanFromContext(r.Context()).SetAttributes(
 		attribute.Int("notes.returned", len(rows)),
 		attribute.Int64("notes.before", beforeID),
+		attribute.Int("notes.author_filter", len(authorIDs)),
 	)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"notes": rows})
+}
+
+// Authors lists everyone who currently has notes, for the author-filter
+// dropdown on the notes page.
+func (h *Handlers) Authors(w http.ResponseWriter, r *http.Request) {
+	if _, ok := auth.CurrentUser(r.Context()); !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	authors, err := h.store.ListNoteAuthors(r.Context())
+	if err != nil {
+		h.serverError(w, r, "notes: authors", err)
+		return
+	}
+	if authors == nil {
+		authors = []store.NoteAuthor{}
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"authors": authors})
 }
 
 // Create posts a new note for the caller.
@@ -10014,6 +12158,58 @@ func ValidateBody(raw string) (string, string) {
 	return body, ""
 }
 
+// maxAuthorFilter caps how many author ids one request may filter by.
+const maxAuthorFilter = 50
+
+// parseAuthors parses the ?authors= query parameter: a comma-separated list
+// of user uuids. Empty input means "no filter". Every entry must look like a
+// uuid — the ids go into a `$n::uuid[]` bind, and a malformed value would
+// otherwise surface as an opaque database cast error instead of a 400.
+func parseAuthors(raw string) ([]string, string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, ""
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if !isUUIDString(p) {
+			return nil, "invalid author id"
+		}
+		out = append(out, strings.ToLower(p))
+	}
+	if len(out) > maxAuthorFilter {
+		return nil, fmt.Sprintf("at most %d authors may be selected", maxAuthorFilter)
+	}
+	return out, ""
+}
+
+// isUUIDString reports whether s is a canonical 8-4-4-4-12 hex uuid.
+func isUUIDString(s string) bool {
+	if len(s) != 36 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch i {
+		case 8, 13, 18, 23:
+			if c != '-' {
+				return false
+			}
+		default:
+			isHex := (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+			if !isHex {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg string, err error) {
 	h.log.ErrorContext(r.Context(), msg,
 		slog.String("error", err.Error()),
@@ -10031,15 +12227,15 @@ func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg strin
   File name:             notes_test.go
   Relative path:         internal/notes/notes_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/notes/notes_test.go
-  Size:                  2.1 KiB (2174 bytes)
-  Last modified:         2026-07-04 17:16:38.000000000 -0400
+  Size:                  4.3 KiB (4435 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406616
+  Inode:                 19816345
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               0479274ca9a9137c66c9356b5ec8799903e99d9356f1165dd805cbe320bcae4e
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               ed76031e17dcd2bd92092a58d7912a0b7ddd23b9c07bbcce0b6b37c84d3bc4ab
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 package notes
@@ -10113,6 +12309,81 @@ func TestValidateBodyMaxCountsRunesNotBytes(t *testing.T) {
 	}
 	if _, problem := ValidateBody(in); problem != "" {
 		t.Fatalf("multibyte body at limit rejected: %s", problem)
+	}
+}
+
+func TestParseAuthors(t *testing.T) {
+	u1 := "11111111-2222-4333-8444-555555555555"
+	u2 := "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE"
+
+	t.Run("empty means no filter", func(t *testing.T) {
+		ids, problem := parseAuthors("")
+		if problem != "" || ids != nil {
+			t.Fatalf("got (%v, %q), want (nil, \"\")", ids, problem)
+		}
+	})
+	t.Run("whitespace only means no filter", func(t *testing.T) {
+		ids, problem := parseAuthors("   ")
+		if problem != "" || ids != nil {
+			t.Fatalf("got (%v, %q), want (nil, \"\")", ids, problem)
+		}
+	})
+	t.Run("parses, trims, lowercases", func(t *testing.T) {
+		ids, problem := parseAuthors(" " + u1 + " , " + u2 + " ")
+		if problem != "" {
+			t.Fatalf("unexpected problem: %s", problem)
+		}
+		if len(ids) != 2 || ids[0] != u1 || ids[1] != strings.ToLower(u2) {
+			t.Fatalf("ids = %v", ids)
+		}
+	})
+	t.Run("skips empty segments", func(t *testing.T) {
+		ids, problem := parseAuthors(u1 + ",," + u1)
+		if problem != "" || len(ids) != 2 {
+			t.Fatalf("got (%v, %q)", ids, problem)
+		}
+	})
+	t.Run("rejects non-uuid entries", func(t *testing.T) {
+		for _, raw := range []string{"alice", u1 + ",alice", "1; DROP TABLE notes", u1 + "x"} {
+			if _, problem := parseAuthors(raw); problem == "" {
+				t.Errorf("parseAuthors(%q) accepted, want rejection", raw)
+			}
+		}
+	})
+	t.Run("caps the list", func(t *testing.T) {
+		parts := make([]string, maxAuthorFilter+1)
+		for i := range parts {
+			parts[i] = u1
+		}
+		if _, problem := parseAuthors(strings.Join(parts, ",")); problem == "" {
+			t.Fatal("over-cap list accepted, want rejection")
+		}
+	})
+}
+
+func TestIsUUIDString(t *testing.T) {
+	good := []string{
+		"11111111-2222-4333-8444-555555555555",
+		"AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE",
+		"00000000-0000-0000-0000-000000000000",
+	}
+	for _, s := range good {
+		if !isUUIDString(s) {
+			t.Errorf("expected %q to be a uuid", s)
+		}
+	}
+	bad := []string{
+		"",
+		"11111111-2222-4333-8444-55555555555",   // too short
+		"11111111-2222-4333-8444-5555555555556", // too long
+		"11111111x2222-4333-8444-555555555555",  // wrong separator
+		"1111111g-2222-4333-8444-555555555555",  // non-hex
+		"11111111-2222-4333-8444_555555555555",  // underscore
+	}
+	for _, s := range bad {
+		if isUUIDString(s) {
+			t.Errorf("expected %q to be rejected", s)
+		}
 	}
 }
 
@@ -10329,15 +12600,15 @@ func TestValidKey(t *testing.T) {
   File name:             server.go
   Relative path:         internal/server/server.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/server/server.go
-  Size:                  5.0 KiB (5128 bytes)
-  Last modified:         2026-07-04 17:16:38.000000000 -0400
+  Size:                  6.8 KiB (7060 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406621
+  Inode:                 19816347
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               fd24d7f84f3c6bd06e045e20ae3d9cb968defa55e1bfd6ad20e600a3cd23743c
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  SHA-256:               842761dd89f822d81eb3bacee0be501c5f536ff2e08aa5fd50dc1477b8672a97
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // Package server assembles the HTTP routes and middleware into a ready-to-run
@@ -10373,7 +12644,15 @@ type Deps struct {
 	Notes            *notes.Handlers
 	Prefs            *prefs.Handlers
 	NotesRateLimiter *httpx.RateLimiter
-	Pepper           []byte
+	// SignupIPLimiter caps account creation per client IP; SignupGlobalLimiter
+	// caps it across everyone. Either may be nil to disable that guard (the
+	// config maps a zero interval to nil). They apply to the moment an
+	// account is actually created: POST /api/signup and the passkey signup
+	// *finish* — begin is deliberately unguarded so an abandoned or failed
+	// authenticator ceremony never burns a scarce signup token.
+	SignupIPLimiter     *httpx.RateLimiter
+	SignupGlobalLimiter *httpx.RateLimiter
+	Pepper              []byte
 }
 
 // New builds the configured *http.Server.
@@ -10386,17 +12665,25 @@ func New(d Deps) *http.Server {
 	mux.HandleFunc("GET /api/info", d.Health.InfoHandler)
 
 	// --- unauthenticated: auth entry points ---
-	mux.HandleFunc("POST /api/signup", d.Auth.Signup)
+	mux.Handle("POST /api/signup", d.signupGuard(http.HandlerFunc(d.Auth.Signup)))
 	mux.HandleFunc("POST /api/login", d.Auth.Login)
 	mux.HandleFunc("POST /api/passkey/login/begin", d.Auth.PasskeyLoginBegin)
 	mux.HandleFunc("POST /api/passkey/login/finish", d.Auth.PasskeyLoginFinish)
+	mux.HandleFunc("POST /api/passkey/signup/begin", d.Auth.PasskeySignupBegin)
+	mux.Handle("POST /api/passkey/signup/finish", d.signupGuard(http.HandlerFunc(d.Auth.PasskeySignupFinish)))
 
 	// --- unauthenticated but rate-limited: CSP violation reports ---
-	cspChain := httpx.Chain(
+	mux.Handle("POST /api/csp-reports", httpx.Chain(
 		http.HandlerFunc(d.CSP.ServeHTTP),
-		d.CSPRateLimiter.LimitByIP(cspRateKey(d.Pepper)),
-	)
-	mux.Handle("POST /api/csp-reports", cspChain)
+		d.CSPRateLimiter.LimitByIP(hashedIPKey(d.Pepper)),
+	))
+	// Public, sanitised read side of the same data: the passkeys/security
+	// explainer page renders it so visitors can watch CSP work. Shares the
+	// CSP limiter so the pair cannot be used to hammer the database.
+	mux.Handle("GET /api/csp-reports/recent", httpx.Chain(
+		http.HandlerFunc(d.CSP.Recent),
+		d.CSPRateLimiter.LimitByIP(hashedIPKey(d.Pepper)),
+	))
 
 	// --- authenticated ---
 	authed := d.Auth.RequireAuth
@@ -10424,6 +12711,7 @@ func New(d Deps) *http.Server {
 	// feed; the limiter sits inside RequireAuth so the key derives from the
 	// verified user, not from anything the client controls.
 	mux.Handle("GET /api/notes", authed(http.HandlerFunc(d.Notes.List)))
+	mux.Handle("GET /api/notes/authors", authed(http.HandlerFunc(d.Notes.Authors)))
 	mux.Handle("POST /api/notes", authed(httpx.Chain(
 		http.HandlerFunc(d.Notes.Create),
 		d.NotesRateLimiter.LimitByIP(noteRateKey()),
@@ -10450,9 +12738,27 @@ func New(d Deps) *http.Server {
 	}
 }
 
-// cspRateKey derives a rate-limit key from the hashed client IP so the CSP
-// endpoint cannot be trivially flooded, while still never storing a raw IP.
-func cspRateKey(pepper []byte) func(*http.Request) string {
+// signupGuard wraps an account-creation handler with the configured signup
+// rate limits. Order matters: the per-IP guard runs first so one noisy client
+// is rejected before it can drain the global bucket everyone shares; the
+// global guard runs second as the site-wide backstop.
+func (d Deps) signupGuard(h http.Handler) http.Handler {
+	var mws []httpx.Middleware
+	if d.SignupIPLimiter != nil {
+		mws = append(mws, d.SignupIPLimiter.LimitWith(hashedIPKey(d.Pepper),
+			"too many signups from your network — please try again in a few minutes"))
+	}
+	if d.SignupGlobalLimiter != nil {
+		mws = append(mws, d.SignupGlobalLimiter.LimitWith(
+			func(*http.Request) string { return "global" },
+			"signups are briefly rate limited site-wide — please try again in a minute"))
+	}
+	return httpx.Chain(h, mws...)
+}
+
+// hashedIPKey derives a rate-limit key from the hashed client IP, so limits
+// track clients without ever storing a raw IP.
+func hashedIPKey(pepper []byte) func(*http.Request) string {
 	return func(r *http.Request) string {
 		return activity.HashIP(pepper, activity.ClientIP(r))
 	}
@@ -10479,15 +12785,15 @@ func noteRateKey() func(*http.Request) string {
   File name:             store.go
   Relative path:         internal/store/store.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/store/store.go
-  Size:                  28.1 KiB (28874 bytes)
-  Last modified:         2026-07-05 05:28:44.424179585 -0400
+  Size:                  33.1 KiB (33982 bytes)
+  Last modified:         2026-07-06 02:21:29.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406623
+  Inode:                 19816349
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               bb847155a2afcee3a306a53133468aee1db2db7b854d18b36bcebe061a354d06
-  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
+  SHA-256:               e47e80cc38efb7e6be36dccdd29a334f839ec8f6a41f382a383b46de5b42164d
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // Package store is the single data-access layer. Every SQL query in the
@@ -10508,6 +12814,7 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -10669,6 +12976,44 @@ func (s *Store) CreateUser(ctx context.Context, username, displayName string) (U
 		VALUES ($1, $2, $3)
 		RETURNING id::text, username, display_name, created_at`,
 		username, lower, displayName,
+	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.CreatedAt)
+	if err != nil {
+		return User{}, err
+	}
+	if _, err = tx.Exec(ctx,
+		`INSERT INTO user_roles (user_id, role) VALUES ($1::uuid, 'user')`, u.ID); err != nil {
+		return User{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return User{}, err
+	}
+	return u, nil
+}
+
+// CreateUserWithID inserts a user under a caller-supplied uuid and grants the
+// default "user" role atomically. The passkey-first signup flow needs this:
+// it must mint the id before any row exists so the id can serve as the
+// WebAuthn user handle during the ceremony, and only writes the row once the
+// authenticator has produced a credential. A duplicate username surfaces as a
+// unique violation here (see IsUniqueViolation) — the authoritative check
+// that closes the begin/finish race.
+func (s *Store) CreateUserWithID(ctx context.Context, id, username, displayName string) (User, error) {
+	lower := normalizeUsername(username)
+	if displayName == "" {
+		displayName = username
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return User{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var u User
+	err = tx.QueryRow(ctx, `
+		INSERT INTO users (id, username, username_lower, display_name)
+		VALUES ($1::uuid, $2, $3, $4)
+		RETURNING id::text, username, display_name, created_at`,
+		id, username, lower, displayName,
 	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.CreatedAt)
 	if err != nil {
 		return User{}, err
@@ -11092,6 +13437,52 @@ func (s *Store) InsertCSPReport(ctx context.Context, in CSPReportInput) error {
 	return err
 }
 
+// CSPReportRow is one sanitised violation for the public transparency feed:
+// when it happened and what was blocked, but deliberately never ip_hash,
+// user_agent, original_policy, or the raw payload — those stay operator-only.
+type CSPReportRow struct {
+	ID                 int64     `json:"id"`
+	CreatedAt          time.Time `json:"created_at"`
+	DocumentURI        string    `json:"document_uri"`
+	BlockedURI         string    `json:"blocked_uri"`
+	ViolatedDirective  string    `json:"violated_directive"`
+	EffectiveDirective string    `json:"effective_directive"`
+	Disposition        string    `json:"disposition"`
+	SourceFile         string    `json:"source_file"`
+	LineNumber         int       `json:"line_number"`
+	ColumnNumber       int       `json:"column_number"`
+	ScriptSample       string    `json:"script_sample"`
+}
+
+// ListRecentCSPReports returns the newest violations for the public feed.
+func (s *Store) ListRecentCSPReports(ctx context.Context, limit int) ([]CSPReportRow, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, created_at, document_uri, blocked_uri, violated_directive,
+		       effective_directive, disposition, source_file, line_number,
+		       column_number, script_sample
+		FROM csp_reports
+		ORDER BY id DESC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CSPReportRow
+	for rows.Next() {
+		var r CSPReportRow
+		if err := rows.Scan(&r.ID, &r.CreatedAt, &r.DocumentURI, &r.BlockedURI,
+			&r.ViolatedDirective, &r.EffectiveDirective, &r.Disposition,
+			&r.SourceFile, &r.LineNumber, &r.ColumnNumber, &r.ScriptSample); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // ---------------------------------------------------------------------------
 // CAPTCHA stats
 // ---------------------------------------------------------------------------
@@ -11243,17 +13634,26 @@ func (s *Store) CreateNote(ctx context.Context, userID, body string) (Note, erro
 // ListNotes returns up to limit notes newest-first. When beforeID > 0 only
 // notes with id < beforeID are returned — a stable cursor for "load older"
 // pagination (ids are monotonic, so the cursor never shifts under the reader
-// the way OFFSET would when new notes arrive).
-func (s *Store) ListNotes(ctx context.Context, beforeID int64, limit int) ([]Note, error) {
+// the way OFFSET would when new notes arrive). When authorIDs is non-empty
+// the feed is restricted to those authors; the filter lives in SQL so the
+// cursor, the limit, and the deletion-detection window all keep working
+// against the filtered feed rather than a client-side subset of it.
+func (s *Store) ListNotes(ctx context.Context, beforeID int64, limit int, authorIDs []string) ([]Note, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
+	}
+	if authorIDs == nil {
+		// pgx encodes nil as SQL NULL; cardinality(NULL) is NULL, not 0, and
+		// the filter would wrongly exclude everything. Always bind an array.
+		authorIDs = []string{}
 	}
 	rows, err := s.pool.Query(ctx, `
 		SELECT n.id, n.user_id::text, u.username, u.display_name, n.body, n.created_at
 		FROM notes n JOIN users u ON u.id = n.user_id
 		WHERE ($1::bigint = 0 OR n.id < $1)
+		  AND (cardinality($3::uuid[]) = 0 OR n.user_id = ANY($3::uuid[]))
 		ORDER BY n.id DESC
-		LIMIT $2`, beforeID, limit)
+		LIMIT $2`, beforeID, limit, authorIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -11265,6 +13665,38 @@ func (s *Store) ListNotes(ctx context.Context, beforeID int64, limit int) ([]Not
 			return nil, err
 		}
 		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// NoteAuthor is one distinct author appearing in the notes feed, with a count
+// of their current notes, for the author-filter dropdown.
+type NoteAuthor struct {
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	Notes       int64  `json:"notes"`
+}
+
+// ListNoteAuthors returns everyone who currently has at least one note,
+// ordered by username. Hard-deleted notes fall out of the counts naturally.
+func (s *Store) ListNoteAuthors(ctx context.Context) ([]NoteAuthor, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT u.id::text, u.username, u.display_name, COUNT(*)::bigint AS notes
+		FROM notes n JOIN users u ON u.id = n.user_id
+		GROUP BY u.id, u.username, u.display_name
+		ORDER BY u.username`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []NoteAuthor
+	for rows.Next() {
+		var a NoteAuthor
+		if err := rows.Scan(&a.UserID, &a.Username, &a.DisplayName, &a.Notes); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
 	}
 	return out, rows.Err()
 }
@@ -11294,6 +13726,15 @@ func mapErr(err error) error {
 		return ErrNotFound
 	}
 	return err
+}
+
+// IsUniqueViolation reports whether err is a Postgres unique-constraint
+// violation (SQLSTATE 23505). Callers use it to turn a duplicate-key insert
+// into a friendly 409 — the authoritative "already taken" signal that closes
+// any check-then-insert race.
+func IsUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // normalizeUsername lowercases and trims a username for case-insensitive
@@ -11486,15 +13927,15 @@ func TestMultiHandler_Enabled(t *testing.T) {
   File name:             telemetry.go
   Relative path:         internal/telemetry/telemetry.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/telemetry/telemetry.go
-  Size:                  9.4 KiB (9636 bytes)
-  Last modified:         2026-07-05 05:29:26.930473329 -0400
+  Size:                  10.2 KiB (10544 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805999
+  Inode:                 19816351
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               032addbedd17d09ef480475fd90104fb8954788e13bedc886dd85a66b2d19785
-  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
+  SHA-256:               94f504ef187759a620f08d0b2330de00ae360160e76350571cb2f1cb306c9c29
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // Package telemetry wires the vendor-neutral OpenTelemetry Go SDK for all three
@@ -11522,6 +13963,7 @@ import (
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -11646,16 +14088,32 @@ func fallback(h slog.Handler, cfg *config.Config, cause error) *Providers {
 	return &Providers{Logger: l}
 }
 
+// buildResource assembles the OTel resource attached to every span, metric,
+// and log record. host.name deserves a note: the SDK does not detect it by
+// default (resource.Default() covers service/SDK attributes only), which is
+// why backends show host_name as an empty string out of the box. When
+// cfg.HostName is set — scripts/up.sh exports the podman host's `hostname`,
+// e.g. "virginia" — it is pinned explicitly, which is the value people
+// actually want (the machine the stack runs on). Otherwise resource.WithHost()
+// fills in the container's hostname: a random short id, less meaningful, but
+// still better than empty.
 func buildResource(ctx context.Context, cfg *config.Config) (*resource.Resource, error) {
-	return resource.New(ctx,
+	opts := []resource.Option{
 		resource.WithFromEnv(),
 		resource.WithTelemetrySDK(),
-		resource.WithAttributes(
-			semconv.ServiceName(cfg.ServiceName),
-			semconv.ServiceVersion(cfg.Version),
-			semconv.ServiceInstanceID(cfg.InstanceID),
-		),
-	)
+	}
+	attrs := []attribute.KeyValue{
+		semconv.ServiceName(cfg.ServiceName),
+		semconv.ServiceVersion(cfg.Version),
+		semconv.ServiceInstanceID(cfg.InstanceID),
+	}
+	if cfg.HostName != "" {
+		attrs = append(attrs, semconv.HostName(cfg.HostName))
+	} else {
+		opts = append(opts, resource.WithHost())
+	}
+	opts = append(opts, resource.WithAttributes(attrs...))
+	return resource.New(ctx, opts...)
 }
 
 func traceHTTPOpts(cfg *config.Config) []otlptracehttp.Option {
@@ -13754,15 +16212,15 @@ main "$@"
   File name:             up.sh
   Relative path:         scripts/up.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/up.sh
-  Size:                  6.6 KiB (6814 bytes)
-  Last modified:         2026-07-05 05:28:33.736402422 -0400
-  Permissions:           -rwxr-xr-x
+  Size:                  8.4 KiB (8635 bytes)
+  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805978
+  Inode:                 19816353
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               6adb95b7e5161adbfe66956f572cb260693322dd9c33b716c6c7f8d1b11aeece
-  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
+  SHA-256:               abdddd1bd276b40fedf533912ed415d6af1e1d0c15de696277f3c9bb43eece6b
+  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -13801,6 +16259,15 @@ export GOTUNNELS_INSTANCE_ID="${GOTUNNELS_INSTANCE_ID:-$PROJECT}"
 set_env_var GOTUNNELS_INSTANCE_ID "$GOTUNNELS_INSTANCE_ID"
 log "project (instance): $PROJECT"
 
+# Telemetry host.name: the OTel SDK does not detect the host by default, so
+# without this the backend shows host_name as an empty string. Export the
+# machine's hostname (e.g. "virginia") so every span/metric/log says which
+# box the stack runs on. Override by exporting GOTUNNELS_HOST_NAME yourself.
+GOTUNNELS_HOST_NAME="${GOTUNNELS_HOST_NAME:-$(hostname)}"
+export GOTUNNELS_HOST_NAME
+set_env_var GOTUNNELS_HOST_NAME "$GOTUNNELS_HOST_NAME"
+log "telemetry host.name: $GOTUNNELS_HOST_NAME"
+
 # 1) Build images (API multi-stage build runs go mod tidy + go build).
 log "building images…"
 dc -p "$PROJECT" build
@@ -13813,6 +16280,33 @@ log "starting database…"
 dc -p "$PROJECT" up -d db
 wait_healthy "$PROJECT" db 60 \
   pg_isready -U "${POSTGRES_USER:-gotunnels}" -d "${POSTGRES_DB:-gotunnels}" -q
+
+# 2b) Clear any stale api container from a previous run of THIS project,
+#     BEFORE the frontend and tunnels come up. Doing it this early matters:
+#     right now nothing has been discovered yet, so if removing the api drags
+#     dependent containers with it (instances created before the compose fix
+#     carry podman --requires links from frontend/cloudflared-api onto the
+#     api container), those dependents are simply recreated fresh by the
+#     steps below. Waiting until after tunnel discovery to do this — as an
+#     earlier version of this script did — is what produced the virginia
+#     failure: `podman rm -f api` failed with "has dependent containers",
+#     the `|| true` swallowed it, `up -d api` then hit "name already in use",
+#     and the API silently kept its bootstrap env (RP_ID=localhost, CORS=*):
+#     everything worked except passkeys.
+_stale_api_cid="$(cid_of "$PROJECT" api)"
+if [ -n "$_stale_api_cid" ]; then
+  warn "found an api container from a previous run; removing it (and any podman-level dependents) so it can be recreated with this run's environment"
+  "$CR" rm -f "$_stale_api_cid" >/dev/null 2>&1 || true
+  if [ -n "$(cid_of "$PROJECT" api)" ]; then
+    # Old-format instances: dependents hold --requires on the api container.
+    # podman's --depend removes them too; they are recreated fresh below.
+    "$CR" rm -f --depend "$_stale_api_cid" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$(cid_of "$PROJECT" api)" ]; then
+    die "could not remove the stale api container ($_stale_api_cid). Tear the instance down first: scripts/down.sh $PROJECT"
+  fi
+  ok "stale api container removed"
+fi
 
 # 3) Frontend + its tunnel, WITHOUT pulling in the api dependency yet.
 log "starting frontend and its tunnel…"
@@ -13835,21 +16329,15 @@ export GOTUNNELS_CORS_ALLOWED_ORIGINS="$FRONTEND_URL"
 
 # 6) Now start the API (with correct RP/CORS) and its tunnel.
 #
-#    podman-compose does NOT honor `--no-deps`: step 3's
-#    `up -d --no-deps frontend cloudflared-frontend` also created and started
-#    the api container (frontend depends_on api), freezing its environment
-#    with the pre-discovery values. A plain `up -d` here then hits "name
-#    already in use", keeps that stale container, and the API never sees the
-#    tunnel-derived GOTUNNELS_RP_ID / RP_ORIGINS / CORS_ALLOWED_ORIGINS just
-#    exported above — which is exactly the CORS-on-signup failure (and, worse,
-#    silently broken passkeys: RP ID stuck at its bootstrap value). So: if an
-#    api container already exists for this project, remove it and let compose
-#    recreate it with the current environment. Under docker compose (which
-#    honors --no-deps) no such container exists yet and this is a no-op.
-_stale_api_cid="$(cid_of "$PROJECT" api)"
-if [ -n "$_stale_api_cid" ]; then
-  warn "api container was pre-created by a dependency with pre-discovery env; recreating it"
-  "$CR" rm -f "$_stale_api_cid" >/dev/null 2>&1 || true
+#    compose.yaml deliberately has no depends_on -> api edges anymore, and
+#    step 2b removed any leftover api container, so nothing can have
+#    pre-created the api with stale env by this point. Verify that instead of
+#    assuming it: if an api container somehow exists here, recreating it is
+#    NOT safe to skip — a container created before the exports above would
+#    run with RP_ID=localhost and CORS=*, the exact state where everything
+#    works except passkeys. Fail loudly rather than continue into that trap.
+if [ -n "$(cid_of "$PROJECT" api)" ]; then
+  die "an api container already exists before 'up -d api' — it would keep pre-discovery env. Tear down and retry: scripts/down.sh $PROJECT && scripts/up.sh $PROJECT"
 fi
 log "starting API and its tunnel…"
 dc -p "$PROJECT" up -d --no-deps api cloudflared-api
@@ -13920,13 +16408,14 @@ for _pair in "cloudflared-frontend|Web app" "cloudflared-api|API"; do
 done
 
 
+
 ################################################################################
 # DUMP SUMMARY
 ################################################################################
-  Files dumped   : 92
-  Total size     : 411.2 KiB (421137 bytes)
+  Files dumped   : 95
+  Total size     : 500.3 KiB (512391 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-05T10:29:54-04:00
+  Completed at   : 2026-07-06T02:36:12-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
