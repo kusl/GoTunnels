@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sign up · GoTunnels</title>
     <link rel="stylesheet" href="/css/style.css" />
+    <script src="/js/theme-boot.js"></script>
   </head>
   <body>
     <header class="topbar">
@@ -12,6 +13,7 @@
         <span class="brand"><span class="dot"></span> GoTunnels</span>
         <nav class="mainnav">
           <a href="/">Home</a>
+          <a href="/passkeys">Passkeys</a>
           <a href="/notes" data-auth="in" class="hidden">Notes</a>
           <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
           <a href="/activity" data-auth="in" class="hidden">Activity</a>
@@ -39,13 +41,24 @@
           <label for="password">Password</label>
           <input id="password" type="password" autocomplete="new-password" required
                  placeholder="at least 8 characters" />
-          <p class="hint">A password is always set as a fallback. You can add a passkey afterwards.</p>
+          <p class="hint">Only needed for the button below. Prefer no password at all? Use the passkey option instead.</p>
 
           <div class="btn-row">
-            <button id="submit" class="primary" type="submit">Create account</button>
+            <button id="submit" class="primary" type="submit">Create account with a password</button>
             <a href="/login"><button class="ghost" type="button">I already have an account</button></a>
           </div>
         </form>
+
+        <div class="divider">or</div>
+
+        <button id="passkey-signup" class="primary" type="button">Create account with a passkey</button>
+        <p class="hint">
+          No password is created — your only credential is a passkey stored on
+          this device (or synced by your platform). Fill in the username above
+          first; the account only comes into existence once your
+          authenticator approves. Curious how this works?
+          <a href="/passkeys">Read the passkeys explainer</a>.
+        </p>
       </div>
     </main>
 

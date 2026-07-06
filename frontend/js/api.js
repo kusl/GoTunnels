@@ -77,6 +77,8 @@ export const Api = {
   me: () => apiFetch("/api/me"),
   activity: () => apiFetch("/api/activity"),
   info: () => apiFetch("/api/info"),
+  cspRecent: (limit) =>
+    apiFetch("/api/csp-reports/recent" + (limit ? "?limit=" + encodeURIComponent(limit) : "")),
 
   passkeyRegisterBegin: () => apiFetch("/api/passkey/register/begin", { method: "POST" }),
   passkeyRegisterFinish: (flow, body) =>
@@ -84,6 +86,9 @@ export const Api = {
   passkeyLoginBegin: (b) => apiFetch("/api/passkey/login/begin", { method: "POST", body: b }),
   passkeyLoginFinish: (flow, body) =>
     apiFetch("/api/passkey/login/finish?flow=" + encodeURIComponent(flow), { method: "POST", body }),
+  passkeySignupBegin: (b) => apiFetch("/api/passkey/signup/begin", { method: "POST", body: b }),
+  passkeySignupFinish: (flow, body) =>
+    apiFetch("/api/passkey/signup/finish?flow=" + encodeURIComponent(flow), { method: "POST", body }),
 
   totpEnroll: () => apiFetch("/api/totp/enroll", { method: "POST" }),
   totpConfirm: (b) => apiFetch("/api/totp/confirm", { method: "POST", body: b }),
@@ -103,9 +108,13 @@ export const Api = {
     const q = new URLSearchParams();
     if (params.before) q.set("before", String(params.before));
     if (params.limit) q.set("limit", String(params.limit));
+    if (Array.isArray(params.authors) && params.authors.length > 0) {
+      q.set("authors", params.authors.join(","));
+    }
     const qs = q.toString();
     return apiFetch("/api/notes" + (qs ? "?" + qs : ""));
   },
+  notesAuthors: () => apiFetch("/api/notes/authors"),
   noteCreate: (body) => apiFetch("/api/notes", { method: "POST", body: { body } }),
   noteDelete: (id) => apiFetch("/api/notes/" + encodeURIComponent(id), { method: "DELETE" }),
 };

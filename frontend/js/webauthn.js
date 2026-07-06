@@ -97,3 +97,14 @@ export async function loginPasskey(username) {
   const cred = await navigator.credentials.get({ publicKey });
   return Api.passkeyLoginFinish(begin.flow_id, encodeAssertion(cred));
 }
+
+// signupPasskey creates a brand-new account whose only credential is a
+// passkey (no password anywhere), and returns the session response. The
+// account only comes into existence server-side once the authenticator has
+// produced a credential; cancelling the browser prompt creates nothing.
+export async function signupPasskey(username, displayName) {
+  const begin = await Api.passkeySignupBegin({ username, display_name: displayName });
+  const publicKey = prepCreation(begin.options.publicKey);
+  const cred = await navigator.credentials.create({ publicKey });
+  return Api.passkeySignupFinish(begin.flow_id, encodeAttestation(cred));
+}

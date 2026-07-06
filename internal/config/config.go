@@ -53,6 +53,33 @@ type Config struct {
 	RPID          string   // relying-party ID: the frontend's registrable domain
 	RPDisplayName string   // human-readable name shown by the authenticator
 	RPOrigins     []string // full origins the browser will present, e.g. https://x.trycloudflare.com
+	// RPOriginPatterns lets the WebAuthn relying party be derived per request
+	// from the browser's Origin header when it matches one of these wildcard
+	// patterns (e.g. "https://*.trycloudflare.com"). Quick Tunnel hostnames
+	// rotate, and container env can go stale (see docs/ARCHITECTURE.md), so
+	// this makes passkeys self-healing instead of frozen at boot time. The
+	// patterns gate only the WebAuthn RP derivation — they are deliberately
+	// NOT added to the CORS allow-list, because CORS + credentials must stay
+	// pinned to the one real frontend origin.
+	RPOriginPatterns []string
+
+	// Signup rate limits --------------------------------------------------
+	// Account creation is limited much harder than ordinary API traffic:
+	// one signup per SignupIPInterval per client IP (hashed), and one per
+	// SignupGlobalInterval across the whole instance. A zero interval
+	// disables that limiter. Bursts allow small clusters (a classroom
+	// behind one NAT can raise SignupIPBurst).
+	SignupIPInterval     time.Duration
+	SignupIPBurst        int
+	SignupGlobalInterval time.Duration
+	SignupGlobalBurst    int
+
+	// Telemetry host identity ---------------------------------------------
+	// HostName becomes the OTel resource attribute host.name. Inside a
+	// container os.Hostname() is the container ID, so scripts/up.sh passes
+	// the real machine's hostname through this variable. Empty means "let
+	// the SDK detect it" (which yields the container hostname).
+	HostName string
 
 	// Content Security Policy -------------------------------------------
 	// The header itself is emitted by Caddy on the frontend. These values let
@@ -91,24 +118,30 @@ type TelemetryConfig struct {
 // Load reads and validates configuration from the environment.
 func Load() (*Config, error) {
 	c := &Config{
-		InstanceID:         getenv("GOTUNNELS_INSTANCE_ID", defaultInstanceID()),
-		ServiceName:        getenv("OTEL_SERVICE_NAME", getenv("GOTUNNELS_SERVICE_NAME", "gotunnels-api")),
-		Version:            getenv("GOTUNNELS_VERSION", "dev"),
-		HTTPAddr:           getenv("GOTUNNELS_HTTP_ADDR", ":8080"),
-		ShutdownTimeout:    getdur("GOTUNNELS_SHUTDOWN_TIMEOUT", 15*time.Second),
-		DatabaseURL:        getenv("DATABASE_URL", ""),
-		DBMaxConns:         int32(getint("GOTUNNELS_DB_MAX_CONNS", 20)),
-		DBMinConns:         int32(getint("GOTUNNELS_DB_MIN_CONNS", 2)),
-		DBConnectTimeout:   getdur("GOTUNNELS_DB_CONNECT_TIMEOUT", 30*time.Second),
-		SessionCookieName:  getenv("GOTUNNELS_SESSION_COOKIE_NAME", "gotunnels_session"),
-		SessionTTL:         getdur("GOTUNNELS_SESSION_TTL", 24*time.Hour),
-		CORSAllowedOrigins: splitList(getenv("GOTUNNELS_CORS_ALLOWED_ORIGINS", "*")),
-		RPID:               getenv("GOTUNNELS_RP_ID", "localhost"),
-		RPDisplayName:      getenv("GOTUNNELS_RP_DISPLAY_NAME", "GoTunnels"),
-		RPOrigins:          splitList(getenv("GOTUNNELS_RP_ORIGINS", "http://localhost:8080")),
-		CSPMode:            getenv("GOTUNNELS_CSP_MODE", "report-only"),
-		CSPPolicy:          getenv("GOTUNNELS_CSP_POLICY", DefaultCSPPolicy),
-		Dev:                getbool("GOTUNNELS_DEV", false),
+		InstanceID:           getenv("GOTUNNELS_INSTANCE_ID", defaultInstanceID()),
+		ServiceName:          getenv("OTEL_SERVICE_NAME", getenv("GOTUNNELS_SERVICE_NAME", "gotunnels-api")),
+		Version:              getenv("GOTUNNELS_VERSION", "dev"),
+		HTTPAddr:             getenv("GOTUNNELS_HTTP_ADDR", ":8080"),
+		ShutdownTimeout:      getdur("GOTUNNELS_SHUTDOWN_TIMEOUT", 15*time.Second),
+		DatabaseURL:          getenv("DATABASE_URL", ""),
+		DBMaxConns:           int32(getint("GOTUNNELS_DB_MAX_CONNS", 20)),
+		DBMinConns:           int32(getint("GOTUNNELS_DB_MIN_CONNS", 2)),
+		DBConnectTimeout:     getdur("GOTUNNELS_DB_CONNECT_TIMEOUT", 30*time.Second),
+		SessionCookieName:    getenv("GOTUNNELS_SESSION_COOKIE_NAME", "gotunnels_session"),
+		SessionTTL:           getdur("GOTUNNELS_SESSION_TTL", 24*time.Hour),
+		CORSAllowedOrigins:   splitList(getenv("GOTUNNELS_CORS_ALLOWED_ORIGINS", "*")),
+		RPID:                 getenv("GOTUNNELS_RP_ID", "localhost"),
+		RPDisplayName:        getenv("GOTUNNELS_RP_DISPLAY_NAME", "GoTunnels"),
+		RPOrigins:            splitList(getenv("GOTUNNELS_RP_ORIGINS", "http://localhost:8080")),
+		RPOriginPatterns:     splitList(getenv("GOTUNNELS_RP_ORIGIN_PATTERNS", "https://*.trycloudflare.com")),
+		SignupIPInterval:     getdur("GOTUNNELS_SIGNUP_IP_INTERVAL", 5*time.Minute),
+		SignupIPBurst:        getint("GOTUNNELS_SIGNUP_IP_BURST", 1),
+		SignupGlobalInterval: getdur("GOTUNNELS_SIGNUP_GLOBAL_INTERVAL", time.Minute),
+		SignupGlobalBurst:    getint("GOTUNNELS_SIGNUP_GLOBAL_BURST", 1),
+		HostName:             getenv("GOTUNNELS_HOST_NAME", ""),
+		CSPMode:              getenv("GOTUNNELS_CSP_MODE", "report-only"),
+		CSPPolicy:            getenv("GOTUNNELS_CSP_POLICY", DefaultCSPPolicy),
+		Dev:                  getbool("GOTUNNELS_DEV", false),
 	}
 
 	if err := c.resolveSecrets(); err != nil {
@@ -218,7 +251,26 @@ func (c *Config) Validate() error {
 	if len(c.RPOrigins) == 0 {
 		return fmt.Errorf("config: GOTUNNELS_RP_ORIGINS must contain at least one origin")
 	}
+	if c.SignupIPInterval < 0 || c.SignupGlobalInterval < 0 {
+		return fmt.Errorf("config: signup rate-limit intervals must not be negative")
+	}
+	if c.SignupIPInterval > 0 && c.SignupIPBurst < 1 {
+		return fmt.Errorf("config: GOTUNNELS_SIGNUP_IP_BURST must be >= 1 when the IP limiter is enabled")
+	}
+	if c.SignupGlobalInterval > 0 && c.SignupGlobalBurst < 1 {
+		return fmt.Errorf("config: GOTUNNELS_SIGNUP_GLOBAL_BURST must be >= 1 when the global limiter is enabled")
+	}
 	return nil
+}
+
+// PerInterval converts "one event per d" into a token-bucket rate in events
+// per second. A non-positive interval yields 0, which callers treat as "this
+// limiter is disabled".
+func PerInterval(d time.Duration) float64 {
+	if d <= 0 {
+		return 0
+	}
+	return 1 / d.Seconds()
 }
 
 // IPHashPepper returns a copy-safe reference to the pepper bytes.

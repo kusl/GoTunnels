@@ -11,9 +11,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/kusl/GoTunnels/internal/activity"
+	"github.com/kusl/GoTunnels/internal/httpx"
 	"github.com/kusl/GoTunnels/internal/store"
 )
 
@@ -274,4 +276,69 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func readAll(r *http.Request, max int64) ([]byte, error) {
 	defer func() { _ = r.Body.Close() }()
 	return io.ReadAll(io.LimitReader(r.Body, max))
+}
+
+// ---------------------------------------------------------------------------
+// public transparency feed
+// ---------------------------------------------------------------------------
+
+const (
+	// recentDefaultLimit / recentMaxLimit bound the public feed page size.
+	recentDefaultLimit = 50
+	recentMaxLimit     = 200
+	// maxURILen / maxSampleLen cap how much of any reported string the public
+	// feed echoes back. Report fields are attacker-controlled input (anyone
+	// can POST to the report endpoint), so the public view truncates them:
+	// long enough to learn from, short enough that the feed cannot be abused
+	// as free hosting for kilobytes of arbitrary text.
+	maxURILen    = 200
+	maxSampleLen = 100
+)
+
+// Recent serves the newest CSP violations as a public, read-only feed for the
+// passkeys/security explainer page. Rows come from the store already stripped
+// of ip_hash, user_agent, original_policy, and the raw payload (see
+// store.CSPReportRow); this handler additionally truncates the free-text
+// fields. Publishing what the browser blocked teaches CSP by example without
+// revealing anything about who triggered a report.
+func (h *Handler) Recent(w http.ResponseWriter, r *http.Request) {
+	limit := recentDefaultLimit
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > recentMaxLimit {
+			httpx.WriteError(w, http.StatusBadRequest, "invalid limit")
+			return
+		}
+		limit = n
+	}
+	rows, err := h.store.ListRecentCSPReports(r.Context(), limit)
+	if err != nil {
+		h.log.ErrorContext(r.Context(), "csp: list recent", slog.String("error", err.Error()))
+		httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if rows == nil {
+		rows = []store.CSPReportRow{}
+	}
+	for i := range rows {
+		rows[i].DocumentURI = truncateRunes(rows[i].DocumentURI, maxURILen)
+		rows[i].BlockedURI = truncateRunes(rows[i].BlockedURI, maxURILen)
+		rows[i].SourceFile = truncateRunes(rows[i].SourceFile, maxURILen)
+		rows[i].ScriptSample = truncateRunes(rows[i].ScriptSample, maxSampleLen)
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"reports": rows})
+}
+
+// truncateRunes shortens s to at most n characters (code points), appending an
+// ellipsis when it cut something. Rune-aware so it never splits a multi-byte
+// UTF-8 sequence into mojibake.
+func truncateRunes(s string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[:n]) + "…"
 }

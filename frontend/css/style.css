@@ -1,9 +1,17 @@
 /* GoTunnels frontend styles.
-   Aesthetic: a quiet, instrument-panel dark theme. One accent (signal green),
-   a monospace face for data, a clean sans for prose. No third-party fonts —
-   everything is a system font stack so the strict self-only CSP holds. */
+   Aesthetic: a quiet, instrument-panel look. One accent, a monospace face for
+   data, a clean sans for prose. No third-party fonts — everything is a system
+   font stack so the strict self-only CSP holds.
+
+   THEMES: every color in the UI comes from the custom properties below.
+   :root carries the default (dark) palette; html[data-theme="..."] blocks
+   override the same variables for the other themes. theme-boot.js stamps the
+   attribute before first paint, common.js provides the picker. "system"
+   follows prefers-color-scheme (dark falls through to :root, light gets the
+   light palette via the media query at the end of the theme section). */
 
 :root {
+  color-scheme: dark;
   --bg: #0d1117;
   --bg-elev: #151b23;
   --bg-elev-2: #1b232d;
@@ -15,11 +23,133 @@
   --accent: #3fb950;
   --accent-dim: #2ea043;
   --accent-glow: rgba(63, 185, 80, 0.15);
+  --on-accent: #04140a;
   --danger: #f85149;
   --warn: #d29922;
+  --ok-text: #7ee787;
+  --ok-soft-bg: rgba(126, 231, 135, 0.12);
+  --danger-soft-bg: rgba(248, 81, 73, 0.1);
+  --danger-soft-border: #5a2d2d;
+  --danger-soft-text: #ff9d97;
+  --warn-soft-bg: rgba(210, 153, 34, 0.08);
+  --warn-soft-border: #5a4a1d;
+  --warn-text: #e3b341;
   --radius: 10px;
   --mono: ui-monospace, "SF Mono", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ---- theme: light (GitHub-light inspired) ---- */
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f8fa;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #eef1f4;
+  --border: #d0d7de;
+  --border-bright: #afb8c1;
+  --text: #1f2328;
+  --text-dim: #57606a;
+  --text-faint: #6e7781;
+  --accent: #1a7f37;
+  --accent-dim: #2da44e;
+  --accent-glow: rgba(26, 127, 55, 0.12);
+  --on-accent: #ffffff;
+  --danger: #cf222e;
+  --warn: #9a6700;
+  --ok-text: #1a7f37;
+  --ok-soft-bg: rgba(26, 127, 55, 0.1);
+  --danger-soft-bg: rgba(207, 34, 46, 0.08);
+  --danger-soft-border: #f0b8b4;
+  --danger-soft-text: #cf222e;
+  --warn-soft-bg: rgba(154, 103, 0, 0.08);
+  --warn-soft-border: #e5d0a1;
+  --warn-text: #9a6700;
+}
+
+/* ---- theme: solarized dark ---- */
+html[data-theme="solarized-dark"] {
+  color-scheme: dark;
+  --bg: #002b36;
+  --bg-elev: #073642;
+  --bg-elev-2: #0a4050;
+  --border: #1f4a56;
+  --border-bright: #37616d;
+  --text: #eee8d5;
+  --text-dim: #93a1a1;
+  --text-faint: #657b83;
+  --accent: #859900;
+  --accent-dim: #6f8000;
+  --accent-glow: rgba(133, 153, 0, 0.16);
+  --on-accent: #002b36;
+  --danger: #dc322f;
+  --warn: #b58900;
+  --ok-text: #b0c94a;
+  --ok-soft-bg: rgba(133, 153, 0, 0.14);
+  --danger-soft-bg: rgba(220, 50, 47, 0.12);
+  --danger-soft-border: #6b2f2e;
+  --danger-soft-text: #ef8683;
+  --warn-soft-bg: rgba(181, 137, 0, 0.1);
+  --warn-soft-border: #6b5a1d;
+  --warn-text: #cfa430;
+}
+
+/* ---- theme: solarized light ---- */
+html[data-theme="solarized-light"] {
+  color-scheme: light;
+  --bg: #fdf6e3;
+  --bg-elev: #eee8d5;
+  --bg-elev-2: #e4ddc8;
+  --border: #d3cbb7;
+  --border-bright: #b8ae95;
+  --text: #073642;
+  --text-dim: #586e75;
+  --text-faint: #839496;
+  --accent: #6f8000;
+  --accent-dim: #859900;
+  --accent-glow: rgba(133, 153, 0, 0.18);
+  --on-accent: #fdf6e3;
+  --danger: #dc322f;
+  --warn: #b58900;
+  --ok-text: #5c6f00;
+  --ok-soft-bg: rgba(133, 153, 0, 0.14);
+  --danger-soft-bg: rgba(220, 50, 47, 0.1);
+  --danger-soft-border: #e5b1ac;
+  --danger-soft-text: #b52d2a;
+  --warn-soft-bg: rgba(181, 137, 0, 0.12);
+  --warn-soft-border: #d9c68d;
+  --warn-text: #8f6d00;
+}
+
+/* ---- theme: system, when the OS asks for light ----
+   (system + OS-dark simply falls through to :root above.)
+   Plain CSS cannot alias a variable block, so this duplicates the light
+   palette; keep it byte-identical with html[data-theme="light"]. */
+@media (prefers-color-scheme: light) {
+  html[data-theme="system"] {
+    color-scheme: light;
+    --bg: #f6f8fa;
+    --bg-elev: #ffffff;
+    --bg-elev-2: #eef1f4;
+    --border: #d0d7de;
+    --border-bright: #afb8c1;
+    --text: #1f2328;
+    --text-dim: #57606a;
+    --text-faint: #6e7781;
+    --accent: #1a7f37;
+    --accent-dim: #2da44e;
+    --accent-glow: rgba(26, 127, 55, 0.12);
+    --on-accent: #ffffff;
+    --danger: #cf222e;
+    --warn: #9a6700;
+    --ok-text: #1a7f37;
+    --ok-soft-bg: rgba(26, 127, 55, 0.1);
+    --danger-soft-bg: rgba(207, 34, 46, 0.08);
+    --danger-soft-border: #f0b8b4;
+    --danger-soft-text: #cf222e;
+    --warn-soft-bg: rgba(154, 103, 0, 0.08);
+    --warn-soft-border: #e5d0a1;
+    --warn-text: #9a6700;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -74,10 +204,27 @@ header.topbar {
   background: var(--accent);
   box-shadow: 0 0 0 4px var(--accent-glow);
 }
-nav.mainnav { display: flex; gap: 18px; margin-left: auto; font-size: 14px; }
+nav.mainnav { display: flex; gap: 18px; margin-left: auto; font-size: 14px; flex-wrap: wrap; }
 nav.mainnav a { color: var(--text-dim); }
 nav.mainnav a.active { color: var(--text); }
 nav.mainnav a:hover { color: var(--text); text-decoration: none; }
+
+/* Theme picker (injected by common.js into .topbar-inner). */
+select.theme-select {
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: var(--mono);
+  background: var(--bg);
+  color: var(--text-dim);
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  cursor: pointer;
+}
+select.theme-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
 
 /* ---- layout ---- */
 main {
@@ -148,12 +295,12 @@ button:hover { border-color: var(--accent); }
 button.primary {
   background: var(--accent-dim);
   border-color: var(--accent);
-  color: #04140a;
+  color: var(--on-accent);
   font-weight: 600;
 }
 button.primary:hover { background: var(--accent); }
 button.ghost { background: transparent; }
-button.danger { color: var(--danger); border-color: #5a2d2d; }
+button.danger { color: var(--danger); border-color: var(--danger-soft-border); }
 button.danger:hover { border-color: var(--danger); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
@@ -164,9 +311,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 /* ---- messages ---- */
 .msg { border-radius: 8px; padding: 10px 12px; margin: 14px 0; font-size: 14px; display: none; }
 .msg.show { display: block; }
-.msg.error { background: rgba(248, 81, 73, 0.1); border: 1px solid #5a2d2d; color: #ff9d97; }
-.msg.ok { background: var(--accent-glow); border: 1px solid var(--accent-dim); color: #7ee787; }
-.msg.info { background: rgba(210, 153, 34, 0.08); border: 1px solid #5a4a1d; color: #e3b341; }
+.msg.error { background: var(--danger-soft-bg); border: 1px solid var(--danger-soft-border); color: var(--danger-soft-text); }
+.msg.ok { background: var(--accent-glow); border: 1px solid var(--accent-dim); color: var(--ok-text); }
+.msg.info { background: var(--warn-soft-bg); border: 1px solid var(--warn-soft-border); color: var(--warn-text); }
 
 /* ---- data table ---- */
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -175,8 +322,8 @@ th { color: var(--text-faint); font-weight: 500; text-transform: uppercase; lett
 td { font-family: var(--mono); color: var(--text-dim); }
 td.hash { color: var(--text-faint); word-break: break-all; max-width: 260px; }
 .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-family: var(--mono); border: 1px solid var(--border-bright); }
-.tag.success { color: #7ee787; border-color: var(--accent-dim); }
-.tag.failure { color: #ff9d97; border-color: #5a2d2d; }
+.tag.success { color: var(--ok-text); border-color: var(--accent-dim); }
+.tag.failure { color: var(--danger-soft-text); border-color: var(--danger-soft-border); }
 
 /* ---- misc ---- */
 .kv { display: grid; grid-template-columns: 140px 1fr; gap: 8px 16px; font-size: 14px; }
@@ -188,14 +335,16 @@ pre.codes {
   border: 1px dashed var(--border-bright);
   border-radius: 8px;
   padding: 14px;
-  color: #7ee787;
+  color: var(--ok-text);
   font-size: 14px;
   line-height: 1.9;
   white-space: pre-wrap;
   word-break: break-all;
 }
 .hint { color: var(--text-faint); font-size: 12px; margin-top: 6px; }
+.hint.over { color: var(--danger); font-weight: 600; }
 .hidden { display: none !important; }
+/* The QR quiet zone must stay white in every theme or scanners struggle. */
 .qr { background: #fff; padding: 12px; border-radius: 8px; display: inline-block; margin-top: 8px; }
 .qr img { display: block; width: 180px; height: 180px; }
 .status-pill { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
@@ -213,6 +362,7 @@ pre.codes {
     width: 100%;
     justify-content: space-between;
   }
+  select.theme-select { align-self: flex-end; }
 
   /* Transform the activity table into cards. Scoped to .activity-table so
      other tables (e.g. the CAPTCHA leaderboard) keep their tabular layout
@@ -424,9 +574,9 @@ dialog.confirm-dialog .dialog-actions { display: flex; justify-content: flex-end
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 .cell.fb-correct {
-  background: rgba(126, 231, 135, 0.15);
-  border-color: #7ee787;
-  color: #7ee787;
+  background: var(--ok-soft-bg);
+  border-color: var(--ok-text);
+  color: var(--ok-text);
 }
 .cell.fb-missed {
   border-color: var(--warn);
@@ -434,7 +584,7 @@ dialog.confirm-dialog .dialog-actions { display: flex; justify-content: flex-end
   color: var(--warn);
 }
 .cell.fb-wrong {
-  background: rgba(248, 81, 73, 0.15);
+  background: var(--danger-soft-bg);
   border-color: var(--danger);
   color: var(--danger);
 }
@@ -515,11 +665,74 @@ details.leaderboard .lb-table { margin-top: 16px; }
 .feed-head {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 .feed-head h2 { margin-bottom: 0; }
+.feed-tools { display: flex; align-items: center; gap: 12px; }
 .feed { margin-top: 12px; }
+
+/* Author filter: a <details> dropdown with checkboxes, no JS framework, no
+   inline styles (the strict CSP forbids them). */
+details.author-filter { position: relative; }
+details.author-filter summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: var(--text-dim);
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: var(--bg-elev);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+details.author-filter summary::-webkit-details-marker { display: none; }
+details.author-filter summary::after { content: " ▾"; color: var(--text-faint); }
+details.author-filter[open] summary { border-color: var(--accent); color: var(--text); }
+.author-filter-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius);
+  padding: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+.author-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.author-option:hover { background: var(--bg-elev-2); }
+.author-option input[type="checkbox"] {
+  accent-color: var(--accent);
+  margin: 0;
+  flex-shrink: 0;
+}
+.author-option .author-meta {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+hr.author-sep { border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
 
 .note-card {
   background: var(--bg-elev);
@@ -587,9 +800,27 @@ details.leaderboard .lb-table { margin-top: 16px; }
   border-radius: 999px;
   background: var(--accent-dim);
   border-color: var(--accent);
-  color: #04140a;
+  color: var(--on-accent);
   font-weight: 600;
   font-size: 13px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
 }
 .new-pill:hover { background: var(--accent); }
+
+/* ---- Passkeys explainer page ---- */
+.steps { padding-left: 22px; margin: 10px 0; }
+.steps li { margin: 9px 0; }
+.faq dt { font-weight: 600; margin-top: 14px; color: var(--text); }
+.faq dd { margin: 4px 0 0; color: var(--text-dim); }
+.csp-table td {
+  max-width: 280px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.csp-feed-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}

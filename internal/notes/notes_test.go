@@ -71,3 +71,78 @@ func TestValidateBodyMaxCountsRunesNotBytes(t *testing.T) {
 		t.Fatalf("multibyte body at limit rejected: %s", problem)
 	}
 }
+
+func TestParseAuthors(t *testing.T) {
+	u1 := "11111111-2222-4333-8444-555555555555"
+	u2 := "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE"
+
+	t.Run("empty means no filter", func(t *testing.T) {
+		ids, problem := parseAuthors("")
+		if problem != "" || ids != nil {
+			t.Fatalf("got (%v, %q), want (nil, \"\")", ids, problem)
+		}
+	})
+	t.Run("whitespace only means no filter", func(t *testing.T) {
+		ids, problem := parseAuthors("   ")
+		if problem != "" || ids != nil {
+			t.Fatalf("got (%v, %q), want (nil, \"\")", ids, problem)
+		}
+	})
+	t.Run("parses, trims, lowercases", func(t *testing.T) {
+		ids, problem := parseAuthors(" " + u1 + " , " + u2 + " ")
+		if problem != "" {
+			t.Fatalf("unexpected problem: %s", problem)
+		}
+		if len(ids) != 2 || ids[0] != u1 || ids[1] != strings.ToLower(u2) {
+			t.Fatalf("ids = %v", ids)
+		}
+	})
+	t.Run("skips empty segments", func(t *testing.T) {
+		ids, problem := parseAuthors(u1 + ",," + u1)
+		if problem != "" || len(ids) != 2 {
+			t.Fatalf("got (%v, %q)", ids, problem)
+		}
+	})
+	t.Run("rejects non-uuid entries", func(t *testing.T) {
+		for _, raw := range []string{"alice", u1 + ",alice", "1; DROP TABLE notes", u1 + "x"} {
+			if _, problem := parseAuthors(raw); problem == "" {
+				t.Errorf("parseAuthors(%q) accepted, want rejection", raw)
+			}
+		}
+	})
+	t.Run("caps the list", func(t *testing.T) {
+		parts := make([]string, maxAuthorFilter+1)
+		for i := range parts {
+			parts[i] = u1
+		}
+		if _, problem := parseAuthors(strings.Join(parts, ",")); problem == "" {
+			t.Fatal("over-cap list accepted, want rejection")
+		}
+	})
+}
+
+func TestIsUUIDString(t *testing.T) {
+	good := []string{
+		"11111111-2222-4333-8444-555555555555",
+		"AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE",
+		"00000000-0000-0000-0000-000000000000",
+	}
+	for _, s := range good {
+		if !isUUIDString(s) {
+			t.Errorf("expected %q to be a uuid", s)
+		}
+	}
+	bad := []string{
+		"",
+		"11111111-2222-4333-8444-55555555555",   // too short
+		"11111111-2222-4333-8444-5555555555556", // too long
+		"11111111x2222-4333-8444-555555555555",  // wrong separator
+		"1111111g-2222-4333-8444-555555555555",  // non-hex
+		"11111111-2222-4333-8444_555555555555",  // underscore
+	}
+	for _, s := range bad {
+		if isUUIDString(s) {
+			t.Errorf("expected %q to be rejected", s)
+		}
+	}
+}

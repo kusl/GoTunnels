@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Passkeys · GoTunnels</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <script src="/js/theme-boot.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="brand"><span class="dot"></span> GoTunnels</span>
+        <nav class="mainnav">
+          <a href="/">Home</a>
+          <a href="/passkeys">Passkeys</a>
+          <a href="/notes" data-auth="in" class="hidden">Notes</a>
+          <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
+          <a href="/activity" data-auth="in" class="hidden">Activity</a>
+          <a href="/settings" data-auth="in" class="hidden">Settings</a>
+          <a href="/login" data-auth="out">Log in</a>
+          <a href="/signup" data-auth="out">Sign up</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <h1>Passkeys, in plain English</h1>
+      <p class="lead">
+        This whole site is a throwaway sandbox that exists so you can poke at
+        passkeys (and a strict Content-Security-Policy) without risking
+        anything real. Here is what passkeys are, how this site uses them, and
+        some exercises to try on your phone.
+      </p>
+
+      <div class="card">
+        <h2>What a passkey actually is</h2>
+        <p>
+          A passkey is a pair of mathematically linked keys. The
+          <strong>private key</strong> never leaves your device (or your
+          platform's encrypted sync, like iCloud Keychain or Google Password
+          Manager). The <strong>public key</strong> is the only thing this
+          site ever stores. When you sign in, the site sends a fresh
+          random challenge; your device signs it with the private key after
+          you approve with Face&nbsp;ID, a fingerprint, or your device PIN; the
+          site checks the signature against the public key it stored. No
+          shared secret ever crosses the network, so there is nothing to
+          phish, leak, or reuse.
+        </p>
+        <p>
+          The part that quietly kills phishing: a passkey is
+          <strong>bound to the website's identity</strong> — its Relying
+          Party ID, essentially the hostname. Your browser simply will not
+          offer a passkey made for one site to a different site, no matter how
+          convincing the lookalike is. A password can be typed into the wrong
+          box; a passkey cannot.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>This deployment, right now</h2>
+        <dl class="kv">
+          <dt>RP ID (hostname)</dt>
+          <dd id="rpIdNow">…</dd>
+          <dt>Your browser</dt>
+          <dd id="passkeySupport">checking…</dd>
+        </dl>
+        <p class="hint">
+          Every <code>./scripts/up.sh</code> run gets a brand-new random
+          <code>*.trycloudflare.com</code> hostname, and passkeys made here
+          are bound to that hostname. When the stack is torn down, the
+          hostname is gone forever and every passkey bound to it becomes a
+          harmless orphan in your password manager — which is exactly what
+          makes this a safe playground. Delete them whenever you like.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>How this site implements them</h2>
+        <p>
+          The backend is Go with the <code>go-webauthn</code> library. A
+          ceremony ("begin") stores a short-lived server-side flow — it
+          expires after 10 minutes — and pins the exact browser origin that
+          started it; the "finish" step must complete against that same
+          origin. Registration asks your authenticator to create a
+          discoverable credential where supported, sign-in verifies the
+          signature and counter, and both paths record an entry you can see on
+          the <a href="/activity">Activity</a> page. Accounts can be created
+          with a passkey alone — no password ever exists for such an account —
+          or with a password to which you can add passkeys later from
+          <a href="/settings">Settings</a>.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Try it on your phone</h2>
+        <p>
+          <strong>iPhone (iOS 16+):</strong> passkeys live in iCloud Keychain.
+          Safari or Chrome will offer Face&nbsp;ID / Touch&nbsp;ID when this
+          site asks. Manage or delete them under
+          Settings&nbsp;→&nbsp;Passwords.
+        </p>
+        <p>
+          <strong>Android (9+):</strong> passkeys live in Google Password
+          Manager (or another manager you have set as the provider). Chrome
+          prompts with your fingerprint or screen lock. Manage them in
+          Settings&nbsp;→&nbsp;Passwords&nbsp;&amp;&nbsp;accounts.
+        </p>
+        <p>
+          <strong>Cross-device:</strong> on a desktop browser, choose
+          "use a phone or tablet" when prompted — you scan a QR code with the
+          phone that holds the passkey, and the two devices verify proximity
+          over Bluetooth before the phone signs. That proximity check is
+          another anti-phishing property: a remote attacker cannot relay it.
+        </p>
+        <h3>Sandbox exercises</h3>
+        <ol class="steps">
+          <li>
+            On your phone, open this site's <a href="/signup">signup page</a>
+            and create an account with
+            <strong>Create account with a passkey</strong> — pick any
+            username; there is no email step. Notice a password never existed.
+          </li>
+          <li>
+            Log out, then sign back in from the <a href="/login">login
+            page</a> with the passkey button. Watch how the prompt names this
+            exact hostname.
+          </li>
+          <li>
+            Open your device's password manager and find the passkey filed
+            under this deployment's hostname. This is where you would delete
+            it later.
+          </li>
+          <li>
+            If you have a laptop nearby: start a passkey login there, pick
+            "use a phone", and scan the QR with the phone that holds the
+            passkey. That is the cross-device flow.
+          </li>
+          <li>
+            Restart the stack (<code>./scripts/down.sh</code> then
+            <code>./scripts/up.sh</code>) and note the new hostname: the old
+            passkey is never offered here again, because the site identity
+            changed. That is origin binding doing its job.
+          </li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>Questions people actually ask</h2>
+        <dl class="faq">
+          <dt>Can I sign up with just a passkey — no password at all?</dt>
+          <dd>
+            Yes, here you can. The <a href="/signup">signup page</a> has a
+            passkey-only path: the account is created at the moment your
+            authenticator approves, with a passkey as its only credential.
+            Password login for such an account simply fails with the same
+            generic error as any wrong password, so its existence leaks
+            nothing.
+          </dd>
+          <dt>What if I lose the device holding my passkey?</dt>
+          <dd>
+            On real accounts you would rely on platform sync (iCloud/Google)
+            or a second registered credential. Here, losing it costs you a
+            demo account on a hostname that disappears at the next restart —
+            that is the point of the sandbox.
+          </dd>
+          <dt>Is my fingerprint or face sent to the site?</dt>
+          <dd>
+            Never. Biometrics only unlock the private key locally; the site
+            sees a signature, nothing biometric.
+          </dd>
+          <dt>Why does the passkey prompt sometimes not appear?</dt>
+          <dd>
+            Usually one of: the browser lacks support (see the panel above),
+            the page is not on HTTPS, or the passkey you are trying to use was
+            created for a different hostname — including this site's
+            <em>previous</em> tunnel hostname.
+          </dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <h2>Watch the CSP work — live</h2>
+        <p>
+          Every page here ships a strict Content-Security-Policy (only this
+          site's own files may load; no inline scripts or styles). When a
+          browser blocks something, it fires a violation report, and this
+          deployment stores them. Below is the public feed of the most recent
+          reports — sanitised (no IPs, no user agents, long fields truncated)
+          but real. Open your browser devtools, try to inject an inline
+          <code>&lt;style&gt;</code> or a third-party script on any page, and
+          your own violation should appear here within moments.
+        </p>
+        <div class="csp-feed-head">
+          <span id="cspStatus" class="status-pill">loading…</span>
+          <button type="button" id="cspReload" class="ghost btn-small">Reload</button>
+        </div>
+        <table class="csp-table">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Directive</th>
+              <th>Blocked</th>
+              <th>Disposition</th>
+            </tr>
+          </thead>
+          <tbody id="cspRows"></tbody>
+        </table>
+        <p class="hint">
+          "report" means the policy ran in report-only mode (nothing was
+          actually blocked); "enforce" means the browser refused to load it.
+        </p>
+      </div>
+    </main>
+
+    <footer class="foot">
+      GoTunnels · built with LLM assistance (see the README)
+    </footer>
+
+    <script type="module" src="/js/page-passkeys.js"></script>
+  </body>
+</html>

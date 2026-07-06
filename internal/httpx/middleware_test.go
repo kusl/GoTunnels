@@ -166,3 +166,99 @@ func TestWriteJSONAndError(t *testing.T) {
 		t.Fatalf("error body = %v", e)
 	}
 }
+
+func TestMatchOriginPattern(t *testing.T) {
+	cases := []struct {
+		pattern, origin string
+		want            bool
+	}{
+		// The shape this exists for: Quick Tunnel hostnames.
+		{"https://*.trycloudflare.com", "https://tart-panda-tea-cup.trycloudflare.com", true},
+		{"https://*.trycloudflare.com", "https://A-B-C.TRYCLOUDFLARE.COM", true}, // case-insensitive
+		// Exactly one label: zero or two labels must not match.
+		{"https://*.trycloudflare.com", "https://trycloudflare.com", false},
+		{"https://*.trycloudflare.com", "https://a.b.trycloudflare.com", false},
+		// Scheme must match; http downgrade must not.
+		{"https://*.trycloudflare.com", "http://a.trycloudflare.com", false},
+		// Suffix tricks: the pattern's dot must be a real boundary.
+		{"https://*.trycloudflare.com", "https://eviltrycloudflare.com", false},
+		{"https://*.trycloudflare.com", "https://a.trycloudflare.com.evil.example", false},
+		// No path/port/userinfo/query in an Origin.
+		{"https://*.trycloudflare.com", "https://a.trycloudflare.com/path", false},
+		{"https://*.trycloudflare.com", "https://a.trycloudflare.com:8443", false},
+		{"https://*.trycloudflare.com", "https://user@a.trycloudflare.com", false},
+		// Non-wildcard patterns match exactly (case-insensitively) only.
+		{"https://app.example", "https://app.example", true},
+		{"https://app.example", "https://APP.EXAMPLE", true},
+		{"https://app.example", "https://other.example", false},
+		// Garbage patterns/origins never match.
+		{"", "https://a.trycloudflare.com", false},
+		{"https://*.trycloudflare.com", "", false},
+		{"not-an-origin", "https://a.trycloudflare.com", false},
+	}
+	for _, tc := range cases {
+		if got := MatchOriginPattern(tc.pattern, tc.origin); got != tc.want {
+			t.Errorf("MatchOriginPattern(%q, %q) = %v, want %v", tc.pattern, tc.origin, got, tc.want)
+		}
+	}
+}
+
+func TestOriginAllowedWildcardEntries(t *testing.T) {
+	allowed := []string{"https://exact.example", "https://*.trycloudflare.com"}
+	if echo, ok := OriginAllowed(allowed, false, "https://a-b.trycloudflare.com"); !ok || echo != "https://a-b.trycloudflare.com" {
+		t.Fatalf("wildcard entry should match and echo the request origin: %q %v", echo, ok)
+	}
+	if _, ok := OriginAllowed(allowed, false, "https://trycloudflare.com"); ok {
+		t.Fatal("apex must not match a *. pattern")
+	}
+	if echo, ok := OriginAllowed(allowed, false, "https://exact.example"); !ok || echo != "https://exact.example" {
+		t.Fatalf("exact entry should still match: %q %v", echo, ok)
+	}
+}
+
+func TestLimitWithMessageAndStatus(t *testing.T) {
+	rl := NewRateLimiter(0, 1) // no refill, single token
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	h := rl.LimitWith(func(*http.Request) string { return "k" }, "custom limit message")(next)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/signup", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first request status = %d, want 200", rec.Code)
+	}
+
+	rec2 := httptest.NewRecorder()
+	h.ServeHTTP(rec2, req)
+	if rec2.Code != http.StatusTooManyRequests {
+		t.Fatalf("second request status = %d, want 429", rec2.Code)
+	}
+	var body map[string]string
+	if err := json.Unmarshal(rec2.Body.Bytes(), &body); err != nil {
+		t.Fatalf("429 body not json: %v", err)
+	}
+	if body["error"] != "custom limit message" {
+		t.Fatalf("429 message = %q, want the caller-supplied one", body["error"])
+	}
+}
+
+func TestChainOrderOutermostFirst(t *testing.T) {
+	var order []string
+	mk := func(name string) Middleware {
+		return func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				order = append(order, name)
+				next.ServeHTTP(w, r)
+			})
+		}
+	}
+	h := Chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		order = append(order, "handler")
+	}), mk("outer"), mk("inner"))
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	if len(order) != 3 || order[0] != "outer" || order[1] != "inner" || order[2] != "handler" {
+		t.Fatalf("execution order = %v, want [outer inner handler]", order)
+	}
+}

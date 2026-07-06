@@ -15,6 +15,12 @@
 //     down to read — then they queue behind a "New notes ↑" pill so the feed
 //     does not jump under your thumb.
 //
+// The author filter is applied server-side (the ?authors= parameter), so the
+// pagination cursor, the page size, and the deletion-detection window all
+// operate on the filtered feed. Changing the filter resets the feed and
+// bumps a generation counter; any poll that was in flight for the previous
+// filter is discarded when it lands.
+//
 // Rendering is plain-text only by construction: note bodies are set with
 // textContent, never innerHTML, so nothing in a note can become markup, a
 // link, or a script.
@@ -28,6 +34,12 @@ const PAGE = 50;
 const MAX_CHARS = 500;
 const SCROLL_DEFER_PX = 200;
 
+// Where the author selection is remembered. The local copy makes the choice
+// instant on this device; the server preference makes it follow the account.
+const AUTHORS_LS_KEY = "gotunnels_notes_authors";
+const AUTHORS_PREF_KEY = "notes.authors";
+const MAX_AUTHOR_FILTER = 50; // mirrors the server's cap
+
 const msgEl = qs("#msg");
 const bodyEl = qs("#noteBody");
 const charCount = qs("#charCount");
@@ -37,6 +49,10 @@ const feedStatus = qs("#feedStatus");
 const newPill = qs("#newPill");
 const loadOlderBtn = qs("#loadOlder");
 const deleteDialog = qs("#deleteDialog");
+const authorFilter = qs("#authorFilter");
+const authorFilterLabel = qs("#authorFilterLabel");
+const authorAllCb = qs("#authorAll");
+const authorListEl = qs("#authorList");
 
 let me = null;
 
@@ -54,6 +70,12 @@ let pollTimer = null;
 let backoffMs = POLL_MS;
 let polling = false;
 let initialLoaded = false; // suppress "new" highlights on the very first fill
+
+// Empty array = everyone. Otherwise: user ids to show.
+let selectedAuthors = [];
+// Bumped whenever the filter changes; in-flight polls compare against it and
+// discard their response if it no longer matches.
+let feedGen = 0;
 
 /* =====================================================================
    Rendering
@@ -208,6 +230,156 @@ newPill.addEventListener("click", () => {
 });
 
 /* =====================================================================
+   Author filter
+   ===================================================================== */
+function sanitizeIds(v) {
+  if (!Array.isArray(v)) return [];
+  const uuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  return v
+    .filter((x) => typeof x === "string" && uuid.test(x))
+    .map((x) => x.toLowerCase())
+    .slice(0, MAX_AUTHOR_FILTER);
+}
+
+// loadSelection restores the saved author filter. The server preference (set
+// on any device) wins over the local copy; the local copy is the fallback for
+// a brand-new pref and keeps working offline.
+async function loadSelection() {
+  let local = [];
+  try {
+    const raw = localStorage.getItem(AUTHORS_LS_KEY);
+    if (raw) local = sanitizeIds(JSON.parse(raw));
+  } catch { /* corrupted or unavailable: ignore */ }
+  try {
+    const res = await Api.prefGet(AUTHORS_PREF_KEY);
+    if (res && res.exists && typeof res.value === "string" && res.value !== "") {
+      const server = sanitizeIds(JSON.parse(res.value));
+      try { localStorage.setItem(AUTHORS_LS_KEY, JSON.stringify(server)); } catch { /* ok */ }
+      return server;
+    }
+  } catch { /* offline or parse error: fall back to local */ }
+  return local;
+}
+
+function persistSelection() {
+  const payload = JSON.stringify(selectedAuthors);
+  try { localStorage.setItem(AUTHORS_LS_KEY, payload); } catch { /* ok */ }
+  Api.prefSet(AUTHORS_PREF_KEY, payload).catch(() => {});
+}
+
+function filterLabelText() {
+  if (selectedAuthors.length === 0) return "Everyone";
+  if (selectedAuthors.length === 1) {
+    const cb = authorListEl.querySelector('input[value="' + selectedAuthors[0] + '"]');
+    const name = cb && cb.dataset.name ? cb.dataset.name : "1 author";
+    return name;
+  }
+  return selectedAuthors.length + " authors";
+}
+
+function updateFilterLabel() {
+  authorFilterLabel.textContent = filterLabelText();
+}
+
+function readCheckboxes() {
+  const ids = [];
+  authorListEl.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    if (cb.checked) ids.push(cb.value);
+  });
+  return ids.slice(0, MAX_AUTHOR_FILTER);
+}
+
+function syncCheckboxes() {
+  const selected = new Set(selectedAuthors);
+  authorListEl.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    cb.checked = selected.has(cb.value);
+  });
+  authorAllCb.checked = selectedAuthors.length === 0;
+}
+
+function applySelection(ids) {
+  const next = sanitizeIds(ids);
+  const changed = JSON.stringify(next) !== JSON.stringify(selectedAuthors);
+  selectedAuthors = next;
+  syncCheckboxes();
+  updateFilterLabel();
+  if (changed) {
+    persistSelection();
+    resetFeed();
+  }
+}
+
+function renderAuthorOptions(authors) {
+  authorListEl.textContent = "";
+  for (const a of authors) {
+    const label = document.createElement("label");
+    label.className = "author-option";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = a.user_id;
+    cb.dataset.name = a.display_name || a.username;
+    const name = document.createElement("span");
+    name.textContent = a.display_name || a.username;
+    const meta = document.createElement("span");
+    meta.className = "author-meta";
+    meta.textContent = "@" + a.username + " · " + a.notes;
+    label.append(cb, name, meta);
+    authorListEl.appendChild(label);
+  }
+  syncCheckboxes();
+  updateFilterLabel();
+}
+
+async function refreshAuthors() {
+  try {
+    const res = await Api.notesAuthors();
+    renderAuthorOptions((res && res.authors) || []);
+  } catch {
+    // The dropdown just stays as it was; the feed itself is unaffected.
+  }
+}
+
+authorAllCb.addEventListener("change", () => {
+  // Checking "Everyone" clears the specific selection; unchecking it with
+  // nothing selected would show nobody, so snap back to everyone.
+  applySelection([]);
+});
+
+authorListEl.addEventListener("change", () => {
+  applySelection(readCheckboxes());
+});
+
+// Refresh the author list (it changes as people post) each time the panel
+// opens, and close the panel when tapping anywhere outside it.
+authorFilter.addEventListener("toggle", () => {
+  if (authorFilter.open) void refreshAuthors();
+});
+document.addEventListener("click", (e) => {
+  if (authorFilter.open && !authorFilter.contains(e.target)) {
+    authorFilter.open = false;
+  }
+});
+
+// resetFeed clears everything on screen and starts over against the current
+// filter. The generation bump makes any in-flight poll discard itself.
+function resetFeed() {
+  feedGen++;
+  noteMap.clear();
+  nodeMap.clear();
+  pendingNew.clear();
+  feedEl.textContent = "";
+  oldestLoadedId = 0;
+  reachedEnd = false;
+  initialLoaded = false;
+  loadOlderBtn.classList.add("hidden");
+  updatePill();
+  if (pollTimer !== null) { clearTimeout(pollTimer); pollTimer = null; }
+  backoffMs = POLL_MS;
+  setStatus("loading…");
+  void pollOnce();
+}
+
+/* =====================================================================
    Polling with reconciliation
    ===================================================================== */
 function setStatus(text) {
@@ -217,8 +389,10 @@ function setStatus(text) {
 async function pollOnce() {
   if (polling) return;
   polling = true;
+  const gen = feedGen;
   try {
-    const res = await Api.notesList({ limit: PAGE });
+    const res = await Api.notesList({ limit: PAGE, authors: selectedAuthors });
+    if (gen !== feedGen) return; // filter changed while in flight: discard
     const fetched = (res && res.notes) || [];
     backoffMs = POLL_MS;
     setStatus(document.visibilityState === "visible" ? "live" : "paused");
@@ -260,6 +434,7 @@ async function pollOnce() {
     initialLoaded = true;
     clearMsg(msgEl);
   } catch (err) {
+    if (gen !== feedGen) return;
     if (err && err.status === 401) {
       location.href = "/login";
       return;
@@ -268,7 +443,13 @@ async function pollOnce() {
     setStatus("reconnecting…");
   } finally {
     polling = false;
-    scheduleNextPoll();
+    if (gen !== feedGen) {
+      // This cycle was for a stale filter; poll again right away for the
+      // current one instead of waiting out a timer.
+      void pollOnce();
+    } else {
+      scheduleNextPoll();
+    }
   }
 }
 
@@ -300,8 +481,10 @@ document.addEventListener("visibilitychange", () => {
    ===================================================================== */
 loadOlderBtn.addEventListener("click", async () => {
   loadOlderBtn.disabled = true;
+  const gen = feedGen;
   try {
-    const res = await Api.notesList({ before: oldestLoadedId, limit: PAGE });
+    const res = await Api.notesList({ before: oldestLoadedId, limit: PAGE, authors: selectedAuthors });
+    if (gen !== feedGen) return; // filter changed while loading: discard
     const older = (res && res.notes) || [];
     for (const n of older) {
       if (!noteMap.has(n.id)) noteMap.set(n.id, n);
@@ -325,9 +508,22 @@ loadOlderBtn.addEventListener("click", async () => {
 /* =====================================================================
    Composer
    ===================================================================== */
+// countChars counts what the server counts: Unicode code points, not UTF-16
+// units. "👨‍👩‍👧" is several code points but even more UTF-16 units, which is
+// exactly why the old maxlength attribute (which counts UTF-16 units) could
+// block typing while the visible counter still showed room to spare.
+function countChars(s) {
+  return [...s].length;
+}
+
 function updateCharCount() {
-  // Count what the server counts: unicode code points, not UTF-16 units.
-  charCount.textContent = [...bodyEl.value].length + " / " + MAX_CHARS;
+  const n = countChars(bodyEl.value);
+  const over = n > MAX_CHARS;
+  charCount.textContent = n + " / " + MAX_CHARS;
+  charCount.classList.toggle("over", over);
+  // Soft limit: typing and pasting are never blocked mid-thought; the Post
+  // button simply stays off until the note fits. The server re-validates.
+  postBtn.disabled = over || bodyEl.value.trim() === "";
 }
 bodyEl.addEventListener("input", updateCharCount);
 
@@ -335,6 +531,10 @@ postBtn.addEventListener("click", async () => {
   const text = bodyEl.value.trim();
   if (!text) {
     showMsg(msgEl, "Write something first.");
+    return;
+  }
+  if (countChars(text) > MAX_CHARS) {
+    showMsg(msgEl, "Notes are capped at " + MAX_CHARS + " characters — trim it a little.");
     return;
   }
   postBtn.disabled = true;
@@ -346,7 +546,6 @@ postBtn.addEventListener("click", async () => {
       if (oldestLoadedId === 0) oldestLoadedId = res.note.id;
     }
     bodyEl.value = "";
-    updateCharCount();
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (err) {
     if (err && err.status === 401) { location.href = "/login"; return; }
@@ -356,7 +555,7 @@ postBtn.addEventListener("click", async () => {
       showMsg(msgEl, err.message || "Could not post the note.");
     }
   } finally {
-    postBtn.disabled = false;
+    updateCharCount(); // re-enables Post exactly when the content allows it
   }
 });
 
@@ -399,6 +598,10 @@ async function boot() {
   if (!me) return; // redirected to /login
 
   updateCharCount();
+
+  selectedAuthors = await loadSelection();
+  await refreshAuthors(); // also syncs checkboxes + label to the selection
+
   setStatus("loading…");
   await pollOnce(); // initial load; also schedules the next poll
 }

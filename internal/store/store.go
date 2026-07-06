@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -177,6 +178,44 @@ func (s *Store) CreateUser(ctx context.Context, username, displayName string) (U
 		VALUES ($1, $2, $3)
 		RETURNING id::text, username, display_name, created_at`,
 		username, lower, displayName,
+	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.CreatedAt)
+	if err != nil {
+		return User{}, err
+	}
+	if _, err = tx.Exec(ctx,
+		`INSERT INTO user_roles (user_id, role) VALUES ($1::uuid, 'user')`, u.ID); err != nil {
+		return User{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return User{}, err
+	}
+	return u, nil
+}
+
+// CreateUserWithID inserts a user under a caller-supplied uuid and grants the
+// default "user" role atomically. The passkey-first signup flow needs this:
+// it must mint the id before any row exists so the id can serve as the
+// WebAuthn user handle during the ceremony, and only writes the row once the
+// authenticator has produced a credential. A duplicate username surfaces as a
+// unique violation here (see IsUniqueViolation) — the authoritative check
+// that closes the begin/finish race.
+func (s *Store) CreateUserWithID(ctx context.Context, id, username, displayName string) (User, error) {
+	lower := normalizeUsername(username)
+	if displayName == "" {
+		displayName = username
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return User{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var u User
+	err = tx.QueryRow(ctx, `
+		INSERT INTO users (id, username, username_lower, display_name)
+		VALUES ($1::uuid, $2, $3, $4)
+		RETURNING id::text, username, display_name, created_at`,
+		id, username, lower, displayName,
 	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.CreatedAt)
 	if err != nil {
 		return User{}, err
@@ -600,6 +639,52 @@ func (s *Store) InsertCSPReport(ctx context.Context, in CSPReportInput) error {
 	return err
 }
 
+// CSPReportRow is one sanitised violation for the public transparency feed:
+// when it happened and what was blocked, but deliberately never ip_hash,
+// user_agent, original_policy, or the raw payload — those stay operator-only.
+type CSPReportRow struct {
+	ID                 int64     `json:"id"`
+	CreatedAt          time.Time `json:"created_at"`
+	DocumentURI        string    `json:"document_uri"`
+	BlockedURI         string    `json:"blocked_uri"`
+	ViolatedDirective  string    `json:"violated_directive"`
+	EffectiveDirective string    `json:"effective_directive"`
+	Disposition        string    `json:"disposition"`
+	SourceFile         string    `json:"source_file"`
+	LineNumber         int       `json:"line_number"`
+	ColumnNumber       int       `json:"column_number"`
+	ScriptSample       string    `json:"script_sample"`
+}
+
+// ListRecentCSPReports returns the newest violations for the public feed.
+func (s *Store) ListRecentCSPReports(ctx context.Context, limit int) ([]CSPReportRow, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, created_at, document_uri, blocked_uri, violated_directive,
+		       effective_directive, disposition, source_file, line_number,
+		       column_number, script_sample
+		FROM csp_reports
+		ORDER BY id DESC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CSPReportRow
+	for rows.Next() {
+		var r CSPReportRow
+		if err := rows.Scan(&r.ID, &r.CreatedAt, &r.DocumentURI, &r.BlockedURI,
+			&r.ViolatedDirective, &r.EffectiveDirective, &r.Disposition,
+			&r.SourceFile, &r.LineNumber, &r.ColumnNumber, &r.ScriptSample); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // ---------------------------------------------------------------------------
 // CAPTCHA stats
 // ---------------------------------------------------------------------------
@@ -751,17 +836,26 @@ func (s *Store) CreateNote(ctx context.Context, userID, body string) (Note, erro
 // ListNotes returns up to limit notes newest-first. When beforeID > 0 only
 // notes with id < beforeID are returned — a stable cursor for "load older"
 // pagination (ids are monotonic, so the cursor never shifts under the reader
-// the way OFFSET would when new notes arrive).
-func (s *Store) ListNotes(ctx context.Context, beforeID int64, limit int) ([]Note, error) {
+// the way OFFSET would when new notes arrive). When authorIDs is non-empty
+// the feed is restricted to those authors; the filter lives in SQL so the
+// cursor, the limit, and the deletion-detection window all keep working
+// against the filtered feed rather than a client-side subset of it.
+func (s *Store) ListNotes(ctx context.Context, beforeID int64, limit int, authorIDs []string) ([]Note, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
+	}
+	if authorIDs == nil {
+		// pgx encodes nil as SQL NULL; cardinality(NULL) is NULL, not 0, and
+		// the filter would wrongly exclude everything. Always bind an array.
+		authorIDs = []string{}
 	}
 	rows, err := s.pool.Query(ctx, `
 		SELECT n.id, n.user_id::text, u.username, u.display_name, n.body, n.created_at
 		FROM notes n JOIN users u ON u.id = n.user_id
 		WHERE ($1::bigint = 0 OR n.id < $1)
+		  AND (cardinality($3::uuid[]) = 0 OR n.user_id = ANY($3::uuid[]))
 		ORDER BY n.id DESC
-		LIMIT $2`, beforeID, limit)
+		LIMIT $2`, beforeID, limit, authorIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -773,6 +867,38 @@ func (s *Store) ListNotes(ctx context.Context, beforeID int64, limit int) ([]Not
 			return nil, err
 		}
 		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// NoteAuthor is one distinct author appearing in the notes feed, with a count
+// of their current notes, for the author-filter dropdown.
+type NoteAuthor struct {
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	Notes       int64  `json:"notes"`
+}
+
+// ListNoteAuthors returns everyone who currently has at least one note,
+// ordered by username. Hard-deleted notes fall out of the counts naturally.
+func (s *Store) ListNoteAuthors(ctx context.Context) ([]NoteAuthor, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT u.id::text, u.username, u.display_name, COUNT(*)::bigint AS notes
+		FROM notes n JOIN users u ON u.id = n.user_id
+		GROUP BY u.id, u.username, u.display_name
+		ORDER BY u.username`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []NoteAuthor
+	for rows.Next() {
+		var a NoteAuthor
+		if err := rows.Scan(&a.UserID, &a.Username, &a.DisplayName, &a.Notes); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
 	}
 	return out, rows.Err()
 }
@@ -802,6 +928,15 @@ func mapErr(err error) error {
 		return ErrNotFound
 	}
 	return err
+}
+
+// IsUniqueViolation reports whether err is a Postgres unique-constraint
+// violation (SQLSTATE 23505). Callers use it to turn a duplicate-key insert
+// into a friendly 409 — the authoritative "already taken" signal that closes
+// any check-then-insert race.
+func IsUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // normalizeUsername lowercases and trims a username for case-insensitive

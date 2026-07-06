@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Notes · GoTunnels</title>
     <link rel="stylesheet" href="/css/style.css" />
+    <script src="/js/theme-boot.js"></script>
   </head>
   <body>
     <header class="topbar">
@@ -12,6 +13,7 @@
         <span class="brand"><span class="dot"></span> GoTunnels</span>
         <nav class="mainnav">
           <a href="/">Home</a>
+          <a href="/passkeys">Passkeys</a>
           <a href="/notes" data-auth="in" class="hidden">Notes</a>
           <a href="/captcha" data-auth="in" class="hidden">CAPTCHA</a>
           <a href="/activity" data-auth="in" class="hidden">Activity</a>
@@ -34,7 +36,7 @@
 
       <div class="card">
         <label for="noteBody">Write a note</label>
-        <textarea id="noteBody" rows="3" maxlength="500"
+        <textarea id="noteBody" rows="3"
           placeholder="Up to 500 characters of plain text…"></textarea>
         <div class="composer-foot">
           <span id="charCount" class="hint">0 / 500</span>
@@ -44,7 +46,20 @@
 
       <div class="feed-head">
         <h2>Latest notes</h2>
-        <span id="feedStatus" class="status-pill" title="Auto-refresh status">live</span>
+        <div class="feed-tools">
+          <details id="authorFilter" class="author-filter">
+            <summary id="authorFilterLabel" title="Filter by author">Everyone</summary>
+            <div class="author-filter-panel">
+              <label class="author-option">
+                <input type="checkbox" id="authorAll" checked />
+                <span>Everyone</span>
+              </label>
+              <hr class="author-sep" />
+              <div id="authorList"></div>
+            </div>
+          </details>
+          <span id="feedStatus" class="status-pill" title="Auto-refresh status">live</span>
+        </div>
       </div>
 
       <button type="button" id="newPill" class="new-pill hidden">New notes ↑</button>

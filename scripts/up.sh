@@ -34,6 +34,15 @@ export GOTUNNELS_INSTANCE_ID="${GOTUNNELS_INSTANCE_ID:-$PROJECT}"
 set_env_var GOTUNNELS_INSTANCE_ID "$GOTUNNELS_INSTANCE_ID"
 log "project (instance): $PROJECT"
 
+# Telemetry host.name: the OTel SDK does not detect the host by default, so
+# without this the backend shows host_name as an empty string. Export the
+# machine's hostname (e.g. "virginia") so every span/metric/log says which
+# box the stack runs on. Override by exporting GOTUNNELS_HOST_NAME yourself.
+GOTUNNELS_HOST_NAME="${GOTUNNELS_HOST_NAME:-$(hostname)}"
+export GOTUNNELS_HOST_NAME
+set_env_var GOTUNNELS_HOST_NAME "$GOTUNNELS_HOST_NAME"
+log "telemetry host.name: $GOTUNNELS_HOST_NAME"
+
 # 1) Build images (API multi-stage build runs go mod tidy + go build).
 log "building images…"
 dc -p "$PROJECT" build
@@ -46,6 +55,33 @@ log "starting database…"
 dc -p "$PROJECT" up -d db
 wait_healthy "$PROJECT" db 60 \
   pg_isready -U "${POSTGRES_USER:-gotunnels}" -d "${POSTGRES_DB:-gotunnels}" -q
+
+# 2b) Clear any stale api container from a previous run of THIS project,
+#     BEFORE the frontend and tunnels come up. Doing it this early matters:
+#     right now nothing has been discovered yet, so if removing the api drags
+#     dependent containers with it (instances created before the compose fix
+#     carry podman --requires links from frontend/cloudflared-api onto the
+#     api container), those dependents are simply recreated fresh by the
+#     steps below. Waiting until after tunnel discovery to do this — as an
+#     earlier version of this script did — is what produced the virginia
+#     failure: `podman rm -f api` failed with "has dependent containers",
+#     the `|| true` swallowed it, `up -d api` then hit "name already in use",
+#     and the API silently kept its bootstrap env (RP_ID=localhost, CORS=*):
+#     everything worked except passkeys.
+_stale_api_cid="$(cid_of "$PROJECT" api)"
+if [ -n "$_stale_api_cid" ]; then
+  warn "found an api container from a previous run; removing it (and any podman-level dependents) so it can be recreated with this run's environment"
+  "$CR" rm -f "$_stale_api_cid" >/dev/null 2>&1 || true
+  if [ -n "$(cid_of "$PROJECT" api)" ]; then
+    # Old-format instances: dependents hold --requires on the api container.
+    # podman's --depend removes them too; they are recreated fresh below.
+    "$CR" rm -f --depend "$_stale_api_cid" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$(cid_of "$PROJECT" api)" ]; then
+    die "could not remove the stale api container ($_stale_api_cid). Tear the instance down first: scripts/down.sh $PROJECT"
+  fi
+  ok "stale api container removed"
+fi
 
 # 3) Frontend + its tunnel, WITHOUT pulling in the api dependency yet.
 log "starting frontend and its tunnel…"
@@ -68,21 +104,15 @@ export GOTUNNELS_CORS_ALLOWED_ORIGINS="$FRONTEND_URL"
 
 # 6) Now start the API (with correct RP/CORS) and its tunnel.
 #
-#    podman-compose does NOT honor `--no-deps`: step 3's
-#    `up -d --no-deps frontend cloudflared-frontend` also created and started
-#    the api container (frontend depends_on api), freezing its environment
-#    with the pre-discovery values. A plain `up -d` here then hits "name
-#    already in use", keeps that stale container, and the API never sees the
-#    tunnel-derived GOTUNNELS_RP_ID / RP_ORIGINS / CORS_ALLOWED_ORIGINS just
-#    exported above — which is exactly the CORS-on-signup failure (and, worse,
-#    silently broken passkeys: RP ID stuck at its bootstrap value). So: if an
-#    api container already exists for this project, remove it and let compose
-#    recreate it with the current environment. Under docker compose (which
-#    honors --no-deps) no such container exists yet and this is a no-op.
-_stale_api_cid="$(cid_of "$PROJECT" api)"
-if [ -n "$_stale_api_cid" ]; then
-  warn "api container was pre-created by a dependency with pre-discovery env; recreating it"
-  "$CR" rm -f "$_stale_api_cid" >/dev/null 2>&1 || true
+#    compose.yaml deliberately has no depends_on -> api edges anymore, and
+#    step 2b removed any leftover api container, so nothing can have
+#    pre-created the api with stale env by this point. Verify that instead of
+#    assuming it: if an api container somehow exists here, recreating it is
+#    NOT safe to skip — a container created before the exports above would
+#    run with RP_ID=localhost and CORS=*, the exact state where everything
+#    works except passkeys. Fail loudly rather than continue into that trap.
+if [ -n "$(cid_of "$PROJECT" api)" ]; then
+  die "an api container already exists before 'up -d api' — it would keep pre-discovery env. Tear down and retry: scripts/down.sh $PROJECT && scripts/up.sh $PROJECT"
 fi
 log "starting API and its tunnel…"
 dc -p "$PROJECT" up -d --no-deps api cloudflared-api
@@ -151,3 +181,4 @@ for _pair in "cloudflared-frontend|Web app" "cloudflared-api|API"; do
   fi
   echo >&2
 done
+

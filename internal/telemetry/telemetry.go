@@ -23,6 +23,7 @@ import (
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -147,16 +148,32 @@ func fallback(h slog.Handler, cfg *config.Config, cause error) *Providers {
 	return &Providers{Logger: l}
 }
 
+// buildResource assembles the OTel resource attached to every span, metric,
+// and log record. host.name deserves a note: the SDK does not detect it by
+// default (resource.Default() covers service/SDK attributes only), which is
+// why backends show host_name as an empty string out of the box. When
+// cfg.HostName is set — scripts/up.sh exports the podman host's `hostname`,
+// e.g. "virginia" — it is pinned explicitly, which is the value people
+// actually want (the machine the stack runs on). Otherwise resource.WithHost()
+// fills in the container's hostname: a random short id, less meaningful, but
+// still better than empty.
 func buildResource(ctx context.Context, cfg *config.Config) (*resource.Resource, error) {
-	return resource.New(ctx,
+	opts := []resource.Option{
 		resource.WithFromEnv(),
 		resource.WithTelemetrySDK(),
-		resource.WithAttributes(
-			semconv.ServiceName(cfg.ServiceName),
-			semconv.ServiceVersion(cfg.Version),
-			semconv.ServiceInstanceID(cfg.InstanceID),
-		),
-	)
+	}
+	attrs := []attribute.KeyValue{
+		semconv.ServiceName(cfg.ServiceName),
+		semconv.ServiceVersion(cfg.Version),
+		semconv.ServiceInstanceID(cfg.InstanceID),
+	}
+	if cfg.HostName != "" {
+		attrs = append(attrs, semconv.HostName(cfg.HostName))
+	} else {
+		opts = append(opts, resource.WithHost())
+	}
+	opts = append(opts, resource.WithAttributes(attrs...))
+	return resource.New(ctx, opts...)
 }
 
 func traceHTTPOpts(cfg *config.Config) []otlptracehttp.Option {

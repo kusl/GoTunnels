@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -77,5 +79,77 @@ func TestExtractToken(t *testing.T) {
 	req3 := httptest.NewRequest(http.MethodGet, "/", nil)
 	if got := h.extractToken(req3); got != "" {
 		t.Fatalf("expected empty token, got %q", got)
+	}
+}
+
+func TestFlowEnvelopeRoundTrip(t *testing.T) {
+	sess := json.RawMessage(`{"challenge":"abc","user_id":"aWQ="}`)
+	env := flowEnvelope{
+		V:       1,
+		Origin:  "https://tart-panda.trycloudflare.com",
+		Signup:  &signupFlowData{UserID: "11111111-2222-4333-8444-555555555555", Username: "alice", DisplayName: "Alice"},
+		Session: sess,
+	}
+	blob, err := json.Marshal(env)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	got := decodeFlowEnvelope(blob)
+	if got.V != 1 || got.Origin != env.Origin {
+		t.Fatalf("roundtrip lost header fields: %+v", got)
+	}
+	if got.Signup == nil || got.Signup.Username != "alice" || got.Signup.UserID != env.Signup.UserID {
+		t.Fatalf("roundtrip lost signup data: %+v", got.Signup)
+	}
+	if string(got.Session) != string(sess) {
+		t.Fatalf("roundtrip changed session blob: %s", got.Session)
+	}
+}
+
+func TestDecodeFlowEnvelopeLegacyBlob(t *testing.T) {
+	// Flows stored before the envelope existed were the bare
+	// webauthn.SessionData JSON. They must wrap on the fly with no pinned
+	// origin (which resolves to the static relying party).
+	legacy := []byte(`{"challenge":"xyz","user_id":"aWQ=","expires":"0001-01-01T00:00:00Z"}`)
+	env := decodeFlowEnvelope(legacy)
+	if env.Origin != "" {
+		t.Fatalf("legacy blob must carry no origin, got %q", env.Origin)
+	}
+	if env.Signup != nil {
+		t.Fatal("legacy blob must carry no signup data")
+	}
+	if string(env.Session) != string(legacy) {
+		t.Fatalf("legacy blob must become the session verbatim, got %s", env.Session)
+	}
+	if _, err := env.sessionData(); err != nil {
+		t.Fatalf("legacy session must still unpack: %v", err)
+	}
+}
+
+func TestDecodeFlowEnvelopeGarbage(t *testing.T) {
+	env := decodeFlowEnvelope([]byte("not json at all"))
+	if string(env.Session) != "not json at all" {
+		t.Fatalf("garbage should be preserved as the session blob, got %q", env.Session)
+	}
+	if _, err := env.sessionData(); err == nil {
+		t.Fatal("unpacking a garbage session must error")
+	}
+}
+
+func TestNewUUIDv4(t *testing.T) {
+	seen := map[string]bool{}
+	re := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+	for i := 0; i < 64; i++ {
+		id, err := newUUIDv4()
+		if err != nil {
+			t.Fatalf("newUUIDv4: %v", err)
+		}
+		if !re.MatchString(id) {
+			t.Fatalf("id %q is not a canonical v4 uuid", id)
+		}
+		if seen[id] {
+			t.Fatalf("duplicate uuid generated: %s", id)
+		}
+		seen[id] = true
 	}
 }

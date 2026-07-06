@@ -99,8 +99,13 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = n
 	}
+	authorIDs, problem := parseAuthors(r.URL.Query().Get("authors"))
+	if problem != "" {
+		httpx.WriteError(w, http.StatusBadRequest, problem)
+		return
+	}
 
-	rows, err := h.store.ListNotes(r.Context(), beforeID, limit)
+	rows, err := h.store.ListNotes(r.Context(), beforeID, limit, authorIDs)
 	if err != nil {
 		h.serverError(w, r, "notes: list", err)
 		return
@@ -111,8 +116,27 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	trace.SpanFromContext(r.Context()).SetAttributes(
 		attribute.Int("notes.returned", len(rows)),
 		attribute.Int64("notes.before", beforeID),
+		attribute.Int("notes.author_filter", len(authorIDs)),
 	)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"notes": rows})
+}
+
+// Authors lists everyone who currently has notes, for the author-filter
+// dropdown on the notes page.
+func (h *Handlers) Authors(w http.ResponseWriter, r *http.Request) {
+	if _, ok := auth.CurrentUser(r.Context()); !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	authors, err := h.store.ListNoteAuthors(r.Context())
+	if err != nil {
+		h.serverError(w, r, "notes: authors", err)
+		return
+	}
+	if authors == nil {
+		authors = []store.NoteAuthor{}
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"authors": authors})
 }
 
 // Create posts a new note for the caller.
@@ -207,6 +231,58 @@ func ValidateBody(raw string) (string, string) {
 		}
 	}
 	return body, ""
+}
+
+// maxAuthorFilter caps how many author ids one request may filter by.
+const maxAuthorFilter = 50
+
+// parseAuthors parses the ?authors= query parameter: a comma-separated list
+// of user uuids. Empty input means "no filter". Every entry must look like a
+// uuid — the ids go into a `$n::uuid[]` bind, and a malformed value would
+// otherwise surface as an opaque database cast error instead of a 400.
+func parseAuthors(raw string) ([]string, string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, ""
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if !isUUIDString(p) {
+			return nil, "invalid author id"
+		}
+		out = append(out, strings.ToLower(p))
+	}
+	if len(out) > maxAuthorFilter {
+		return nil, fmt.Sprintf("at most %d authors may be selected", maxAuthorFilter)
+	}
+	return out, ""
+}
+
+// isUUIDString reports whether s is a canonical 8-4-4-4-12 hex uuid.
+func isUUIDString(s string) bool {
+	if len(s) != 36 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch i {
+		case 8, 13, 18, 23:
+			if c != '-' {
+				return false
+			}
+		default:
+			isHex := (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+			if !isHex {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg string, err error) {

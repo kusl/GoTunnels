@@ -89,12 +89,21 @@ func run() error {
 	st := store.New(pool)
 	rec := activity.NewRecorder(st, cfg.IPHashPepper())
 
-	wa, err := auth.NewWebAuthn(cfg.RPID, cfg.RPDisplayName, cfg.RPOrigins)
+	// The relying-party provider validates the static RP config at boot and
+	// additionally derives per-origin relying parties for origins matching
+	// cfg.RPOriginPatterns — the fix for passkeys breaking when the tunnel
+	// hostname the browser sees differs from the one configured at startup.
+	rp, err := auth.NewRPProvider(auth.RPConfig{
+		RPID:           cfg.RPID,
+		RPDisplayName:  cfg.RPDisplayName,
+		RPOrigins:      cfg.RPOrigins,
+		OriginPatterns: cfg.RPOriginPatterns,
+	})
 	if err != nil {
 		return err
 	}
 
-	authHandlers := auth.NewHandlers(st, wa, rec, log, auth.Settings{
+	authHandlers := auth.NewHandlers(st, rp, rec, log, auth.Settings{
 		SessionTTL:   cfg.SessionTTL,
 		TOTPKey:      cfg.TOTPAESKey(),
 		Issuer:       cfg.RPDisplayName,
@@ -117,6 +126,16 @@ func run() error {
 	notesHandlers := notes.NewHandlers(st, log)
 	prefsHandlers := prefs.NewHandlers(st, log)
 
+	// Signup limiters: nil disables a guard (config maps a zero interval to
+	// "off"). PerInterval converts "one every N" into the limiter's rate/sec.
+	var signupIP, signupGlobal *httpx.RateLimiter
+	if cfg.SignupIPInterval > 0 {
+		signupIP = httpx.NewRateLimiter(config.PerInterval(cfg.SignupIPInterval), float64(cfg.SignupIPBurst))
+	}
+	if cfg.SignupGlobalInterval > 0 {
+		signupGlobal = httpx.NewRateLimiter(config.PerInterval(cfg.SignupGlobalInterval), float64(cfg.SignupGlobalBurst))
+	}
+
 	srv := server.New(server.Deps{
 		Config:         cfg,
 		Log:            log,
@@ -128,8 +147,10 @@ func run() error {
 		Notes:          notesHandlers,
 		Prefs:          prefsHandlers,
 		// One note every 2 seconds sustained, short bursts of 5, per user.
-		NotesRateLimiter: httpx.NewRateLimiter(0.5, 5),
-		Pepper:           cfg.IPHashPepper(),
+		NotesRateLimiter:    httpx.NewRateLimiter(0.5, 5),
+		SignupIPLimiter:     signupIP,
+		SignupGlobalLimiter: signupGlobal,
+		Pepper:              cfg.IPHashPepper(),
 	})
 
 	// Run the server and wait for either a serve error or a shutdown signal.

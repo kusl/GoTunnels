@@ -176,3 +176,117 @@ func TestGetHelpers(t *testing.T) {
 		t.Error("getdur failed")
 	}
 }
+
+func TestLoad_SignupLimitDefaults(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.SignupIPInterval != 5*time.Minute || c.SignupIPBurst != 1 {
+		t.Fatalf("ip defaults = (%v, %d), want (5m, 1)", c.SignupIPInterval, c.SignupIPBurst)
+	}
+	if c.SignupGlobalInterval != time.Minute || c.SignupGlobalBurst != 1 {
+		t.Fatalf("global defaults = (%v, %d), want (1m, 1)", c.SignupGlobalInterval, c.SignupGlobalBurst)
+	}
+}
+
+func TestLoad_SignupLimitOverridesAndDisable(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	t.Setenv("GOTUNNELS_SIGNUP_IP_INTERVAL", "30s")
+	t.Setenv("GOTUNNELS_SIGNUP_IP_BURST", "3")
+	t.Setenv("GOTUNNELS_SIGNUP_GLOBAL_INTERVAL", "0")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.SignupIPInterval != 30*time.Second || c.SignupIPBurst != 3 {
+		t.Fatalf("ip override = (%v, %d)", c.SignupIPInterval, c.SignupIPBurst)
+	}
+	if c.SignupGlobalInterval != 0 {
+		t.Fatalf("global interval = %v, want 0 (disabled)", c.SignupGlobalInterval)
+	}
+}
+
+func TestValidate_SignupBurstMustBePositiveWhenEnabled(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	t.Setenv("GOTUNNELS_SIGNUP_IP_BURST", "0")
+	if _, err := Load(); err == nil {
+		t.Fatal("burst 0 with a non-zero interval should fail validation")
+	}
+}
+
+func TestLoad_RPOriginPatternsDefault(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.RPOriginPatterns) != 1 || c.RPOriginPatterns[0] != "https://*.trycloudflare.com" {
+		t.Fatalf("patterns = %v, want the trycloudflare default", c.RPOriginPatterns)
+	}
+}
+
+func TestLoad_RPOriginPatternsOverrideAndClear(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	t.Setenv("GOTUNNELS_RP_ORIGIN_PATTERNS", "https://*.a.example, https://*.b.example")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.RPOriginPatterns) != 2 || c.RPOriginPatterns[0] != "https://*.a.example" || c.RPOriginPatterns[1] != "https://*.b.example" {
+		t.Fatalf("patterns = %v", c.RPOriginPatterns)
+	}
+
+	t.Setenv("GOTUNNELS_RP_ORIGIN_PATTERNS", " ")
+	c2, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c2.RPOriginPatterns) != 0 {
+		t.Fatalf("blank override should clear patterns, got %v", c2.RPOriginPatterns)
+	}
+}
+
+func TestLoad_HostName(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.HostName != "" {
+		t.Fatalf("default host name = %q, want empty (SDK fallback)", c.HostName)
+	}
+	t.Setenv("GOTUNNELS_HOST_NAME", "virginia")
+	c2, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c2.HostName != "virginia" {
+		t.Fatalf("host name = %q, want virginia", c2.HostName)
+	}
+}
+
+func TestPerInterval(t *testing.T) {
+	cases := []struct {
+		in   time.Duration
+		want float64
+	}{
+		{time.Second, 1},
+		{time.Minute, 1.0 / 60.0},
+		{5 * time.Minute, 1.0 / 300.0},
+		{0, 0},
+		{-time.Second, 0},
+	}
+	for _, tc := range cases {
+		if got := PerInterval(tc.in); got != tc.want {
+			t.Errorf("PerInterval(%v) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}

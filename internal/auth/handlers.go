@@ -6,11 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 
 	"github.com/kusl/GoTunnels/internal/activity"
@@ -31,21 +33,25 @@ type Settings struct {
 // Handlers bundles dependencies for the auth HTTP endpoints.
 type Handlers struct {
 	store *store.Store
-	wa    *webauthn.WebAuthn
+	rp    *RPProvider
 	rec   *activity.Recorder
 	log   *slog.Logger
 	set   Settings
 }
 
-// NewHandlers builds the auth handler set.
-func NewHandlers(s *store.Store, wa *webauthn.WebAuthn, rec *activity.Recorder, log *slog.Logger, set Settings) *Handlers {
+// NewHandlers builds the auth handler set. The RPProvider (rather than a
+// single *webauthn.WebAuthn) is what lets passkey ceremonies bind to the
+// origin the browser actually presents instead of whatever origin happened to
+// be configured when the process booted — the root cause of the classic
+// "requested RPID did not match the origin" error behind a rotating tunnel.
+func NewHandlers(s *store.Store, rp *RPProvider, rec *activity.Recorder, log *slog.Logger, set Settings) *Handlers {
 	if set.FlowTTL <= 0 {
 		set.FlowTTL = 10 * time.Minute
 	}
 	if set.CookieName == "" {
 		set.CookieName = "gotunnels_session"
 	}
-	return &Handlers{store: s, wa: wa, rec: rec, log: log, set: set}
+	return &Handlers{store: s, rp: rp, rec: rec, log: log, set: set}
 }
 
 // ---------------------------------------------------------------------------
@@ -148,8 +154,9 @@ type sessionResponse struct {
 // signup / login / logout / me / activity
 // ---------------------------------------------------------------------------
 
-// Signup creates an account with a password (the always-present fallback
-// credential) and immediately establishes a session.
+// Signup creates an account with a password and immediately establishes a
+// session. (Password is one of two ways in — see PasskeySignupBegin/Finish
+// for the passwordless path.)
 func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 	var req signupRequest
 	if !decodeJSON(w, r, &req) {
@@ -182,6 +189,10 @@ func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := h.store.CreateUser(r.Context(), req.Username, req.DisplayName)
 	if err != nil {
+		if store.IsUniqueViolation(err) {
+			httpx.WriteError(w, http.StatusConflict, "username already taken")
+			return
+		}
 		h.serverError(w, r, "signup: create user", err)
 		return
 	}
@@ -209,6 +220,7 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := h.store.GetPasswordHash(r.Context(), user.ID)
 	if err != nil {
+		// Passkey-only accounts have no password row; same generic answer.
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -284,17 +296,24 @@ func (h *Handlers) PasskeyRegisterBegin(w http.ResponseWriter, r *http.Request) 
 		httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
+	wa, origin, err := h.rp.ForRequest(r)
+	if err != nil {
+		h.record(r, &user.ID, user.Username, "passkey_register", "passkey", "failure", map[string]any{"error": err.Error()})
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+		return
+	}
 	waUser, err := h.buildWAUser(r.Context(), user)
 	if err != nil {
 		h.serverError(w, r, "passkey: load user", err)
 		return
 	}
-	creation, sessionData, err := h.wa.BeginRegistration(waUser)
+	creation, sessionData, err := wa.BeginRegistration(waUser,
+		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred))
 	if err != nil {
 		h.serverError(w, r, "passkey: begin registration", err)
 		return
 	}
-	flowID, err := h.saveFlow(r.Context(), &user.ID, "register", sessionData)
+	flowID, err := h.saveFlow(r.Context(), &user.ID, "register", origin, nil, sessionData)
 	if err != nil {
 		h.serverError(w, r, "passkey: save flow", err)
 		return
@@ -310,9 +329,21 @@ func (h *Handlers) PasskeyRegisterFinish(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	flowID := r.URL.Query().Get("flow")
-	session, err := h.loadFlow(r.Context(), flowID, "register", &user.ID)
+	env, err := h.loadFlow(r.Context(), flowID, "register", &user.ID)
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired registration flow")
+		return
+	}
+	sd, err := env.sessionData()
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "corrupt registration flow")
+		return
+	}
+	// Finish against the relying party pinned when the flow began, so begin
+	// and finish agree even if the Origin header were to change between them.
+	wa, err := h.rpForFlow(env)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
 		return
 	}
 	waUser, err := h.buildWAUser(r.Context(), user)
@@ -320,7 +351,7 @@ func (h *Handlers) PasskeyRegisterFinish(w http.ResponseWriter, r *http.Request)
 		h.serverError(w, r, "passkey: load user", err)
 		return
 	}
-	cred, err := h.wa.FinishRegistration(waUser, *session, r)
+	cred, err := wa.FinishRegistration(waUser, *sd, r)
 	if err != nil {
 		h.record(r, &user.ID, user.Username, "passkey_register", "passkey", "failure", map[string]any{"error": err.Error()})
 		httpx.WriteError(w, http.StatusBadRequest, "passkey registration failed")
@@ -349,6 +380,12 @@ func (h *Handlers) PasskeyLoginBegin(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
+	wa, origin, err := h.rp.ForRequest(r)
+	if err != nil {
+		h.record(r, nil, req.Username, "login", "passkey", "failure", map[string]any{"error": err.Error()})
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+		return
+	}
 	user, err := h.store.GetUserByUsername(r.Context(), strings.TrimSpace(req.Username))
 	if err != nil {
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
@@ -363,12 +400,12 @@ func (h *Handlers) PasskeyLoginBegin(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "no passkeys registered for this account")
 		return
 	}
-	assertion, sessionData, err := h.wa.BeginLogin(waUser)
+	assertion, sessionData, err := wa.BeginLogin(waUser)
 	if err != nil {
 		h.serverError(w, r, "passkey: begin login", err)
 		return
 	}
-	flowID, err := h.saveFlow(r.Context(), &user.ID, "login", sessionData)
+	flowID, err := h.saveFlow(r.Context(), &user.ID, "login", origin, nil, sessionData)
 	if err != nil {
 		h.serverError(w, r, "passkey: save flow", err)
 		return
@@ -389,17 +426,23 @@ func (h *Handlers) PasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
+	env := decodeFlowEnvelope(flow.SessionData)
+	sd, err := env.sessionData()
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "corrupt login flow")
+		return
+	}
+	wa, err := h.rpForFlow(env)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+		return
+	}
 	waUser, err := h.buildWAUser(r.Context(), user)
 	if err != nil {
 		h.serverError(w, r, "passkey: load user", err)
 		return
 	}
-	var sd webauthn.SessionData
-	if err := json.Unmarshal(flow.SessionData, &sd); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "corrupt login flow")
-		return
-	}
-	cred, err := h.wa.FinishLogin(waUser, sd, r)
+	cred, err := wa.FinishLogin(waUser, *sd, r)
 	if err != nil {
 		h.record(r, &user.ID, user.Username, "login", "passkey", "failure", map[string]any{"error": err.Error()})
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
@@ -410,6 +453,138 @@ func (h *Handlers) PasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = h.store.DeleteFlow(r.Context(), flowID)
 	h.record(r, &user.ID, user.Username, "login", "passkey", "success", nil)
+	h.issueSession(w, r, user, "passkey")
+}
+
+// ---------------------------------------------------------------------------
+// passkey-first signup (unauthenticated) — create an account with no password
+// ---------------------------------------------------------------------------
+
+type passkeySignupBeginRequest struct {
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+}
+
+// PasskeySignupBegin starts creating a brand-new account whose only credential
+// will be a passkey. No user row is written yet: a candidate user id is
+// generated here and carried inside the flow envelope, and the account only
+// comes into existence in PasskeySignupFinish after the authenticator has
+// actually produced a credential. Abandoned ceremonies therefore leave nothing
+// behind but an expiring row in webauthn_flows.
+func (h *Handlers) PasskeySignupBegin(w http.ResponseWriter, r *http.Request) {
+	var req passkeySignupBeginRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	req.Username = strings.TrimSpace(req.Username)
+	if !validUsername(req.Username) {
+		httpx.WriteError(w, http.StatusBadRequest, "username must be 3-32 chars: letters, digits, dot, dash, underscore")
+		return
+	}
+	// Fast-fail on an obviously taken name. The authoritative check is the
+	// unique index at Finish time, which also closes the begin/finish race.
+	exists, err := h.store.UsernameExists(r.Context(), req.Username)
+	if err != nil {
+		h.serverError(w, r, "passkey signup: check username", err)
+		return
+	}
+	if exists {
+		httpx.WriteError(w, http.StatusConflict, "username already taken")
+		return
+	}
+
+	wa, origin, err := h.rp.ForRequest(r)
+	if err != nil {
+		h.record(r, nil, req.Username, "signup", "passkey", "failure", map[string]any{"error": err.Error()})
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+		return
+	}
+
+	candidateID, err := newUUIDv4()
+	if err != nil {
+		h.serverError(w, r, "passkey signup: candidate id", err)
+		return
+	}
+	displayName := strings.TrimSpace(req.DisplayName)
+	if displayName == "" {
+		displayName = req.Username
+	}
+
+	// A transient user object: satisfies webauthn.User for the ceremony
+	// without existing in the database.
+	waUser := &WebAuthnUser{User: store.User{ID: candidateID, Username: req.Username, DisplayName: displayName}}
+	creation, sessionData, err := wa.BeginRegistration(waUser,
+		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred))
+	if err != nil {
+		h.serverError(w, r, "passkey signup: begin registration", err)
+		return
+	}
+	flowID, err := h.saveFlow(r.Context(), nil, "signup", origin, &signupFlowData{
+		UserID:      candidateID,
+		Username:    req.Username,
+		DisplayName: displayName,
+	}, sessionData)
+	if err != nil {
+		h.serverError(w, r, "passkey signup: save flow", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"flow_id": flowID, "options": creation})
+}
+
+// PasskeySignupFinish verifies the new credential and only then creates the
+// account (passwordless) and starts a session.
+func (h *Handlers) PasskeySignupFinish(w http.ResponseWriter, r *http.Request) {
+	flowID := r.URL.Query().Get("flow")
+	flow, err := h.loadFlowAny(r.Context(), flowID, "signup")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired signup flow")
+		return
+	}
+	env := decodeFlowEnvelope(flow.SessionData)
+	if env.Signup == nil {
+		httpx.WriteError(w, http.StatusBadRequest, "corrupt signup flow")
+		return
+	}
+	sd, err := env.sessionData()
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "corrupt signup flow")
+		return
+	}
+	wa, err := h.rpForFlow(env)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+		return
+	}
+
+	candidate := store.User{
+		ID:          env.Signup.UserID,
+		Username:    env.Signup.Username,
+		DisplayName: env.Signup.DisplayName,
+	}
+	waUser := &WebAuthnUser{User: candidate}
+	cred, err := wa.FinishRegistration(waUser, *sd, r)
+	if err != nil {
+		h.record(r, nil, candidate.Username, "signup", "passkey", "failure", map[string]any{"error": err.Error()})
+		httpx.WriteError(w, http.StatusBadRequest, "passkey signup failed")
+		return
+	}
+
+	user, err := h.store.CreateUserWithID(r.Context(), candidate.ID, candidate.Username, candidate.DisplayName)
+	if err != nil {
+		if store.IsUniqueViolation(err) {
+			h.record(r, nil, candidate.Username, "signup", "passkey", "failure", map[string]any{"reason": "username_taken"})
+			httpx.WriteError(w, http.StatusConflict, "username already taken")
+			return
+		}
+		h.serverError(w, r, "passkey signup: create user", err)
+		return
+	}
+	if err := h.store.AddWebAuthnCredential(r.Context(), user.ID, cred); err != nil {
+		h.serverError(w, r, "passkey signup: store credential", err)
+		return
+	}
+	_ = h.store.DeleteFlow(r.Context(), flowID)
+	h.record(r, &user.ID, user.Username, "signup", "passkey", "success", nil)
 	h.issueSession(w, r, user, "passkey")
 }
 
@@ -509,6 +684,56 @@ func (h *Handlers) TOTPDisable(w http.ResponseWriter, r *http.Request) {
 	}
 	h.record(r, &user.ID, user.Username, "totp_disable", "totp", "success", nil)
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "totp_disabled"})
+}
+
+// ---------------------------------------------------------------------------
+// flow envelope — what actually goes into webauthn_flows.session_data
+// ---------------------------------------------------------------------------
+
+// flowEnvelope wraps the go-webauthn ceremony state with the origin the flow
+// was created for (so begin and finish always agree on the relying party) and,
+// for passkey-first signup, the candidate account that will be created only if
+// the ceremony succeeds.
+type flowEnvelope struct {
+	V       int             `json:"v"`
+	Origin  string          `json:"origin,omitempty"`
+	Signup  *signupFlowData `json:"signup,omitempty"`
+	Session json.RawMessage `json:"session"`
+}
+
+// signupFlowData is the not-yet-created account carried through a passkey
+// signup ceremony.
+type signupFlowData struct {
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+}
+
+// decodeFlowEnvelope reads a stored flow blob. Flows written before the
+// envelope existed stored the bare webauthn.SessionData; those are wrapped
+// on the fly (with no pinned origin, which resolves to the static relying
+// party) so in-flight ceremonies survive an upgrade.
+func decodeFlowEnvelope(blob []byte) flowEnvelope {
+	var env flowEnvelope
+	if err := json.Unmarshal(blob, &env); err == nil && len(env.Session) > 0 {
+		return env
+	}
+	return flowEnvelope{V: 0, Session: json.RawMessage(blob)}
+}
+
+// sessionData unpacks the library's ceremony state.
+func (e flowEnvelope) sessionData() (*webauthn.SessionData, error) {
+	var sd webauthn.SessionData
+	if err := json.Unmarshal(e.Session, &sd); err != nil {
+		return nil, err
+	}
+	return &sd, nil
+}
+
+// rpForFlow resolves the relying party a flow was pinned to when it began.
+func (h *Handlers) rpForFlow(env flowEnvelope) (*webauthn.WebAuthn, error) {
+	wa, _, err := h.rp.ForOrigin(env.Origin)
+	return wa, err
 }
 
 // ---------------------------------------------------------------------------
@@ -625,8 +850,12 @@ func (h *Handlers) verifySecondFactor(ctx context.Context, userID, code string) 
 	return used
 }
 
-func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind string, sd *webauthn.SessionData) (string, error) {
-	blob, err := json.Marshal(sd)
+func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind, origin string, signup *signupFlowData, sd *webauthn.SessionData) (string, error) {
+	sess, err := json.Marshal(sd)
+	if err != nil {
+		return "", err
+	}
+	blob, err := json.Marshal(flowEnvelope{V: 1, Origin: origin, Signup: signup, Session: sess})
 	if err != nil {
 		return "", err
 	}
@@ -647,21 +876,17 @@ func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind string, sd
 	return id, nil
 }
 
-func (h *Handlers) loadFlow(ctx context.Context, id, kind string, expectUser *string) (*webauthn.SessionData, error) {
+func (h *Handlers) loadFlow(ctx context.Context, id, kind string, expectUser *string) (flowEnvelope, error) {
 	flow, err := h.loadFlowAny(ctx, id, kind)
 	if err != nil {
-		return nil, err
+		return flowEnvelope{}, err
 	}
 	if expectUser != nil {
 		if flow.UserID == nil || *flow.UserID != *expectUser {
-			return nil, errors.New("auth: flow does not belong to user")
+			return flowEnvelope{}, errors.New("auth: flow does not belong to user")
 		}
 	}
-	var sd webauthn.SessionData
-	if err := json.Unmarshal(flow.SessionData, &sd); err != nil {
-		return nil, err
-	}
-	return &sd, nil
+	return decodeFlowEnvelope(flow.SessionData), nil
 }
 
 func (h *Handlers) loadFlowAny(ctx context.Context, id, kind string) (store.Flow, error) {
@@ -717,6 +942,21 @@ func newFlowID() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil
+}
+
+// newUUIDv4 generates an RFC 4122 version 4 UUID string. Kept local (like the
+// store's id::text convention) to avoid pulling in a UUID dependency for the
+// one place the application, rather than Postgres, must mint an id: the
+// passkey-signup candidate user, which has to exist as a WebAuthn user handle
+// before any row exists in the database.
+func newUUIDv4() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // RFC 4122 variant
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
 }
 
 // decodeJSON reads a size-limited JSON body into dst, writing a 400 on failure.

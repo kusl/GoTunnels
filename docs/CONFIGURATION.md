@@ -60,7 +60,24 @@ with a warning (fine for local hacking, never for anything real).
 | `GOTUNNELS_RP_ID` | `localhost` | WebAuthn Relying Party ID = the frontend's registrable domain. |
 | `GOTUNNELS_RP_DISPLAY_NAME` | `GoTunnels` | Human-readable RP name (also the TOTP issuer). |
 | `GOTUNNELS_RP_ORIGINS` | `http://localhost:8080` | Full origin(s) the browser presents (comma/space separated). |
+| `GOTUNNELS_RP_ORIGIN_PATTERNS` | `https://*.trycloudflare.com` | Origins matching any pattern may use passkeys even when not listed in `GOTUNNELS_RP_ORIGINS`; the relying party (RP ID + origin) is derived per request from the browser's own `Origin` header. `*.` matches exactly one DNS label. Patterns gate **WebAuthn only**, never CORS. Empty disables derivation. |
 | `GOTUNNELS_CORS_ALLOWED_ORIGINS` | `*` | Exact allowed origin(s), or `*`. Because credentials are used, `*` is echoed as the request origin rather than literally, and never treated as authorization. |
+
+## Signup rate limits
+
+Applied at the moment an account is actually created: `POST /api/signup` and
+the passkey-signup **finish** step. The begin step is deliberately unguarded
+so an abandoned or failed authenticator prompt never consumes a token. The
+per-IP guard runs before the global one, so a single noisy client is rejected
+before it can drain the bucket everyone shares. An interval of `0` disables
+that guard.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `GOTUNNELS_SIGNUP_IP_INTERVAL` | `5m` | Sustained rate: one signup per interval per (hashed) client IP. |
+| `GOTUNNELS_SIGNUP_IP_BURST` | `1` | Burst per IP (raise for e.g. a workshop behind one NAT). |
+| `GOTUNNELS_SIGNUP_GLOBAL_INTERVAL` | `1m` | Sustained rate: one signup per interval across the whole instance. |
+| `GOTUNNELS_SIGNUP_GLOBAL_BURST` | `1` | Burst across the whole instance. |
 
 ## Content Security Policy (central)
 
@@ -96,6 +113,7 @@ disabled (stdout logging only).
 | `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | `delta` | `delta`, `cumulative`, or `lowmemory` (spec casing like `DELTA` also accepted). Uptrace prefers delta. |
 | `OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION` | `base2_exponential_bucket_histogram` | Or `explicit_bucket_histogram`. Exponential buckets give Uptrace accurate percentiles at lower cost. |
 | `OTEL_SERVICE_NAME` / `GOTUNNELS_SERVICE_NAME` | `gotunnels-api` | OTel `service.name`. |
+| `GOTUNNELS_HOST_NAME` | (empty) | OTel resource attribute `host.name`. The SDK does not detect the host by default, which is why backends showed `host_name` as empty. `scripts/up.sh` sets it to the machine's `hostname`; when empty, the app falls back to the container's hostname. |
 
 ## Dev
 

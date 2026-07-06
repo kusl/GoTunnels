@@ -51,8 +51,22 @@ services:
       GOTUNNELS_RP_ID: "${GOTUNNELS_RP_ID:-localhost}"
       GOTUNNELS_RP_DISPLAY_NAME: "${GOTUNNELS_RP_DISPLAY_NAME:-GoTunnels}"
       GOTUNNELS_RP_ORIGINS: "${GOTUNNELS_RP_ORIGINS:-http://localhost:8080}"
+      # Origins matching these patterns may use passkeys even when they differ
+      # from GOTUNNELS_RP_ORIGINS: the relying party is derived per request
+      # (see internal/auth/passkey.go). Patterns gate WebAuthn only — never
+      # CORS, which stays pinned to the exact discovered origin.
+      GOTUNNELS_RP_ORIGIN_PATTERNS: "${GOTUNNELS_RP_ORIGIN_PATTERNS:-https://*.trycloudflare.com}"
       GOTUNNELS_CORS_ALLOWED_ORIGINS: "${GOTUNNELS_CORS_ALLOWED_ORIGINS:-*}"
       GOTUNNELS_CSP_MODE: "${GOTUNNELS_CSP_MODE:-report-only}"
+      # Account-creation rate limits (password signup and passkey-signup
+      # finish). An interval of 0 disables that guard.
+      GOTUNNELS_SIGNUP_IP_INTERVAL: "${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m}"
+      GOTUNNELS_SIGNUP_IP_BURST: "${GOTUNNELS_SIGNUP_IP_BURST:-1}"
+      GOTUNNELS_SIGNUP_GLOBAL_INTERVAL: "${GOTUNNELS_SIGNUP_GLOBAL_INTERVAL:-1m}"
+      GOTUNNELS_SIGNUP_GLOBAL_BURST: "${GOTUNNELS_SIGNUP_GLOBAL_BURST:-1}"
+      # OTel resource attribute host.name — scripts/up.sh exports the podman
+      # host's `hostname` so telemetry says which machine the stack runs on.
+      GOTUNNELS_HOST_NAME: "${GOTUNNELS_HOST_NAME:-}"
       # Telemetry: a single Uptrace (cloud or self-hosted) DSN, or OTLP env vars.
       UPTRACE_DSN: "${UPTRACE_DSN:-}"
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
@@ -68,8 +82,14 @@ services:
     build:
       context: .
       dockerfile: Containerfile.frontend
-    depends_on:
-      - api
+    # Deliberately NO depends_on here. The frontend is static files; it does
+    # not need the api at startup. More importantly, under podman a
+    # depends_on becomes a hard --requires link on the api *container*, which
+    # (a) made podman-compose pre-create the api during step 3 of up.sh with
+    # pre-discovery env, and (b) made the later `podman rm -f <api>` fail
+    # with "has dependent containers" — the API then silently kept
+    # RP_ID=localhost and CORS=*, which is exactly the state where everything
+    # works EXCEPT passkeys. See scripts/up.sh step 3/6 and virginia.txt.
     environment:
       GOTUNNELS_CSP_HEADER_NAME: "${GOTUNNELS_CSP_HEADER_NAME:-Content-Security-Policy-Report-Only}"
       GOTUNNELS_CSP_POLICY: "${GOTUNNELS_CSP_POLICY:-default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'}"
@@ -84,8 +104,10 @@ services:
 
   cloudflared-api:
     image: docker.io/cloudflare/cloudflared:latest
-    depends_on:
-      - api
+    # No depends_on for the same reason as the frontend service above:
+    # cloudflared retries its upstream connection, so start order does not
+    # matter, and a --requires link here would again block recreating the api
+    # container after tunnel discovery.
     command: ["tunnel", "--no-autoupdate", "--url", "http://api:8080"]
     restart: unless-stopped
 

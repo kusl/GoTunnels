@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,6 +42,11 @@ func Chain(h http.Handler, mws ...Middleware) http.Handler {
 // request Origin. Because the browser sends credentials (Bearer token flows
 // still trigger CORS), the wildcard cannot be combined with credentials, so we
 // echo a specific origin. When allowAny is true any non-empty Origin is echoed.
+//
+// Entries in allowed may be exact origins ("https://a.example") or wildcard
+// patterns with a single "*" standing in for exactly one DNS label in the
+// leftmost host position ("https://*.trycloudflare.com"). See
+// MatchOriginPattern for the precise rules.
 func OriginAllowed(allowed []string, allowAny bool, origin string) (echo string, ok bool) {
 	if origin == "" {
 		return "", false
@@ -52,8 +58,66 @@ func OriginAllowed(allowed []string, allowAny bool, origin string) (echo string,
 		if a == origin {
 			return origin, true
 		}
+		if strings.Contains(a, "*") && MatchOriginPattern(a, origin) {
+			return origin, true
+		}
 	}
 	return "", false
+}
+
+// MatchOriginPattern reports whether origin matches pattern. A pattern is an
+// origin whose host begins with "*." — the "*" stands for exactly one
+// non-empty DNS label (no dots), which is the shape Cloudflare Quick Tunnel
+// hostnames take (<random-words>.trycloudflare.com). Rules:
+//
+//   - schemes must match exactly (case-insensitive)
+//   - the origin must carry no path, port, userinfo, query, or fragment
+//   - "https://*.trycloudflare.com" matches "https://a-b-c.trycloudflare.com"
+//     but not "https://a.b.trycloudflare.com" (two labels), not
+//     "https://trycloudflare.com" (zero labels), and not
+//     "http://a.trycloudflare.com" (scheme mismatch)
+//
+// Patterns without a leading "*." only match exactly (case-insensitively).
+func MatchOriginPattern(pattern, origin string) bool {
+	pScheme, pHost, ok := splitOrigin(pattern)
+	if !ok {
+		return false
+	}
+	oScheme, oHost, ok := splitOrigin(origin)
+	if !ok {
+		return false
+	}
+	if pScheme != oScheme {
+		return false
+	}
+	if !strings.HasPrefix(pHost, "*.") {
+		return pHost == oHost
+	}
+	suffix := pHost[1:] // ".trycloudflare.com"
+	if !strings.HasSuffix(oHost, suffix) {
+		return false
+	}
+	label := oHost[:len(oHost)-len(suffix)]
+	if label == "" || strings.ContainsAny(label, ".:/") {
+		return false
+	}
+	return true
+}
+
+// splitOrigin lowercases and splits "scheme://host" (no path, port allowed as
+// part of host verbatim). It rejects anything with a path, query, fragment,
+// or userinfo — Origin headers never carry those.
+func splitOrigin(o string) (scheme, host string, ok bool) {
+	o = strings.ToLower(strings.TrimSpace(o))
+	i := strings.Index(o, "://")
+	if i <= 0 {
+		return "", "", false
+	}
+	scheme, host = o[:i], o[i+3:]
+	if host == "" || strings.ContainsAny(host, "/?#@ ") {
+		return "", "", false
+	}
+	return scheme, host, true
 }
 
 // CORS returns middleware that applies the origin policy and answers
@@ -208,10 +272,17 @@ func (rl *RateLimiter) Allow(key string) bool {
 // request (the provided keyFn, typically a hashed client IP). Rejected
 // requests receive 429.
 func (rl *RateLimiter) LimitByIP(keyFn func(*http.Request) string) Middleware {
+	return rl.LimitWith(keyFn, "rate limit exceeded")
+}
+
+// LimitWith is LimitByIP with a caller-supplied 429 message, so endpoints with
+// deliberately strict limits (e.g. signup) can tell the person what happened
+// and roughly when to retry.
+func (rl *RateLimiter) LimitWith(keyFn func(*http.Request) string, message string) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !rl.Allow(keyFn(r)) {
-				WriteError(w, http.StatusTooManyRequests, "rate limit exceeded")
+				WriteError(w, http.StatusTooManyRequests, message)
 				return
 			}
 			next.ServeHTTP(w, r)

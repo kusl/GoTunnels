@@ -1,6 +1,14 @@
 package csp
 
-import "testing"
+import (
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"unicode/utf8"
+)
 
 func TestNormalizeLegacy(t *testing.T) {
 	body := []byte(`{"csp-report":{
@@ -134,5 +142,55 @@ func TestFirstNonEmpty(t *testing.T) {
 	}
 	if firstNonEmpty("", "") != "" {
 		t.Fatal("expected empty when all empty")
+	}
+}
+
+func TestTruncateRunes(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		n    int
+		want string
+	}{
+		{"shorter passes through", "hello", 10, "hello"},
+		{"exactly n passes through", "hello", 5, "hello"},
+		{"ascii truncates with ellipsis", "hello world", 5, "hello…"},
+		{"multibyte counts runes not bytes", "ééééé", 5, "ééééé"},
+		{"multibyte truncates cleanly", "日本語テキスト", 3, "日本語…"},
+		{"zero yields empty", "anything", 0, ""},
+		{"negative yields empty", "anything", -1, ""},
+		{"empty stays empty", "", 5, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := truncateRunes(tc.in, tc.n); got != tc.want {
+				t.Fatalf("truncateRunes(%q, %d) = %q, want %q", tc.in, tc.n, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTruncateRunesNeverSplitsUTF8(t *testing.T) {
+	in := strings.Repeat("界", 300)
+	got := truncateRunes(in, maxURILen)
+	if !utf8.ValidString(got) {
+		t.Fatal("truncation produced invalid UTF-8")
+	}
+	if utf8.RuneCountInString(got) != maxURILen+1 { // +1 for the ellipsis
+		t.Fatalf("rune count = %d, want %d", utf8.RuneCountInString(got), maxURILen+1)
+	}
+}
+
+func TestRecentRejectsBadLimit(t *testing.T) {
+	// Limit validation runs before any store access, so a nil store is safe
+	// here and keeps this a pure unit test.
+	h := NewHandler(nil, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	for _, q := range []string{"limit=0", "limit=-1", "limit=201", "limit=abc"} {
+		req := httptest.NewRequest(http.MethodGet, "/api/csp-reports/recent?"+q, nil)
+		rec := httptest.NewRecorder()
+		h.Recent(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", q, rec.Code)
+		}
 	}
 }
