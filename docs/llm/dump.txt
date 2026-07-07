@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-07T17:52:53-04:00
+  Generated at   : 2026-07-07T18:02:23-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,31 +17,18 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : 3581a16765e6a68ac6ffabc74dfce22d75d1ff75
-  Commit (short) : 3581a16
-  Commit date    : 2026-07-07 17:46:59 -0400
-  Commit message : add claude response
+  Commit (full)  : ef57382d2797258240d2811a20c024a8f1eef452
+  Commit (short) : ef57382
+  Commit date    : 2026-07-07 18:02:15 -0400
+  Commit message : move to config package
   Remote origin  : git@github.com:kusl/GoTunnels.git
-  Files included : 95
+  Files included : 97
   Excluded path  : docs/llm/
   Excluded files : yarn.lock
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
- M .env.example
- M .github/workflows/ci.yaml
- M Containerfile.frontend
- M compose.yaml
- M docs/ARCHITECTURE.md
- M docs/CONFIGURATION.md
  M docs/llm/vendor/output.txt
- M frontend/Caddyfile
- M frontend/js/common.js
- M internal/csp/csp.go
- M scripts/ci-container-test.sh
- M scripts/lib.sh
-?? internal/csp/csp_deployment_test.go
-?? scripts/lib-detect-test.sh
 
 ################################################################################
 # FILE: export.sh  [THIS SCRIPT — included for full context]
@@ -437,7 +424,7 @@ FOOTER
 mv -f "$TMP_FILE" "$OUTPUT_FILE"
 
 ################################################################################
-# FILE TREE  (all 95 included files)
+# FILE TREE  (all 97 included files)
 ################################################################################
 .
 .
@@ -508,7 +495,8 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 │   │   └── captcha_test.go
 │   ├── config
 │   │   ├── config.go
-│   │   └── config_test.go
+│   │   ├── config_test.go
+│   │   └── csp_deployment_test.go
 │   ├── csp
 │   │   ├── csp.go
 │   │   └── csp_test.go
@@ -556,6 +544,7 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 └── scripts
     ├── ci-container-test.sh
     ├── down.sh
+    ├── lib-detect-test.sh
     ├── lib.sh
     ├── run.sh
     ├── test.sh
@@ -781,7 +770,7 @@ func run() error {
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               4a28db7d5e5809801f6f921e8badf3e5f33c0dd637c23c24d4035828aa2aaaa2
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
 # compose.yaml — the whole GoTunnels stack.
@@ -979,7 +968,7 @@ ENTRYPOINT ["/api"]
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               0bd885b147f3311d245faa17c1ca26e6b89d3309bf9656e729cb1d20a2ca1816
-  Last git commit:       995655c 2026-07-01 18:11:28 -0400 add claude response
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
 # Containerfile.frontend — Caddy serving the static web app.
@@ -1067,7 +1056,7 @@ README.md
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               25a94804664ec489a433198638115d7ffb8b04e01f383572f46f221306f676a5
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
 # Architecture
@@ -1371,7 +1360,7 @@ also annotate their active span (batch sizes, note ids) so traces answer
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               fe577c1f1b822d327adbe3e294ec054fb2dcf38019ecf25679a9c6b68e73e745
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
 # Configuration
@@ -1535,7 +1524,7 @@ naming and the test toolchain:
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               069f65dd3104b508a185918af42d31bde2f5e5657a8688df2f943f7d60751325
-  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
 # .env.example — shape of the environment file.
@@ -2111,7 +2100,7 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               73791fe7ccf87ad73d5869e76c2d3018488d3ace3a30e64c08c1547dce89cf6a
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
 # GoTunnels frontend — Caddy static file server.
@@ -3436,7 +3425,7 @@ export const Api = {
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               6c60f5143683833619f92daec6382358af406a342b25620f09b4cd8ee70264ab
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
 // common.js — shared helpers used by every page. Importing it also installs
@@ -6494,7 +6483,7 @@ updates:
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               5ce0e2e0a1c24432963b55bf4bf57b56156b294c24b5a8afc6322ca4142d1a04
-  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
 # Build and test. Deliberately thin: all logic lives in scripts/test.sh so the
@@ -10333,6 +10322,166 @@ func TestPerInterval(t *testing.T) {
 
 
 ################################################################################
+# FILE: internal/config/csp_deployment_test.go
+################################################################################
+
+--- METADATA ---
+  File name:             csp_deployment_test.go
+  Relative path:         internal/config/csp_deployment_test.go
+  Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/csp_deployment_test.go
+  Size:                  5.2 KiB (5332 bytes)
+  Last modified:         2026-07-07 17:48:52.635647967 -0400
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 19931264
+  Hard links:            1
+  MIME type:             text/plain
+  SHA-256:               3977c4a20d511dc89a5b318bfd0f396c2b7e5564b0a6b2026561f10fe64af960
+  Last git commit:       ef57382 2026-07-07 18:02:15 -0400 move to config package
+
+--- CONTENT ---
+package config
+
+// These tests pin the deployment files to the canonical DefaultCSPPolicy and
+// to the CSP reporting wiring the Caddyfile must carry. The policy string is
+// duplicated by necessity — the compose default, the Caddyfile fallback, the
+// .env template in scripts/lib.sh, .env.example, and the docs all repeat it —
+// and the copies HAD drifted: every one of them was missing media-src and
+// frame-src relative to this constant, so /api/info advertised a stricter
+// policy than the frontend actually emitted. Reading the real files from the
+// repo keeps every copy honest, and pins the report-uri/report-to/
+// Reporting-Endpoints plumbing so native browser reporting cannot silently
+// regress.
+//
+// stdlib only, no network, no containers: safe under `go test ./...` both in
+// CI and in the offline sandbox.
+
+import (
+	"os"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"strings"
+	"testing"
+)
+
+// repoRoot resolves the repository root relative to this source file
+// (internal/config/ -> ../..) so `go test ./...` works from any directory.
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", ".."))
+}
+
+func mustRead(t *testing.T, rel string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(repoRoot(t), filepath.FromSlash(rel)))
+	if err != nil {
+		t.Fatalf("read %s: %v", rel, err)
+	}
+	return string(b)
+}
+
+// extractOne returns the single capture group of re in text, failing the test
+// when the pattern is absent or ambiguous.
+func extractOne(t *testing.T, rel, text string, re *regexp.Regexp) string {
+	t.Helper()
+	m := re.FindAllStringSubmatch(text, -1)
+	if len(m) == 0 {
+		t.Fatalf("%s: pattern %q not found", rel, re)
+	}
+	if len(m) > 1 {
+		t.Fatalf("%s: pattern %q matched %d times, want exactly 1", rel, re, len(m))
+	}
+	return m[0][1]
+}
+
+func TestDefaultCSPPolicyCopiesAgree(t *testing.T) {
+	cases := []struct {
+		rel string
+		re  *regexp.Regexp
+	}{
+		// Caddyfile fallback inside the env placeholder:
+		//   {$GOTUNNELS_CSP_POLICY:<default>}
+		{"frontend/Caddyfile", regexp.MustCompile(`\{\$GOTUNNELS_CSP_POLICY:([^}]*)\}`)},
+		// compose.yaml default for the FRONTEND service:
+		//   GOTUNNELS_CSP_POLICY: "${GOTUNNELS_CSP_POLICY:-<default>}"
+		// [^}]+ (non-empty) so the api service's deliberately empty mirror
+		// (asserted separately below) is not caught here.
+		{"compose.yaml", regexp.MustCompile(`GOTUNNELS_CSP_POLICY: "\$\{GOTUNNELS_CSP_POLICY:-([^}]+)\}"`)},
+		// .env template written by scripts/lib.sh ensure_env:
+		{"scripts/lib.sh", regexp.MustCompile(`(?m)^GOTUNNELS_CSP_POLICY="([^"]*)"$`)},
+		// documented example env file:
+		{".env.example", regexp.MustCompile(`(?m)^GOTUNNELS_CSP_POLICY="([^"]*)"$`)},
+	}
+	for _, tc := range cases {
+		got := extractOne(t, tc.rel, mustRead(t, tc.rel), tc.re)
+		if got != DefaultCSPPolicy {
+			t.Errorf("%s: CSP policy default drifted from config.DefaultCSPPolicy\n got: %s\nwant: %s",
+				tc.rel, got, DefaultCSPPolicy)
+		}
+	}
+}
+
+func TestComposeMirrorsCSPPolicyToAPI(t *testing.T) {
+	compose := mustRead(t, "compose.yaml")
+	// The api service must receive the SAME variable with an EMPTY default:
+	// config.getenv treats empty as unset, so with nothing in .env the API
+	// falls back to DefaultCSPPolicy (== the frontend default per the test
+	// above), and with a customised .env both services see the same value —
+	// either way /api/info stays honest.
+	if !strings.Contains(compose, `GOTUNNELS_CSP_POLICY: "${GOTUNNELS_CSP_POLICY:-}"`) {
+		t.Error(`compose.yaml: api service must pass GOTUNNELS_CSP_POLICY through with an empty default ("${GOTUNNELS_CSP_POLICY:-}")`)
+	}
+}
+
+func TestCaddyfileWiresCSPReporting(t *testing.T) {
+	caddy := mustRead(t, "frontend/Caddyfile")
+
+	for _, want := range []string{
+		// Reporting directives appended OUTSIDE the policy placeholder, so a
+		// customised (or stale, pre-reporting) GOTUNNELS_CSP_POLICY in .env
+		// still reports.
+		`}; report-uri /csp-report; report-to csp-endpoint"`,
+		// Reporting API endpoint group matching `report-to csp-endpoint`.
+		"Reporting-Endpoints `csp-endpoint=\"/csp-report\"`",
+		// Same-origin ingest path proxied to the API on the compose network.
+		"handle /csp-report",
+		"rewrite * /api/csp-reports",
+		"reverse_proxy {$GOTUNNELS_API_UPSTREAM:api:8080}",
+	} {
+		if !strings.Contains(caddy, want) {
+			t.Errorf("frontend/Caddyfile: missing %q", want)
+		}
+	}
+
+	// The proxy target must actually exist on the API side, or /csp-report
+	// would forward into a 404.
+	server := mustRead(t, "internal/server/server.go")
+	if !strings.Contains(server, `"POST /api/csp-reports"`) {
+		t.Error(`internal/server/server.go: route "POST /api/csp-reports" not found — the /csp-report proxy would 404`)
+	}
+}
+
+func TestConfigurationDocsShowCanonicalPolicy(t *testing.T) {
+	doc := mustRead(t, "docs/CONFIGURATION.md")
+	re := regexp.MustCompile("(?s)```\n(default-src 'self';.*?)\n```")
+	m := re.FindStringSubmatch(doc)
+	if m == nil {
+		t.Fatal("docs/CONFIGURATION.md: fenced default-policy block not found")
+	}
+	got := strings.Join(strings.Fields(m[1]), " ")
+	if got != DefaultCSPPolicy {
+		t.Errorf("docs/CONFIGURATION.md policy block drifted from config.DefaultCSPPolicy\n got: %s\nwant: %s",
+			got, DefaultCSPPolicy)
+	}
+}
+
+
+################################################################################
 # FILE: internal/csp/csp.go
 ################################################################################
 
@@ -10348,7 +10497,7 @@ func TestPerInterval(t *testing.T) {
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               e1b9dcc65c070fa4ebbccdea0a2841fb0f586ac5d1290241785f69c08a1dac97
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
 // Package csp accepts Content-Security-Policy violation reports and
@@ -15440,7 +15589,7 @@ the corresponding source.
   Hard links:            1
   MIME type:             text/x-shellscript
   SHA-256:               1f3d27e7ae7847706c92ace7429fb35588232a70144f0ad25061ff64d4f81b84
-  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -15783,6 +15932,251 @@ ok "instance '$PROJECT' removed (containers + volumes)."
 
 
 ################################################################################
+# FILE: scripts/lib-detect-test.sh
+################################################################################
+
+--- METADATA ---
+  File name:             lib-detect-test.sh
+  Relative path:         scripts/lib-detect-test.sh
+  Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/lib-detect-test.sh
+  Size:                  8.7 KiB (8927 bytes)
+  Last modified:         2026-07-07 17:47:53.555657810 -0400
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 19931179
+  Hard links:            1
+  MIME type:             text/x-shellscript
+  SHA-256:               fc20bcd0ce17dca5680b4735afe7235d8aecfec74a9b0ac5fd032b6509e27df4
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
+
+--- CONTENT ---
+#!/usr/bin/env bash
+# scripts/tests/lib-detect-test.sh — hermetic unit tests for detect_runtime()
+# and ensure_podman_socket() in scripts/lib.sh.
+#
+# Strategy: for each case, build a stub bin directory containing fake
+# `podman` / `podman-compose` / `docker` executables that record every
+# invocation and answer exactly the probes lib.sh makes, then run
+# detect_runtime inside `env -i` whose PATH holds only the stubs plus a
+# symlink farm of the real coreutils lib.sh needs. No containers, no
+# sockets, no network, no root — this runs in a second on any box with bash.
+#
+# What it pins (the CI failure this guards against): `podman compose` is only
+# a dispatcher, and on GitHub's ubuntu runners it delegates to docker's
+# compose plugin, which needs a podman API socket that is not running. So:
+#   1. podman-compose on PATH must WIN over `podman compose`.
+#   2. `podman compose` delegating to docker-compose must start the socket
+#      and set COMPOSE_BAKE=false.
+#   3. `podman compose` delegating to anything else must NOT touch sockets.
+#   4. docker-only hosts keep using `docker compose`.
+#   5. Preset CR/COMPOSE must bypass detection entirely.
+#
+# Usage: bash scripts/tests/lib-detect-test.sh
+
+set -euo pipefail
+IFS=$'\n\t'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB="$SCRIPT_DIR/../lib.sh"
+BASH_BIN="$(command -v bash)"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+pass() { printf 'PASS: %s\n' "$*"; }
+fail() { printf 'FAIL: %s\n' "$*" >&2; FAILED=1; }
+
+# ---------------------------------------------------------------------------
+# hermetic PATH: symlink only the external tools lib.sh (and the stubs, which
+# use nothing but bash builtins) actually need. Builtins resolve inside bash
+# and need no entry; `command -v` prints a bare name for those, which the /*
+# guard skips.
+# ---------------------------------------------------------------------------
+REALBIN="$TMP/realbin"
+mkdir -p "$REALBIN"
+for tool in bash dirname sed sleep seq mkdir rm cat grep head cut tr; do
+  p="$(command -v "$tool" || true)"
+  case "$p" in
+    /*) ln -sf "$p" "$REALBIN/$tool" ;;
+  esac
+done
+
+# The harness every case runs: source lib.sh under the same strict shell
+# options the real scripts use, detect, and print the outcome as KEY=VALUE.
+HARNESS="$TMP/harness.sh"
+cat > "$HARNESS" <<'EOF'
+set -euo pipefail
+IFS=$'\n\t'
+. "$1"
+detect_runtime
+printf 'CR=%s\n' "$CR"
+printf 'COMPOSE=%s\n' "$COMPOSE"
+printf 'COMPOSE_BAKE=%s\n' "${COMPOSE_BAKE:-}"
+EOF
+
+# run_detect STUBDIR [VAR=VAL ...] — run the harness hermetically; stdout is
+# the KEY=VALUE outcome, lib.sh's own logging stays on stderr.
+run_detect() {
+  local stubdir="$1"
+  shift
+  env -i HOME="$TMP" TERM=dumb PATH="$stubdir:$REALBIN" "$@" \
+    "$BASH_BIN" "$HARNESS" "$LIB"
+}
+
+# make_stub DIR NAME — install an executable stub from stdin.
+make_stub() {
+  mkdir -p "$1"
+  cat > "$1/$2"
+  chmod +x "$1/$2"
+}
+
+expect_line() { # OUTPUT LINE LABEL — grep must drain stdin (no -q + pipefail)
+  if printf '%s\n' "$1" | grep -Fx -- "$2" >/dev/null; then
+    pass "$3"
+  else
+    fail "$3 (wanted line '$2'; got: $(printf '%s' "$1" | tr '\n' '|'))"
+  fi
+}
+
+calls_contain() { # CALLS_FILE NEEDLE LABEL
+  if grep -F -- "$2" "$1" >/dev/null 2>&1; then
+    pass "$3"
+  else
+    fail "$3 (no '$2' in $(tr '\n' '|' < "$1" 2>/dev/null))"
+  fi
+}
+
+calls_lack() { # CALLS_FILE NEEDLE LABEL
+  if grep -F -- "$2" "$1" >/dev/null 2>&1; then
+    fail "$3 (found unwanted '$2' in $(tr '\n' '|' < "$1" 2>/dev/null))"
+  else
+    pass "$3"
+  fi
+}
+
+# A recording podman stub that answers every probe lib.sh makes. Behaviour is
+# steered by env: CALLS (log file), STATE (dir; socket-up marker = socket
+# exists), PROVIDER (path echoed in the dispatcher banner). `system service`
+# creates the marker, simulating a socket that comes up after being started.
+# shellcheck disable=SC2016  # single quotes are the point: this is a template
+PODMAN_STUB='#!/usr/bin/env bash
+printf "podman %s\n" "$*" >> "$CALLS"
+if [ "${1:-}" = "compose" ] && [ "${2:-}" = "version" ]; then
+  if [ -n "${PROVIDER:-}" ]; then
+    printf ">>>> Executing external compose provider \"%s\". Please refer to the documentation for details. <<<<\n" "$PROVIDER" >&2
+  fi
+  exit 0
+fi
+if [ "${1:-}" = "info" ]; then
+  case "$*" in
+    *RemoteSocket.Exists*)
+      if [ -e "$STATE/socket-up" ]; then echo true; else echo false; fi
+      exit 0 ;;
+    *RemoteSocket.Path*)
+      echo "unix://$STATE/podman.sock"
+      exit 0 ;;
+  esac
+  exit 0
+fi
+if [ "${1:-}" = "system" ] && [ "${2:-}" = "service" ]; then
+  : > "$STATE/socket-up"
+  exit 0
+fi
+exit 0
+'
+
+# ---------------------------------------------------------------------------
+# case 1: podman + podman-compose both present -> podman-compose wins, and
+# nothing ever goes near the socket machinery.
+# ---------------------------------------------------------------------------
+c1="$TMP/c1"; mkdir -p "$c1/state"; : > "$c1/calls.log"
+printf '%s' "$PODMAN_STUB" | make_stub "$c1/bin" podman
+make_stub "$c1/bin" podman-compose <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+if out="$(run_detect "$c1/bin" CALLS="$c1/calls.log" STATE="$c1/state" PROVIDER=/usr/libexec/docker/cli-plugins/docker-compose)"; then
+  expect_line "$out" "CR=podman" "case1: CR is podman"
+  expect_line "$out" "COMPOSE=podman-compose" "case1: podman-compose preferred over the dispatcher"
+  expect_line "$out" "COMPOSE_BAKE=" "case1: COMPOSE_BAKE untouched"
+  calls_lack "$c1/calls.log" "system service" "case1: no socket started"
+else
+  fail "case1: detect_runtime exited non-zero"
+fi
+
+# ---------------------------------------------------------------------------
+# case 2: podman only, dispatcher delegates to docker-compose, socket down,
+# no systemctl -> falls back to `podman system service`, exports
+# COMPOSE_BAKE=false, and succeeds once the socket is up.
+# ---------------------------------------------------------------------------
+c2="$TMP/c2"; mkdir -p "$c2/state"; : > "$c2/calls.log"
+printf '%s' "$PODMAN_STUB" | make_stub "$c2/bin" podman
+if out="$(run_detect "$c2/bin" CALLS="$c2/calls.log" STATE="$c2/state" PROVIDER=/usr/libexec/docker/cli-plugins/docker-compose)"; then
+  expect_line "$out" "CR=podman" "case2: CR is podman"
+  expect_line "$out" "COMPOSE=podman compose" "case2: falls back to the dispatcher"
+  expect_line "$out" "COMPOSE_BAKE=false" "case2: COMPOSE_BAKE=false for the docker-compose provider"
+  calls_contain "$c2/calls.log" "system service" "case2: socket self-heal started 'podman system service'"
+  if [ -e "$c2/state/socket-up" ]; then
+    pass "case2: socket came up"
+  else
+    fail "case2: socket marker missing"
+  fi
+else
+  fail "case2: detect_runtime exited non-zero"
+fi
+
+# ---------------------------------------------------------------------------
+# case 3: podman only, dispatcher delegates to a NON-docker provider ->
+# no socket calls, COMPOSE_BAKE untouched.
+# ---------------------------------------------------------------------------
+c3="$TMP/c3"; mkdir -p "$c3/state"; : > "$c3/calls.log"
+printf '%s' "$PODMAN_STUB" | make_stub "$c3/bin" podman
+if out="$(run_detect "$c3/bin" CALLS="$c3/calls.log" STATE="$c3/state" PROVIDER=/usr/libexec/podman/podman-compose-provider)"; then
+  expect_line "$out" "COMPOSE=podman compose" "case3: uses the dispatcher"
+  expect_line "$out" "COMPOSE_BAKE=" "case3: COMPOSE_BAKE untouched for non-docker provider"
+  calls_lack "$c3/calls.log" "system service" "case3: no socket started"
+else
+  fail "case3: detect_runtime exited non-zero"
+fi
+
+# ---------------------------------------------------------------------------
+# case 4: docker only -> docker compose.
+# ---------------------------------------------------------------------------
+c4="$TMP/c4"
+make_stub "$c4/bin" docker <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "compose" ] && [ "${2:-}" = "version" ]; then exit 0; fi
+exit 0
+EOF
+if out="$(run_detect "$c4/bin")"; then
+  expect_line "$out" "CR=docker" "case4: CR is docker"
+  expect_line "$out" "COMPOSE=docker compose" "case4: docker compose selected"
+else
+  fail "case4: detect_runtime exited non-zero"
+fi
+
+# ---------------------------------------------------------------------------
+# case 5: preset CR/COMPOSE bypasses detection (no runtimes on PATH at all).
+# ---------------------------------------------------------------------------
+c5="$TMP/c5"; mkdir -p "$c5/bin"
+if out="$(run_detect "$c5/bin" CR=docker COMPOSE="docker compose")"; then
+  expect_line "$out" "CR=docker" "case5: preset CR respected"
+  expect_line "$out" "COMPOSE=docker compose" "case5: preset COMPOSE respected"
+else
+  fail "case5: detect_runtime exited non-zero with preset CR/COMPOSE"
+fi
+
+# ---------------------------------------------------------------------------
+# verdict
+# ---------------------------------------------------------------------------
+if [ "$FAILED" -ne 0 ]; then
+  printf 'lib-detect-test: FAILURES above\n' >&2
+  exit 1
+fi
+printf 'lib-detect-test: all cases passed.\n'
+
+
+################################################################################
 # FILE: scripts/lib.sh
 ################################################################################
 
@@ -15798,7 +16192,7 @@ ok "instance '$PROJECT' removed (containers + volumes)."
   Hard links:            1
   MIME type:             text/x-shellscript
   SHA-256:               97109596340ab8ec03c53fcfb8e6cb27d38647fbab1a51539c4ee4b1048fc4e5
-  Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
+  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -16627,10 +17021,10 @@ done
 ################################################################################
 # DUMP SUMMARY
 ################################################################################
-  Files dumped   : 95
-  Total size     : 512.6 KiB (524944 bytes)
+  Files dumped   : 97
+  Total size     : 526.5 KiB (539203 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-07T17:52:57-04:00
+  Completed at   : 2026-07-07T18:02:26-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
