@@ -1595,3 +1595,6 @@ Claude is AI and can make mistakes. Please double-check responses.
 45
 58
 100
+
+Now using usage credits for Fable 5 · Your Fable 5 limit resets Jul 11 at 7:00 PM.
+
