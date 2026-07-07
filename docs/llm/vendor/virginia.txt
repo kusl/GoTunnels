@@ -218,4 +218,7 @@ d6462c62fbb1  localhost/weather_api:latest                                      
 ae6484a4725a  localhost/weather_web:latest                                        38 hours ago  Up 38 hours            0.0.0.0:8081->8080/tcp                        weather_web_1
 8fab95dfc3dc  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago  Up 38 hours                                                          weather_tunnel-api_1
 6898f86e1ba9  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago  Up 38 hours                                                          weather_tunnel-web_1
-kushal@virginia:~/src/golang/GoTunnels$ 
+kushal@virginia:~/src/golang/GoTunnels$ exit
+logout
+Connection to virginia closed.
+kushal@fedora:~/src/golang/GoTunnels$ 
