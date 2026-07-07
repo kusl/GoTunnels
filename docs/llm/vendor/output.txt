@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-07T18:02:23-04:00
+  Generated at   : 2026-07-07T18:08:24-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : ef57382d2797258240d2811a20c024a8f1eef452
-  Commit (short) : ef57382
-  Commit date    : 2026-07-07 18:02:15 -0400
-  Commit message : move to config package
+  Commit (full)  : 77c262a5cadf0cb42b94a79867fd740db5f82215
+  Commit (short) : 77c262a
+  Commit date    : 2026-07-07 18:02:33 -0400
+  Commit message : run dump
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 97
   Excluded path  : docs/llm/
@@ -28,7 +28,9 @@ REPOSITORY METADATA
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
+ M docs/llm/vendor/claude-conversations.md
  M docs/llm/vendor/output.txt
+ M docs/llm/vendor/virginia.txt
 
 ################################################################################
 # FILE: export.sh  [THIS SCRIPT — included for full context]
@@ -17024,7 +17026,7 @@ done
   Files dumped   : 97
   Total size     : 526.5 KiB (539203 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-07T18:02:26-04:00
+  Completed at   : 2026-07-07T18:08:27-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################

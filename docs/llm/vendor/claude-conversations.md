@@ -13,6 +13,12 @@ cmd/api/main.go:20:2: found packages csp (csp.go) and config (csp_deployment_tes
 Error: building at STEP "RUN go mod tidy  && go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api": while running runtime: exit status 1
 
 
+
+
+
+
+
+
 /
 Claude is responding
 Please review this again. The solution is broken. 
@@ -147,8 +153,23 @@ Done
 A second issue is already visible: CI references scripts/tests/lib-detect-test.sh, but git status shows the untracked file at scripts/lib-detect-test.sh. Let me map every reference to these paths.
 
 
-Reconciling file reconstruction versus safe relocation strategy
-Reconciling file reconstruction versus safe relocation strategy
+Diagnosed misplaced test files causing build and CI failures
+Diagnosed misplaced test files causing build and CI failures
+A second misplaced file. Let me now read the shell library and scripts so I can fix the second defect correctly (a blind move could break internal source paths).
+
+
+Diagnosed package conflict and devised test file placement strategy
+Diagnosed package conflict and devised test file placement strategy
+Let me extract the four copies of the CSP policy (config.go, Caddyfile, .env.example, lib.sh) and verify they're byte-identical, so the pinning test I write will actually pass in CI.
+
+
+Orchestrated package conflict resolution and test validation strategy
+Orchestrated package conflict resolution and test validation strategy
+All four copies are byte-identical, so a pinning test will pass. Let me check the Go toolchain in the sandbox so I can validate the reconstructed test's logic.
+
+
+Diagnosed package naming conflict in internal/csp directory structure
+Diagnosed package naming conflict in internal/csp directory structure
 
 Want to be notified when Claude responds?
 
@@ -157,7 +178,6 @@ Want to be notified when Claude responds?
 
 
 Claude is AI and can make mistakes. Please double-check responses.
-
 
 
 
