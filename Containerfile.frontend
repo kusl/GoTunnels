@@ -15,10 +15,14 @@
 FROM docker.io/library/caddy:2-alpine
 
 # Copy the web app, then place the Caddyfile where Caddy expects it and remove
-# the copy that landed under the web root so it is never served.
+# the copy that landed under the web root so it is never served. `caddy
+# validate` then fails the BUILD on any Caddyfile error (env placeholders use
+# their in-file defaults at validate time; upstreams are not dialled), so a
+# broken config can never ship in an image.
 COPY frontend/ /srv/
 COPY frontend/Caddyfile /etc/caddy/Caddyfile
-RUN rm -f /srv/Caddyfile
+RUN rm -f /srv/Caddyfile \
+ && caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
 EXPOSE 8080
 # The base image's default entrypoint runs:

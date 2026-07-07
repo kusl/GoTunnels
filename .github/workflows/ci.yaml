@@ -21,6 +21,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Fast, host-only checks on the bash layer: syntax, shellcheck (ships on
+      # ubuntu runners), and the hermetic detect_runtime/ensure_podman_socket
+      # unit tests (stubbed binaries — no containers, no sockets, no network).
+      - name: Shell script checks
+        run: |
+          for f in scripts/*.sh scripts/tests/*.sh; do bash -n "$f"; done
+          shellcheck -x -P SCRIPTDIR scripts/*.sh scripts/tests/*.sh
+          bash scripts/tests/lib-detect-test.sh
+
       - uses: actions/setup-go@v6
         with:
           go-version: "stable"
@@ -34,9 +43,13 @@ jobs:
   # that compose wiring + env substitution is correct, that migrations run
   # against a real Postgres, and that the HTTP surface works end to end —
   # including the captcha-sync regression that only reproduces against real
-  # Postgres via the pgx extended protocol. Ubuntu runners ship podman;
-  # podman-compose comes from pipx. No tunnels are started and no host ports
-  # are published; assertions run from a curl container on the compose network.
+  # Postgres via the pgx extended protocol, and the CSP reporting round trip
+  # through the frontend's /csp-report proxy. Ubuntu runners ship podman;
+  # podman-compose comes from pipx and scripts/lib.sh now PREFERS it over the
+  # `podman compose` dispatcher (which on these runners would delegate to
+  # docker's compose plugin against a podman socket that is not running).
+  # No tunnels are started and no host ports are published; assertions run
+  # from a curl container on the compose network.
   containers:
     runs-on: ubuntu-latest
     timeout-minutes: 25

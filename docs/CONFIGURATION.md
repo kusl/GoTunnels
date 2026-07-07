@@ -85,7 +85,8 @@ that guard.
 | --- | --- | --- |
 | `GOTUNNELS_CSP_HEADER_NAME` | `Content-Security-Policy-Report-Only` | Set to `Content-Security-Policy` to **enforce**. |
 | `GOTUNNELS_CSP_MODE` | `report-only` | Informational mirror surfaced on `/api/info` (`report-only` or `enforce`). |
-| `GOTUNNELS_CSP_POLICY` | strict self-only (see below) | The policy string. Emitted by Caddy; mirrored to the API for `/api/info`. |
+| `GOTUNNELS_CSP_POLICY` | strict self-only (see below) | The policy string. Emitted by Caddy; mirrored to the API for `/api/info`. Do **not** add `report-uri`/`report-to` here — Caddy appends them. |
+| `GOTUNNELS_API_UPSTREAM` | `api:8080` | Where the frontend's Caddy forwards native CSP violation reports POSTed to its same-origin `/csp-report` path (the api service on the compose network). |
 
 The default policy is fully self-hosted — no third-party scripts, styles,
 images, fonts, media, or frames:
@@ -95,6 +96,15 @@ default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self';
 font-src 'self'; connect-src 'self' https:; media-src 'self'; object-src 'none';
 frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
 ```
+
+Caddy appends `; report-uri /csp-report; report-to csp-endpoint` to the policy
+— outside `GOTUNNELS_CSP_POLICY`, so customised (or stale) policies keep
+reporting — and sends a matching `Reporting-Endpoints: csp-endpoint="/csp-report"`
+header. `/csp-report` is a same-origin path reverse-proxied to the API's
+`POST /api/csp-reports`, which is how reporting works without knowing the
+API's tunnel URL. `internal/config/csp_deployment_test.go` pins every
+duplicated copy of the default policy (compose, Caddyfile, `.env` template,
+`.env.example`, this file) to `config.DefaultCSPPolicy`.
 
 Because the app has no inline scripts, inline event handlers, or inline styles,
 it already satisfies the enforcing form of this policy.

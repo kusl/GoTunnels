@@ -7,7 +7,10 @@
 # migrations run against real Postgres, and that the HTTP surface behaves —
 # including a regression test for the captcha sync 500 (`operator is not
 # unique: unknown + unknown`), which only ever reproduced against a real
-# Postgres because unit tests never hit the pgx extended protocol.
+# Postgres because unit tests never hit the pgx extended protocol, and an
+# end-to-end check of native CSP reporting (browser wire formats POSTed to
+# the frontend's same-origin /csp-report proxy must land in the API's public
+# transparency feed).
 #
 # Runs identically on a laptop and in GitHub Actions:
 #   bash scripts/ci-container-test.sh [project-name]     (default: gotunnels-ci)
@@ -249,11 +252,36 @@ pre_code="$(ccurl -o /dev/null -w '%{http_code}' -X OPTIONS http://api:8080/api/
 assert_eq "$pre_code" "204" "CORS preflight answered with 204"
 
 # ---------------------------------------------------------------------------
-# 10) frontend serves the app with the CSP header
+# 10) frontend serves the app with the CSP header, wired for native reporting
 # ---------------------------------------------------------------------------
 front="$(ccurl -D - http://frontend:8080/)"
 assert_icontains "$front" 'content-security-policy' "frontend sends a CSP header"
+assert_icontains "$front" 'report-uri /csp-report'  "CSP carries report-uri (legacy reporting)"
+assert_icontains "$front" 'report-to csp-endpoint'  "CSP carries report-to (Reporting API)"
+assert_icontains "$front" 'reporting-endpoints'     "frontend sends the Reporting-Endpoints header"
 assert_icontains "$front" '<html' "frontend serves the HTML app"
+
+# ---------------------------------------------------------------------------
+# 11) CSP reporting end to end: both browser wire formats POSTed to the
+#     frontend's same-origin /csp-report path must proxy to the API (204) and
+#     show up in the public transparency feed. This exercises the Caddy
+#     rewrite + reverse_proxy, the Normalize() parsers, and the feed.
+# ---------------------------------------------------------------------------
+legacy_body='{"csp-report":{"document-uri":"http://frontend:8080/","blocked-uri":"https://blocked.invalid/legacy.js","violated-directive":"script-src","effective-directive":"script-src","original-policy":"default-src","disposition":"report","status-code":200}}'
+legacy_code="$(ccurl -o /dev/null -w '%{http_code}' -X POST http://frontend:8080/csp-report \
+  -H 'Content-Type: application/csp-report' \
+  --data-raw "$legacy_body")"
+assert_eq "$legacy_code" "204" "legacy csp-report accepted via /csp-report proxy"
+
+reports_body='[{"type":"csp-violation","age":10,"url":"http://frontend:8080/","user_agent":"ci","body":{"documentURL":"http://frontend:8080/","blockedURL":"https://blocked.invalid/reporting-api.css","effectiveDirective":"style-src-elem","originalPolicy":"default-src","disposition":"report","statusCode":200}}]'
+reports_code="$(ccurl -o /dev/null -w '%{http_code}' -X POST http://frontend:8080/csp-report \
+  -H 'Content-Type: application/reports+json' \
+  --data-raw "$reports_body")"
+assert_eq "$reports_code" "204" "reporting-api payload accepted via /csp-report proxy"
+
+feed="$(ccurl 'http://api:8080/api/csp-reports/recent?limit=50')"
+assert_contains "$feed" 'blocked.invalid/legacy.js'        "public feed lists the legacy report"
+assert_contains "$feed" 'blocked.invalid/reporting-api.css' "public feed lists the reporting-api report"
 
 # ---------------------------------------------------------------------------
 # verdict

@@ -101,17 +101,34 @@ never needs a raw IP.
 
 Caddy emits the CSP header, centrally configured via environment variables. It
 ships as `Content-Security-Policy-Report-Only` with a strict self-only policy.
-The header carries **no** `report-uri`/`report-to`, because the API's URL is
-only known at runtime. Instead, `frontend/js/csp.js` listens for the in-page
-`securitypolicyviolation` event (which fires for both report-only and enforcing
-policies, regardless of any reporting endpoint) and POSTs a compact JSON report
-to the API.
 
-`internal/csp` normalises the three report shapes browsers actually send — the
-legacy `application/csp-report` object, the Reporting API array, and the custom
-body from the in-page listener — into one row. Each report is both stored in
-`csp_reports` and logged through the OpenTelemetry-backed logger, so violations
-show up in telemetry too.
+Violation reporting is **native browser reporting**. The API's public URL is a
+Quick Tunnel only discovered at runtime, so the policy cannot name it directly
+— instead Caddy exposes a stable same-origin path, `/csp-report`, and
+reverse-proxies it over the internal compose network to the API's
+`POST /api/csp-reports` (upstream configurable via `GOTUNNELS_API_UPSTREAM`,
+default `api:8080`). The Caddyfile appends
+`report-uri /csp-report; report-to csp-endpoint` to whatever policy is
+configured and sends a matching `Reporting-Endpoints: csp-endpoint="/csp-report"`
+header, so browsers on the legacy `report-uri` path and on the modern
+Reporting API both deliver reports, in report-only and enforcing modes alike.
+Because the directives are appended **outside** the `GOTUNNELS_CSP_POLICY`
+value, reporting keeps working even with a customised (or stale) policy in an
+old `.env`. Same-origin also means no CORS preflight and no runtime URL
+discovery; the earlier in-page `securitypolicyviolation` listener
+(`frontend/js/csp.js`) is gone — native reporting also catches violations that
+occur before any JavaScript loads.
+
+`internal/csp` normalises the report shapes browsers actually send — the
+legacy `application/csp-report` object and the Reporting API
+`application/reports+json` array (plus the camelCase shape the former in-page
+listener posted, kept for compatibility) — into one row. Each report is both
+stored in `csp_reports` and logged through the OpenTelemetry-backed logger, so
+violations show up in telemetry too.
+`internal/config/csp_deployment_test.go` pins every duplicated copy of the
+default policy to `config.DefaultCSPPolicy` and pins the Caddyfile's reporting
+wiring, and the container smoke test posts both wire formats through the
+proxy end to end.
 
 ## Telemetry
 

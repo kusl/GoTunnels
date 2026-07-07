@@ -58,6 +58,11 @@ services:
       GOTUNNELS_RP_ORIGIN_PATTERNS: "${GOTUNNELS_RP_ORIGIN_PATTERNS:-https://*.trycloudflare.com}"
       GOTUNNELS_CORS_ALLOWED_ORIGINS: "${GOTUNNELS_CORS_ALLOWED_ORIGINS:-*}"
       GOTUNNELS_CSP_MODE: "${GOTUNNELS_CSP_MODE:-report-only}"
+      # Mirror of the policy Caddy emits, surfaced on /api/info. The default
+      # here is deliberately EMPTY: config.go treats empty as unset and falls
+      # back to config.DefaultCSPPolicy, which equals the frontend default
+      # below (internal/config/csp_deployment_test.go pins all copies).
+      GOTUNNELS_CSP_POLICY: "${GOTUNNELS_CSP_POLICY:-}"
       # Account-creation rate limits (password signup and passkey-signup
       # finish). An interval of 0 disables that guard.
       GOTUNNELS_SIGNUP_IP_INTERVAL: "${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m}"
@@ -92,7 +97,14 @@ services:
     # works EXCEPT passkeys. See scripts/up.sh step 3/6 and virginia.txt.
     environment:
       GOTUNNELS_CSP_HEADER_NAME: "${GOTUNNELS_CSP_HEADER_NAME:-Content-Security-Policy-Report-Only}"
-      GOTUNNELS_CSP_POLICY: "${GOTUNNELS_CSP_POLICY:-default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'}"
+      # Must stay identical to config.DefaultCSPPolicy (pinned by
+      # internal/config/csp_deployment_test.go). Caddy appends
+      # `; report-uri /csp-report; report-to csp-endpoint` itself — never put
+      # reporting directives in this value.
+      GOTUNNELS_CSP_POLICY: "${GOTUNNELS_CSP_POLICY:-default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; media-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'}"
+      # Where Caddy forwards native CSP violation reports posted to the
+      # same-origin /csp-report path (see frontend/Caddyfile).
+      GOTUNNELS_API_UPSTREAM: "${GOTUNNELS_API_UPSTREAM:-api:8080}"
     restart: unless-stopped
 
   cloudflared-frontend:

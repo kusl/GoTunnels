@@ -1,7 +1,9 @@
-// Package csp accepts Content-Security-Policy violation reports in the three
-// shapes browsers actually send and normalises them into a single struct that
-// is both stored in Postgres and logged through the OpenTelemetry-backed slog
-// logger. The reporting endpoint is unauthenticated (browsers post it without
+// Package csp accepts Content-Security-Policy violation reports and
+// normalises them into a single struct that is both stored in Postgres and
+// logged through the OpenTelemetry-backed slog logger. Browsers deliver
+// reports natively to the frontend's same-origin /csp-report path, which
+// Caddy reverse-proxies to this package's handler (see frontend/Caddyfile).
+// The reporting endpoint is unauthenticated (browsers post it without
 // credentials), so callers rate-limit it at the middleware layer.
 package csp
 
@@ -24,7 +26,9 @@ import (
 //
 //   - legacy application/csp-report: {"csp-report": {...}} with hyphenated keys
 //   - the Reporting API application/reports+json: an array of {type,url,body}
-//   - a custom camelCase body posted by our in-page violation listener
+//   - a custom camelCase body — the shape the frontend's former in-page
+//     violation listener posted; parsing is kept so anything still speaking
+//     it keeps working
 //
 // The raw JSON of each individual report is preserved in Raw.
 func Normalize(contentType string, body []byte) ([]store.CSPReportInput, error) {
@@ -168,7 +172,7 @@ func parseReportingAPI(body []byte) ([]store.CSPReportInput, error) {
 	return out, nil
 }
 
-// --- custom in-page listener shape --------------------------------------
+// --- custom shape (former in-page listener; kept for compatibility) ------
 
 type customReport struct {
 	DocumentURI        string `json:"documentURI"`

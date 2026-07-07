@@ -1,9 +1,10 @@
 // common.js — shared helpers used by every page. Importing it also installs
-// the CSP violation reporter (via ./csp.js) and the theme picker in the top
-// bar (theme-boot.js already applied the saved theme pre-paint; this module
-// adds the UI and, when signed in, syncs the choice to the account).
+// the theme picker in the top bar (theme-boot.js already applied the saved
+// theme pre-paint; this module adds the UI and, when signed in, syncs the
+// choice to the account). CSP violation reporting needs no JS anymore: the
+// browser reports natively to the same-origin /csp-report path, which Caddy
+// proxies to the API (see frontend/Caddyfile).
 
-import "./csp.js";
 import { Api, getToken } from "./api.js";
 
 export function qs(sel, root = document) {

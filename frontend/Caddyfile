@@ -12,11 +12,23 @@
 #                                 or "Content-Security-Policy" to enforce.
 #   GOTUNNELS_CSP_POLICY       -> the policy string. Defaults to a strict
 #                                 self-only policy (no third-party anything).
+#                                 Do NOT put report-uri/report-to in it; those
+#                                 are appended below, outside the variable, so
+#                                 reporting also works with a customised (or
+#                                 stale, pre-reporting) policy from an old .env.
+#   GOTUNNELS_API_UPSTREAM     -> host:port Caddy proxies /csp-report to.
+#                                 Defaults to the compose service address,
+#                                 api:8080.
 #
-# There is deliberately no report-uri/report-to directive: the API tunnel URL
-# is discovered at runtime, so violation reporting is done from the page via a
-# `securitypolicyviolation` listener (see js/csp.js) that POSTs to the API. The
-# violation event fires for both report-only and enforcing modes regardless.
+# Violation reporting is native browser reporting. The API's public URL is a
+# Quick Tunnel only discovered at runtime, so the policy cannot name it
+# directly. Instead this server exposes a stable same-origin path,
+# /csp-report, and reverse-proxies it over the internal compose network to the
+# API's POST /api/csp-reports. The policy carries `report-uri /csp-report`
+# (legacy, universally supported) plus `report-to csp-endpoint` backed by a
+# matching Reporting-Endpoints header (the modern Reporting API). Browsers
+# report violations in both report-only and enforcing modes, with no runtime
+# URL discovery and no CORS involved.
 
 {
 	admin off
@@ -34,7 +46,15 @@
 
 	header {
 		# Central CSP. Header name and policy both come from the environment.
-		{$GOTUNNELS_CSP_HEADER_NAME:Content-Security-Policy-Report-Only} "{$GOTUNNELS_CSP_POLICY:default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'}"
+		# The reporting directives are appended OUTSIDE the policy variable —
+		# see the file header for why.
+		{$GOTUNNELS_CSP_HEADER_NAME:Content-Security-Policy-Report-Only} "{$GOTUNNELS_CSP_POLICY:default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; media-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'}; report-uri /csp-report; report-to csp-endpoint"
+
+		# Reporting API endpoint group referenced by `report-to csp-endpoint`
+		# above. A relative URL resolves against this response's origin, i.e.
+		# the same /csp-report path report-uri uses. Backticks because the
+		# value itself contains double quotes.
+		Reporting-Endpoints `csp-endpoint="/csp-report"`
 
 		# Sensible always-on hardening headers.
 		X-Content-Type-Options "nosniff"
@@ -45,8 +65,19 @@
 		-Server
 	}
 
-	# Pretty routes: /login -> login.html, etc. config.json is a real file and
-	# is served as-is by file_server.
-	try_files {path} {path}.html {path}/ /index.html
-	file_server
+	# Native CSP reports land here (same origin — no preflight, no discovery)
+	# and are forwarded to the API's ingest endpoint on the internal compose
+	# network. handle blocks are mutually exclusive: this one wins for
+	# /csp-report, the bare handle below serves everything else.
+	handle /csp-report {
+		rewrite * /api/csp-reports
+		reverse_proxy {$GOTUNNELS_API_UPSTREAM:api:8080}
+	}
+
+	handle {
+		# Pretty routes: /login -> login.html, etc. config.json is a real
+		# file and is served as-is by file_server.
+		try_files {path} {path}.html {path}/ /index.html
+		file_server
+	}
 }

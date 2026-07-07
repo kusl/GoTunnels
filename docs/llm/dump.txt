@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-07T09:04:59-04:00
+  Generated at   : 2026-07-07T17:52:53-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : 71f62a46ba3a1c21c3a4b394a3b83ea48aabd15c
-  Commit (short) : 71f62a4
-  Commit date    : 2026-07-06 03:58:25 -0400
-  Commit message : update deployment
+  Commit (full)  : 3581a16765e6a68ac6ffabc74dfce22d75d1ff75
+  Commit (short) : 3581a16
+  Commit date    : 2026-07-07 17:46:59 -0400
+  Commit message : add claude response
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 95
   Excluded path  : docs/llm/
@@ -28,7 +28,20 @@ REPOSITORY METADATA
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
+ M .env.example
+ M .github/workflows/ci.yaml
+ M Containerfile.frontend
+ M compose.yaml
+ M docs/ARCHITECTURE.md
+ M docs/CONFIGURATION.md
  M docs/llm/vendor/output.txt
+ M frontend/Caddyfile
+ M frontend/js/common.js
+ M internal/csp/csp.go
+ M scripts/ci-container-test.sh
+ M scripts/lib.sh
+?? internal/csp/csp_deployment_test.go
+?? scripts/lib-detect-test.sh
 
 ################################################################################
 # FILE: export.sh  [THIS SCRIPT — included for full context]
@@ -760,14 +773,14 @@ func run() error {
   File name:             compose.yaml
   Relative path:         compose.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/compose.yaml
-  Size:                  5.9 KiB (6058 bytes)
-  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Size:                  6.7 KiB (6908 bytes)
+  Last modified:         2026-07-07 17:48:07.966642693 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816306
+  Inode:                 19931199
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               d13d2d3a4dbd627d5005eecfaf8e7f7b1e1ed51e568b68bb725c180202d0206e
+  SHA-256:               4a28db7d5e5809801f6f921e8badf3e5f33c0dd637c23c24d4035828aa2aaaa2
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
@@ -831,6 +844,11 @@ services:
       GOTUNNELS_RP_ORIGIN_PATTERNS: "${GOTUNNELS_RP_ORIGIN_PATTERNS:-https://*.trycloudflare.com}"
       GOTUNNELS_CORS_ALLOWED_ORIGINS: "${GOTUNNELS_CORS_ALLOWED_ORIGINS:-*}"
       GOTUNNELS_CSP_MODE: "${GOTUNNELS_CSP_MODE:-report-only}"
+      # Mirror of the policy Caddy emits, surfaced on /api/info. The default
+      # here is deliberately EMPTY: config.go treats empty as unset and falls
+      # back to config.DefaultCSPPolicy, which equals the frontend default
+      # below (internal/config/csp_deployment_test.go pins all copies).
+      GOTUNNELS_CSP_POLICY: "${GOTUNNELS_CSP_POLICY:-}"
       # Account-creation rate limits (password signup and passkey-signup
       # finish). An interval of 0 disables that guard.
       GOTUNNELS_SIGNUP_IP_INTERVAL: "${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m}"
@@ -865,7 +883,14 @@ services:
     # works EXCEPT passkeys. See scripts/up.sh step 3/6 and virginia.txt.
     environment:
       GOTUNNELS_CSP_HEADER_NAME: "${GOTUNNELS_CSP_HEADER_NAME:-Content-Security-Policy-Report-Only}"
-      GOTUNNELS_CSP_POLICY: "${GOTUNNELS_CSP_POLICY:-default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'}"
+      # Must stay identical to config.DefaultCSPPolicy (pinned by
+      # internal/config/csp_deployment_test.go). Caddy appends
+      # `; report-uri /csp-report; report-to csp-endpoint` itself — never put
+      # reporting directives in this value.
+      GOTUNNELS_CSP_POLICY: "${GOTUNNELS_CSP_POLICY:-default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; media-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'}"
+      # Where Caddy forwards native CSP violation reports posted to the
+      # same-origin /csp-report path (see frontend/Caddyfile).
+      GOTUNNELS_API_UPSTREAM: "${GOTUNNELS_API_UPSTREAM:-api:8080}"
     restart: unless-stopped
 
   cloudflared-frontend:
@@ -946,14 +971,14 @@ ENTRYPOINT ["/api"]
   File name:             Containerfile.frontend
   Relative path:         Containerfile.frontend
   Absolute path:         /home/kushal/src/golang/GoTunnels/Containerfile.frontend
-  Size:                  1.2 KiB (1309 bytes)
-  Last modified:         2026-07-01 18:10:36.355264271 -0400
+  Size:                  1.5 KiB (1585 bytes)
+  Last modified:         2026-07-07 17:49:23.205563805 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805928
+  Inode:                 19931303
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               1faa4dd9b33c03d28e943852f4ab4a39dd7c6d2f720adf18cdf0841491d2c0ca
+  SHA-256:               0bd885b147f3311d245faa17c1ca26e6b89d3309bf9656e729cb1d20a2ca1816
   Last git commit:       995655c 2026-07-01 18:11:28 -0400 add claude response
 
 --- CONTENT ---
@@ -974,10 +999,14 @@ ENTRYPOINT ["/api"]
 FROM docker.io/library/caddy:2-alpine
 
 # Copy the web app, then place the Caddyfile where Caddy expects it and remove
-# the copy that landed under the web root so it is never served.
+# the copy that landed under the web root so it is never served. `caddy
+# validate` then fails the BUILD on any Caddyfile error (env placeholders use
+# their in-file defaults at validate time; upstreams are not dialled), so a
+# broken config can never ship in an image.
 COPY frontend/ /srv/
 COPY frontend/Caddyfile /etc/caddy/Caddyfile
-RUN rm -f /srv/Caddyfile
+RUN rm -f /srv/Caddyfile \
+ && caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
 EXPOSE 8080
 # The base image's default entrypoint runs:
@@ -1030,14 +1059,14 @@ README.md
   File name:             ARCHITECTURE.md
   Relative path:         docs/ARCHITECTURE.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/docs/ARCHITECTURE.md
-  Size:                  13.8 KiB (14169 bytes)
-  Last modified:         2026-07-04 17:18:07.000000000 -0400
+  Size:                  14.9 KiB (15276 bytes)
+  Last modified:         2026-07-07 17:51:30.250430556 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406593
+  Inode:                 19931454
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               2eb861b6fe93b6271ac9d5d3d6f5e53adbf61dcd5ff9c77388dfa0f6fd396771
+  SHA-256:               25a94804664ec489a433198638115d7ffb8b04e01f383572f46f221306f676a5
   Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
 
 --- CONTENT ---
@@ -1144,17 +1173,34 @@ never needs a raw IP.
 
 Caddy emits the CSP header, centrally configured via environment variables. It
 ships as `Content-Security-Policy-Report-Only` with a strict self-only policy.
-The header carries **no** `report-uri`/`report-to`, because the API's URL is
-only known at runtime. Instead, `frontend/js/csp.js` listens for the in-page
-`securitypolicyviolation` event (which fires for both report-only and enforcing
-policies, regardless of any reporting endpoint) and POSTs a compact JSON report
-to the API.
 
-`internal/csp` normalises the three report shapes browsers actually send — the
-legacy `application/csp-report` object, the Reporting API array, and the custom
-body from the in-page listener — into one row. Each report is both stored in
-`csp_reports` and logged through the OpenTelemetry-backed logger, so violations
-show up in telemetry too.
+Violation reporting is **native browser reporting**. The API's public URL is a
+Quick Tunnel only discovered at runtime, so the policy cannot name it directly
+— instead Caddy exposes a stable same-origin path, `/csp-report`, and
+reverse-proxies it over the internal compose network to the API's
+`POST /api/csp-reports` (upstream configurable via `GOTUNNELS_API_UPSTREAM`,
+default `api:8080`). The Caddyfile appends
+`report-uri /csp-report; report-to csp-endpoint` to whatever policy is
+configured and sends a matching `Reporting-Endpoints: csp-endpoint="/csp-report"`
+header, so browsers on the legacy `report-uri` path and on the modern
+Reporting API both deliver reports, in report-only and enforcing modes alike.
+Because the directives are appended **outside** the `GOTUNNELS_CSP_POLICY`
+value, reporting keeps working even with a customised (or stale) policy in an
+old `.env`. Same-origin also means no CORS preflight and no runtime URL
+discovery; the earlier in-page `securitypolicyviolation` listener
+(`frontend/js/csp.js`) is gone — native reporting also catches violations that
+occur before any JavaScript loads.
+
+`internal/csp` normalises the report shapes browsers actually send — the
+legacy `application/csp-report` object and the Reporting API
+`application/reports+json` array (plus the camelCase shape the former in-page
+listener posted, kept for compatibility) — into one row. Each report is both
+stored in `csp_reports` and logged through the OpenTelemetry-backed logger, so
+violations show up in telemetry too.
+`internal/config/csp_deployment_test.go` pins every duplicated copy of the
+default policy to `config.DefaultCSPPolicy` and pins the Caddyfile's reporting
+wiring, and the container smoke test posts both wire formats through the
+proxy end to end.
 
 ## Telemetry
 
@@ -1317,14 +1363,14 @@ also annotate their active span (batch sizes, note ids) so traces answer
   File name:             CONFIGURATION.md
   Relative path:         docs/CONFIGURATION.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/docs/CONFIGURATION.md
-  Size:                  7.0 KiB (7246 bytes)
-  Last modified:         2026-07-06 02:21:31.000000000 -0400
+  Size:                  7.9 KiB (8101 bytes)
+  Last modified:         2026-07-07 17:51:37.195689713 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816308
+  Inode:                 19931461
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               bb6090bfb42e4dd7d6fc5ad7bc2574f56eeebceacae897b012e508dec89a6832
+  SHA-256:               fe577c1f1b822d327adbe3e294ec054fb2dcf38019ecf25679a9c6b68e73e745
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
@@ -1415,7 +1461,8 @@ that guard.
 | --- | --- | --- |
 | `GOTUNNELS_CSP_HEADER_NAME` | `Content-Security-Policy-Report-Only` | Set to `Content-Security-Policy` to **enforce**. |
 | `GOTUNNELS_CSP_MODE` | `report-only` | Informational mirror surfaced on `/api/info` (`report-only` or `enforce`). |
-| `GOTUNNELS_CSP_POLICY` | strict self-only (see below) | The policy string. Emitted by Caddy; mirrored to the API for `/api/info`. |
+| `GOTUNNELS_CSP_POLICY` | strict self-only (see below) | The policy string. Emitted by Caddy; mirrored to the API for `/api/info`. Do **not** add `report-uri`/`report-to` here — Caddy appends them. |
+| `GOTUNNELS_API_UPSTREAM` | `api:8080` | Where the frontend's Caddy forwards native CSP violation reports POSTed to its same-origin `/csp-report` path (the api service on the compose network). |
 
 The default policy is fully self-hosted — no third-party scripts, styles,
 images, fonts, media, or frames:
@@ -1425,6 +1472,15 @@ default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self';
 font-src 'self'; connect-src 'self' https:; media-src 'self'; object-src 'none';
 frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
 ```
+
+Caddy appends `; report-uri /csp-report; report-to csp-endpoint` to the policy
+— outside `GOTUNNELS_CSP_POLICY`, so customised (or stale) policies keep
+reporting — and sends a matching `Reporting-Endpoints: csp-endpoint="/csp-report"`
+header. `/csp-report` is a same-origin path reverse-proxied to the API's
+`POST /api/csp-reports`, which is how reporting works without knowing the
+API's tunnel URL. `internal/config/csp_deployment_test.go` pins every
+duplicated copy of the default policy (compose, Caddyfile, `.env` template,
+`.env.example`, this file) to `config.DefaultCSPPolicy`.
 
 Because the app has no inline scripts, inline event handlers, or inline styles,
 it already satisfies the enforcing form of this policy.
@@ -1471,14 +1527,14 @@ naming and the test toolchain:
   File name:             .env.example
   Relative path:         .env.example
   Absolute path:         /home/kushal/src/golang/GoTunnels/.env.example
-  Size:                  3.3 KiB (3471 bytes)
-  Last modified:         2026-07-05 05:30:22.608843488 -0400
+  Size:                  3.8 KiB (3967 bytes)
+  Last modified:         2026-07-07 17:49:44.946703520 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805983
+  Inode:                 19931334
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               359973121fd9b6e975e32a55a6c5e19e1608c0e6e19ab56e3f15a83563b34621
+  SHA-256:               069f65dd3104b508a185918af42d31bde2f5e5657a8688df2f943f7d60751325
   Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
@@ -1521,7 +1577,14 @@ GOTUNNELS_CORS_ALLOWED_ORIGINS=*
 #   Content-Security-Policy              (enforce)
 GOTUNNELS_CSP_HEADER_NAME=Content-Security-Policy-Report-Only
 GOTUNNELS_CSP_MODE=report-only
-GOTUNNELS_CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+# Must match config.DefaultCSPPolicy (internal/config/csp_deployment_test.go
+# pins every copy). Caddy appends `; report-uri /csp-report; report-to
+# csp-endpoint` itself — never put reporting directives in this value.
+GOTUNNELS_CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; media-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+# Where the frontend's Caddy forwards native CSP violation reports POSTed to
+# its same-origin /csp-report path. The default (the api service on the
+# compose network) is right for every normal deployment.
+#GOTUNNELS_API_UPSTREAM=api:8080
 
 # --- Telemetry (optional) ----------------------------------------------------
 # Point at Uptrace Cloud (or any OTLP/HTTP backend) with a single DSN:
@@ -2040,14 +2103,14 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   File name:             Caddyfile
   Relative path:         frontend/Caddyfile
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/Caddyfile
-  Size:                  1.9 KiB (2009 bytes)
-  Last modified:         2026-07-01 09:28:22.000000000 -0400
+  Size:                  3.6 KiB (3741 bytes)
+  Last modified:         2026-07-07 17:47:05.503708214 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805939
+  Inode:                 19930979
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               87d66e1d965fd49db94f8f4dd3bdc722ffc49dedca2ad989abd5dfa2a5a8c39f
+  SHA-256:               73791fe7ccf87ad73d5869e76c2d3018488d3ace3a30e64c08c1547dce89cf6a
   Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
 
 --- CONTENT ---
@@ -2065,11 +2128,23 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 #                                 or "Content-Security-Policy" to enforce.
 #   GOTUNNELS_CSP_POLICY       -> the policy string. Defaults to a strict
 #                                 self-only policy (no third-party anything).
+#                                 Do NOT put report-uri/report-to in it; those
+#                                 are appended below, outside the variable, so
+#                                 reporting also works with a customised (or
+#                                 stale, pre-reporting) policy from an old .env.
+#   GOTUNNELS_API_UPSTREAM     -> host:port Caddy proxies /csp-report to.
+#                                 Defaults to the compose service address,
+#                                 api:8080.
 #
-# There is deliberately no report-uri/report-to directive: the API tunnel URL
-# is discovered at runtime, so violation reporting is done from the page via a
-# `securitypolicyviolation` listener (see js/csp.js) that POSTs to the API. The
-# violation event fires for both report-only and enforcing modes regardless.
+# Violation reporting is native browser reporting. The API's public URL is a
+# Quick Tunnel only discovered at runtime, so the policy cannot name it
+# directly. Instead this server exposes a stable same-origin path,
+# /csp-report, and reverse-proxies it over the internal compose network to the
+# API's POST /api/csp-reports. The policy carries `report-uri /csp-report`
+# (legacy, universally supported) plus `report-to csp-endpoint` backed by a
+# matching Reporting-Endpoints header (the modern Reporting API). Browsers
+# report violations in both report-only and enforcing modes, with no runtime
+# URL discovery and no CORS involved.
 
 {
 	admin off
@@ -2087,7 +2162,15 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 
 	header {
 		# Central CSP. Header name and policy both come from the environment.
-		{$GOTUNNELS_CSP_HEADER_NAME:Content-Security-Policy-Report-Only} "{$GOTUNNELS_CSP_POLICY:default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'}"
+		# The reporting directives are appended OUTSIDE the policy variable —
+		# see the file header for why.
+		{$GOTUNNELS_CSP_HEADER_NAME:Content-Security-Policy-Report-Only} "{$GOTUNNELS_CSP_POLICY:default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; media-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'}; report-uri /csp-report; report-to csp-endpoint"
+
+		# Reporting API endpoint group referenced by `report-to csp-endpoint`
+		# above. A relative URL resolves against this response's origin, i.e.
+		# the same /csp-report path report-uri uses. Backticks because the
+		# value itself contains double quotes.
+		Reporting-Endpoints `csp-endpoint="/csp-report"`
 
 		# Sensible always-on hardening headers.
 		X-Content-Type-Options "nosniff"
@@ -2098,10 +2181,21 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 		-Server
 	}
 
-	# Pretty routes: /login -> login.html, etc. config.json is a real file and
-	# is served as-is by file_server.
-	try_files {path} {path}.html {path}/ /index.html
-	file_server
+	# Native CSP reports land here (same origin — no preflight, no discovery)
+	# and are forwarded to the API's ingest endpoint on the internal compose
+	# network. handle blocks are mutually exclusive: this one wins for
+	# /csp-report, the bare handle below serves everything else.
+	handle /csp-report {
+		rewrite * /api/csp-reports
+		reverse_proxy {$GOTUNNELS_API_UPSTREAM:api:8080}
+	}
+
+	handle {
+		# Pretty routes: /login -> login.html, etc. config.json is a real
+		# file and is served as-is by file_server.
+		try_files {path} {path}.html {path}/ /index.html
+		file_server
+	}
 }
 
 
@@ -3334,23 +3428,24 @@ export const Api = {
   File name:             common.js
   Relative path:         frontend/js/common.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/common.js
-  Size:                  4.2 KiB (4366 bytes)
-  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Size:                  4.3 KiB (4475 bytes)
+  Last modified:         2026-07-07 17:48:18.453631703 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816317
+  Inode:                 19931215
   Hard links:            1
   MIME type:             application/javascript
-  SHA-256:               1c4b9b7d1bdb122dce5226b226b7b4c2c59450c6ed7bbfc9de4329e6f6a9c01a
+  SHA-256:               6c60f5143683833619f92daec6382358af406a342b25620f09b4cd8ee70264ab
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // common.js — shared helpers used by every page. Importing it also installs
-// the CSP violation reporter (via ./csp.js) and the theme picker in the top
-// bar (theme-boot.js already applied the saved theme pre-paint; this module
-// adds the UI and, when signed in, syncs the choice to the account).
+// the theme picker in the top bar (theme-boot.js already applied the saved
+// theme pre-paint; this module adds the UI and, when signed in, syncs the
+// choice to the account). CSP violation reporting needs no JS anymore: the
+// browser reports natively to the same-origin /csp-report path, which Caddy
+// proxies to the API (see frontend/Caddyfile).
 
-import "./csp.js";
 import { Api, getToken } from "./api.js";
 
 export function qs(sel, root = document) {
@@ -6391,14 +6486,14 @@ updates:
   File name:             ci.yaml
   Relative path:         .github/workflows/ci.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/workflows/ci.yaml
-  Size:                  1.5 KiB (1587 bytes)
-  Last modified:         2026-07-05 05:29:57.280107799 -0400
+  Size:                  2.2 KiB (2339 bytes)
+  Last modified:         2026-07-07 17:51:05.963733805 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805935
+  Inode:                 19931424
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               9c50b45ef68aab69cd415e19761b33aa06923f97e76cec5f2a7eced15b2b3077
+  SHA-256:               5ce0e2e0a1c24432963b55bf4bf57b56156b294c24b5a8afc6322ca4142d1a04
   Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
@@ -6425,6 +6520,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Fast, host-only checks on the bash layer: syntax, shellcheck (ships on
+      # ubuntu runners), and the hermetic detect_runtime/ensure_podman_socket
+      # unit tests (stubbed binaries — no containers, no sockets, no network).
+      - name: Shell script checks
+        run: |
+          for f in scripts/*.sh scripts/tests/*.sh; do bash -n "$f"; done
+          shellcheck -x -P SCRIPTDIR scripts/*.sh scripts/tests/*.sh
+          bash scripts/tests/lib-detect-test.sh
+
       - uses: actions/setup-go@v6
         with:
           go-version: "stable"
@@ -6438,9 +6542,13 @@ jobs:
   # that compose wiring + env substitution is correct, that migrations run
   # against a real Postgres, and that the HTTP surface works end to end —
   # including the captcha-sync regression that only reproduces against real
-  # Postgres via the pgx extended protocol. Ubuntu runners ship podman;
-  # podman-compose comes from pipx. No tunnels are started and no host ports
-  # are published; assertions run from a curl container on the compose network.
+  # Postgres via the pgx extended protocol, and the CSP reporting round trip
+  # through the frontend's /csp-report proxy. Ubuntu runners ship podman;
+  # podman-compose comes from pipx and scripts/lib.sh now PREFERS it over the
+  # `podman compose` dispatcher (which on these runners would delegate to
+  # docker's compose plugin against a podman socket that is not running).
+  # No tunnels are started and no host ports are published; assertions run
+  # from a curl container on the compose network.
   containers:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -10232,21 +10340,23 @@ func TestPerInterval(t *testing.T) {
   File name:             csp.go
   Relative path:         internal/csp/csp.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/csp/csp.go
-  Size:                  11.4 KiB (11733 bytes)
-  Last modified:         2026-07-06 02:21:29.000000000 -0400
+  Size:                  11.6 KiB (11963 bytes)
+  Last modified:         2026-07-07 17:48:33.290616140 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816338
+  Inode:                 19931235
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               4ff4d2478ebb51758563b4bf2ee11d53c9225d6ddffdc09bea36fe779c1f8b75
+  SHA-256:               e1b9dcc65c070fa4ebbccdea0a2841fb0f586ac5d1290241785f69c08a1dac97
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
-// Package csp accepts Content-Security-Policy violation reports in the three
-// shapes browsers actually send and normalises them into a single struct that
-// is both stored in Postgres and logged through the OpenTelemetry-backed slog
-// logger. The reporting endpoint is unauthenticated (browsers post it without
+// Package csp accepts Content-Security-Policy violation reports and
+// normalises them into a single struct that is both stored in Postgres and
+// logged through the OpenTelemetry-backed slog logger. Browsers deliver
+// reports natively to the frontend's same-origin /csp-report path, which
+// Caddy reverse-proxies to this package's handler (see frontend/Caddyfile).
+// The reporting endpoint is unauthenticated (browsers post it without
 // credentials), so callers rate-limit it at the middleware layer.
 package csp
 
@@ -10269,7 +10379,9 @@ import (
 //
 //   - legacy application/csp-report: {"csp-report": {...}} with hyphenated keys
 //   - the Reporting API application/reports+json: an array of {type,url,body}
-//   - a custom camelCase body posted by our in-page violation listener
+//   - a custom camelCase body — the shape the frontend's former in-page
+//     violation listener posted; parsing is kept so anything still speaking
+//     it keeps working
 //
 // The raw JSON of each individual report is preserved in Raw.
 func Normalize(contentType string, body []byte) ([]store.CSPReportInput, error) {
@@ -10413,7 +10525,7 @@ func parseReportingAPI(body []byte) ([]store.CSPReportInput, error) {
 	return out, nil
 }
 
-// --- custom in-page listener shape --------------------------------------
+// --- custom shape (former in-page listener; kept for compatibility) ------
 
 type customReport struct {
 	DocumentURI        string `json:"documentURI"`
@@ -15320,14 +15432,14 @@ the corresponding source.
   File name:             ci-container-test.sh
   Relative path:         scripts/ci-container-test.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/ci-container-test.sh
-  Size:                  11.1 KiB (11433 bytes)
-  Last modified:         2026-07-05 05:28:05.231486945 -0400
+  Size:                  13.4 KiB (13736 bytes)
+  Last modified:         2026-07-07 17:47:52.438658979 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19487463
+  Inode:                 19931174
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               bf444369d4648d3a619e3382fc61bb18efe7f09a98e3e9b2c51720a93149e1da
+  SHA-256:               1f3d27e7ae7847706c92ace7429fb35588232a70144f0ad25061ff64d4f81b84
   Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
@@ -15340,7 +15452,10 @@ the corresponding source.
 # migrations run against real Postgres, and that the HTTP surface behaves —
 # including a regression test for the captcha sync 500 (`operator is not
 # unique: unknown + unknown`), which only ever reproduced against a real
-# Postgres because unit tests never hit the pgx extended protocol.
+# Postgres because unit tests never hit the pgx extended protocol, and an
+# end-to-end check of native CSP reporting (browser wire formats POSTed to
+# the frontend's same-origin /csp-report proxy must land in the API's public
+# transparency feed).
 #
 # Runs identically on a laptop and in GitHub Actions:
 #   bash scripts/ci-container-test.sh [project-name]     (default: gotunnels-ci)
@@ -15582,11 +15697,36 @@ pre_code="$(ccurl -o /dev/null -w '%{http_code}' -X OPTIONS http://api:8080/api/
 assert_eq "$pre_code" "204" "CORS preflight answered with 204"
 
 # ---------------------------------------------------------------------------
-# 10) frontend serves the app with the CSP header
+# 10) frontend serves the app with the CSP header, wired for native reporting
 # ---------------------------------------------------------------------------
 front="$(ccurl -D - http://frontend:8080/)"
 assert_icontains "$front" 'content-security-policy' "frontend sends a CSP header"
+assert_icontains "$front" 'report-uri /csp-report'  "CSP carries report-uri (legacy reporting)"
+assert_icontains "$front" 'report-to csp-endpoint'  "CSP carries report-to (Reporting API)"
+assert_icontains "$front" 'reporting-endpoints'     "frontend sends the Reporting-Endpoints header"
 assert_icontains "$front" '<html' "frontend serves the HTML app"
+
+# ---------------------------------------------------------------------------
+# 11) CSP reporting end to end: both browser wire formats POSTed to the
+#     frontend's same-origin /csp-report path must proxy to the API (204) and
+#     show up in the public transparency feed. This exercises the Caddy
+#     rewrite + reverse_proxy, the Normalize() parsers, and the feed.
+# ---------------------------------------------------------------------------
+legacy_body='{"csp-report":{"document-uri":"http://frontend:8080/","blocked-uri":"https://blocked.invalid/legacy.js","violated-directive":"script-src","effective-directive":"script-src","original-policy":"default-src","disposition":"report","status-code":200}}'
+legacy_code="$(ccurl -o /dev/null -w '%{http_code}' -X POST http://frontend:8080/csp-report \
+  -H 'Content-Type: application/csp-report' \
+  --data-raw "$legacy_body")"
+assert_eq "$legacy_code" "204" "legacy csp-report accepted via /csp-report proxy"
+
+reports_body='[{"type":"csp-violation","age":10,"url":"http://frontend:8080/","user_agent":"ci","body":{"documentURL":"http://frontend:8080/","blockedURL":"https://blocked.invalid/reporting-api.css","effectiveDirective":"style-src-elem","originalPolicy":"default-src","disposition":"report","statusCode":200}}]'
+reports_code="$(ccurl -o /dev/null -w '%{http_code}' -X POST http://frontend:8080/csp-report \
+  -H 'Content-Type: application/reports+json' \
+  --data-raw "$reports_body")"
+assert_eq "$reports_code" "204" "reporting-api payload accepted via /csp-report proxy"
+
+feed="$(ccurl 'http://api:8080/api/csp-reports/recent?limit=50')"
+assert_contains "$feed" 'blocked.invalid/legacy.js'        "public feed lists the legacy report"
+assert_contains "$feed" 'blocked.invalid/reporting-api.css' "public feed lists the reporting-api report"
 
 # ---------------------------------------------------------------------------
 # verdict
@@ -15650,14 +15790,14 @@ ok "instance '$PROJECT' removed (containers + volumes)."
   File name:             lib.sh
   Relative path:         scripts/lib.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/lib.sh
-  Size:                  16.3 KiB (16765 bytes)
-  Last modified:         2026-07-05 05:28:18.176495561 -0400
-  Permissions:           -rwxr-xr-x
+  Size:                  20.1 KiB (20608 bytes)
+  Last modified:         2026-07-07 17:47:51.250660224 -0400
+  Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805976
+  Inode:                 19931168
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               65e9b20c46c25e983557068ca3e866c833d28f52768b3d047bf09974add6f2f4
+  SHA-256:               97109596340ab8ec03c53fcfb8e6cb27d38647fbab1a51539c4ee4b1048fc4e5
   Last git commit:       b29c6a3 2026-07-05 05:31:18 -0400 add claude response
 
 --- CONTENT ---
@@ -15690,16 +15830,44 @@ REPO_ROOT="$(cd "$LIB_DIR/.." && pwd)"
 # Sets:
 #   CR      -> container runtime binary (podman|docker) for logs/cp/inspect
 #   COMPOSE -> the compose invocation (may be two words, used unquoted)
+#
+# Preset CR and COMPOSE in the environment to bypass detection entirely.
+#
+# podman branch ordering is deliberate: prefer the podman-compose BINARY over
+# the `podman compose` dispatcher. `podman compose` is only a shim — it
+# executes whichever external provider it finds first, and on GitHub's ubuntu
+# runners that is docker's compose plugin
+# (/usr/libexec/docker/cli-plugins/docker-compose), which speaks the Docker
+# API to a podman socket that is not running by default in a rootless
+# session. That is exactly the CI failure "Cannot connect to the Docker
+# daemon at unix:///run/user/1001/podman/podman.sock" — the workflow's
+# pipx-installed podman-compose was sitting unused because the old detection
+# probed `podman compose` first. podman-compose drives the podman CLI
+# directly and needs no socket. When only the dispatcher exists we still use
+# it, but if its provider turns out to be docker-compose we make that path
+# workable: start the podman API socket and disable compose Bake (a
+# buildkit-only build path podman's compat socket cannot serve).
 detect_runtime() {
   if [ -n "${CR:-}" ] && [ -n "${COMPOSE:-}" ]; then return 0; fi
   if command -v podman >/dev/null 2>&1; then
     CR=podman
-    if podman compose version >/dev/null 2>&1; then
-      COMPOSE="podman compose"
-    elif command -v podman-compose >/dev/null 2>&1; then
+    if command -v podman-compose >/dev/null 2>&1; then
       COMPOSE="podman-compose"
+    elif podman compose version >/dev/null 2>&1; then
+      COMPOSE="podman compose"
+      local provider
+      provider="$(podman_compose_provider)"
+      if [ -n "$provider" ]; then
+        log "podman compose delegates to: $provider"
+      fi
+      case "$provider" in
+        *docker-compose*)
+          export COMPOSE_BAKE="${COMPOSE_BAKE:-false}"
+          ensure_podman_socket || die "podman compose delegates to docker-compose, which needs the podman API socket, and the socket could not be started. Install podman-compose (e.g. 'pipx install podman-compose') or start the socket yourself ('systemctl --user start podman.socket')."
+          ;;
+      esac
     else
-      die "podman found but neither 'podman compose' nor 'podman-compose' is available"
+      die "podman found but neither 'podman-compose' nor 'podman compose' is available"
     fi
   elif command -v docker >/dev/null 2>&1; then
     CR=docker
@@ -15713,6 +15881,53 @@ detect_runtime() {
   fi
   export CR COMPOSE
   log "using runtime: $CR / compose: $COMPOSE"
+}
+
+# podman_compose_provider — the path of the external provider that
+# `podman compose` would execute, parsed from its
+#   >>>> Executing external compose provider "<path>". ... <<<<
+# stderr banner. Empty when the banner is absent (older podman). Probe only —
+# never fails, so it is safe in `$(...)` under set -e/pipefail.
+podman_compose_provider() {
+  podman compose version 2>&1 \
+    | sed -n 's/.*Executing external compose provider "\([^"]*\)".*/\1/p' \
+    | sed -n '1p' || true
+}
+
+# ensure_podman_socket — make sure the podman API socket is accepting
+# connections; start it when it is not. Only needed when a Docker-API client
+# (docker's compose plugin) fronts podman. Prefers the systemd user unit;
+# falls back to a backgrounded `podman system service` with a 10-minute idle
+# timeout so it reaps itself — no EXIT trap needed here, which matters
+# because ci-container-test.sh already owns the (single) EXIT trap.
+ensure_podman_socket() {
+  local exists sock
+  exists="$(podman info --format '{{.Host.RemoteSocket.Exists}}' 2>/dev/null || true)"
+  if [ "$exists" = "true" ]; then return 0; fi
+
+  # Path may or may not carry a unix:// scheme depending on podman version.
+  sock="$(podman info --format '{{.Host.RemoteSocket.Path}}' 2>/dev/null || true)"
+  sock="${sock#unix://}"
+  log "podman API socket not running — starting it for the docker-compose provider"
+
+  if command -v systemctl >/dev/null 2>&1 \
+     && systemctl --user start podman.socket >/dev/null 2>&1; then
+    log "started podman.socket (systemd user unit)"
+  elif [ -n "$sock" ]; then
+    mkdir -p "$(dirname "$sock")" 2>/dev/null || true
+    (podman system service --time=600 "unix://$sock" >/dev/null 2>&1 &)
+    log "started 'podman system service' on unix://$sock (10 min idle timeout)"
+  else
+    (podman system service --time=600 >/dev/null 2>&1 &)
+    log "started 'podman system service' on the default socket (10 min idle timeout)"
+  fi
+
+  for _ in $(seq 1 40); do
+    exists="$(podman info --format '{{.Host.RemoteSocket.Exists}}' 2>/dev/null || true)"
+    if [ "$exists" = "true" ]; then return 0; fi
+    sleep 0.25
+  done
+  return 1
 }
 
 # dc: run a compose command against the repo compose file. COMPOSE may be two
@@ -15770,7 +15985,7 @@ GOTUNNELS_RP_ORIGINS=http://localhost:8080
 GOTUNNELS_CORS_ALLOWED_ORIGINS=*
 GOTUNNELS_CSP_HEADER_NAME=Content-Security-Policy-Report-Only
 GOTUNNELS_CSP_MODE=report-only
-GOTUNNELS_CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+GOTUNNELS_CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; media-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 UPTRACE_DSN=${UPTRACE_DSN:-}
 OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
 OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS:-}
@@ -15853,9 +16068,9 @@ resolve_project() {
   if [ -z "$p" ] && [ -n "${GOTUNNELS_INSTANCE_ID:-}" ] && [ "${GOTUNNELS_INSTANCE_ID}" != "default" ]; then
     p="gotunnels-${GOTUNNELS_INSTANCE_ID}"
   fi
-  if [ -z "$p" ]; then p="gotunnels-$(gen_secret 4 | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9' | cut -c1-6)"; fi
+  if [ -z "$p" ]; then p="gotunnels-$(gen_secret 4 | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9' | cut -c1-6)"; fi
   # compose project names must be lowercase alnum/dash/underscore.
-  p="$(printf '%s' "$p" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')"
+  p="$(printf '%s' "$p" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-')"
   echo "$p"
 }
 
@@ -15933,9 +16148,9 @@ health_status() { # cid
 wait_healthy() { # project service timeout_seconds [probe-cmd...]
   local project="$1" svc="$2" timeout="${3:-90}"
   shift 3 2>/dev/null || true
-  local i cid status st hs
+  local cid status st hs
   log "waiting for '$svc' to become ready (up to ${timeout}s)"
-  for i in $(seq 1 "$timeout"); do
+  for _ in $(seq 1 "$timeout"); do
     cid="$(cid_of "$project" "$svc")"
     if [ -n "$cid" ]; then
       status="$(health_status "$cid")"
@@ -15966,8 +16181,8 @@ wait_healthy() { # project service timeout_seconds [probe-cmd...]
 }
 
 poll_tunnel_url() { # project service timeout_seconds
-  local project="$1" svc="$2" timeout="${3:-60}" i cid url
-  for i in $(seq 1 "$timeout"); do
+  local project="$1" svc="$2" timeout="${3:-60}" cid url
+  for _ in $(seq 1 "$timeout"); do
     cid="$(cid_of "$project" "$svc")"
     if [ -n "$cid" ]; then
       # `|| true` is required: before the URL is logged, `grep` matches nothing
@@ -15994,8 +16209,8 @@ poll_tunnel_url() { # project service timeout_seconds
 # reading to EOF lets `logs` exit 0. A genuine no-match still exits 1 and the
 # loop just polls again.
 wait_for_log() {
-  local project="$1" svc="$2" pat="$3" timeout="${4:-60}" i cid
-  for i in $(seq 1 "$timeout"); do
+  local project="$1" svc="$2" pat="$3" timeout="${4:-60}" cid
+  for _ in $(seq 1 "$timeout"); do
     cid="$(cid_of "$project" "$svc")"
     if [ -n "$cid" ] && "$CR" logs "$cid" 2>&1 | grep -E -- "$pat" >/dev/null; then
       return 0
@@ -16413,9 +16628,9 @@ done
 # DUMP SUMMARY
 ################################################################################
   Files dumped   : 95
-  Total size     : 500.3 KiB (512391 bytes)
+  Total size     : 512.6 KiB (524944 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-07T09:05:02-04:00
+  Completed at   : 2026-07-07T17:52:57-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
