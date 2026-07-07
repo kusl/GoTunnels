@@ -266,4 +266,9 @@ a2ac6be6461e  docker.io/library/postgres:16-alpine          postgres            
 kushal@virginia:~/src/golang/GoTunnels$ exit
 logout
 Connection to virginia closed.
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash export.sh > docs/llm/vendor/output.txt
+
+real	0m3.010s
+user	0m1.446s
+sys	0m1.966s
 kushal@fedora:~/src/golang/GoTunnels$ 
