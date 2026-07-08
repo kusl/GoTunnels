@@ -1,8 +1,3 @@
-kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash export.sh > docs/llm/vendor/output.txt
-
-real	0m3.040s
-user	0m1.427s
-sys	0m1.996s
 kushal@fedora:~/src/golang/GoTunnels$ ssh virginia
 Linux virginia 6.12.95+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.95-1 (2026-07-04) x86_64
 
@@ -12,50 +7,55 @@ individual files in /usr/share/doc/*/copyright.
 
 Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
 permitted by applicable law.
-Last login: Tue Jul  7 17:53:35 2026 from 100.105.139.82
+Last login: Tue Jul  7 18:02:43 2026 from 100.105.139.82
 kushal@virginia:~$ podman ps -a
 CONTAINER ID  IMAGE                                         COMMAND               CREATED       STATUS                 PORTS                                         NAMES
-de63451507bb  localhost/gotunnels-jyxoxq_frontend:latest    caddy run --confi...  38 hours ago  Up 38 hours            80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-jyxoxq_frontend_1
-502d27af85a1  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago  Up 38 hours                                                          gotunnels-jyxoxq_cloudflared-frontend_1
-d4d1794e0675  docker.io/library/postgres:16-alpine          postgres              38 hours ago  Up 38 hours (healthy)  5432/tcp                                      gotunnels-jyxoxq_db_1
-b6f3e30d72aa  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago  Up 38 hours                                                          gotunnels-jyxoxq_cloudflared-api_1
-e47881889394  localhost/gotunnels-jyxoxq_api:latest                               38 hours ago  Up 38 hours            8080/tcp                                      gotunnels-jyxoxq_api_1
-62b5ec60d7ba  mcr.microsoft.com/dotnet/aspire-dashboard:13                        38 hours ago  Up 38 hours            0.0.0.0:18888->18888/tcp                      weather_aspire-dashboard_1
-64c6009c259f  localhost/weather_otelcol:latest              --config=/etc/ote...  38 hours ago  Up 38 hours            4317-4318/tcp, 55679/tcp                      weather_otelcol_1
-e4537886844e  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago  Up 38 hours                                                          weather_tunnel-aspire_1
-d6462c62fbb1  localhost/weather_api:latest                                        38 hours ago  Up 38 hours            0.0.0.0:8080->8080/tcp                        weather_api_1
-ae6484a4725a  localhost/weather_web:latest                                        38 hours ago  Up 38 hours            0.0.0.0:8081->8080/tcp                        weather_web_1
-8fab95dfc3dc  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago  Up 38 hours                                                          weather_tunnel-api_1
-6898f86e1ba9  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago  Up 38 hours                                                          weather_tunnel-web_1
-kushal@virginia:~$ cd ~/src/golang/GoTunnels/; time git status; time git fetch; time git status; time git remote show origin; time git pull; time git status; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh; podman ps -a;
+de63451507bb  localhost/gotunnels-jyxoxq_frontend:latest    caddy run --confi...  2 days ago    Up 2 days              80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-jyxoxq_frontend_1
+502d27af85a1  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago    Up 2 days                                                            gotunnels-jyxoxq_cloudflared-frontend_1
+d4d1794e0675  docker.io/library/postgres:16-alpine          postgres              2 days ago    Up 2 days (healthy)    5432/tcp                                      gotunnels-jyxoxq_db_1
+b6f3e30d72aa  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago    Up 2 days                                                            gotunnels-jyxoxq_cloudflared-api_1
+e47881889394  localhost/gotunnels-jyxoxq_api:latest                               2 days ago    Up 2 days              8080/tcp                                      gotunnels-jyxoxq_api_1
+62b5ec60d7ba  mcr.microsoft.com/dotnet/aspire-dashboard:13                        2 days ago    Up 2 days              0.0.0.0:18888->18888/tcp                      weather_aspire-dashboard_1
+64c6009c259f  localhost/weather_otelcol:latest              --config=/etc/ote...  2 days ago    Up 2 days              4317-4318/tcp, 55679/tcp                      weather_otelcol_1
+e4537886844e  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago    Up 2 days                                                            weather_tunnel-aspire_1
+d6462c62fbb1  localhost/weather_api:latest                                        2 days ago    Up 2 days              0.0.0.0:8080->8080/tcp                        weather_api_1
+ae6484a4725a  localhost/weather_web:latest                                        2 days ago    Up 2 days              0.0.0.0:8081->8080/tcp                        weather_web_1
+8fab95dfc3dc  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago    Up 2 days                                                            weather_tunnel-api_1
+6898f86e1ba9  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago    Up 2 days                                                            weather_tunnel-web_1
+c4a1a1f9bf44  localhost/gotunnels-boc0tg_frontend:latest    caddy run --confi...  16 hours ago  Up 16 hours            80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-boc0tg_frontend_1
+1872bd68152f  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  16 hours ago  Up 16 hours                                                          gotunnels-boc0tg_cloudflared-frontend_1
+a2ac6be6461e  docker.io/library/postgres:16-alpine          postgres              16 hours ago  Up 16 hours (healthy)  5432/tcp                                      gotunnels-boc0tg_db_1
+42d8eba536ae  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  16 hours ago  Up 16 hours                                                          gotunnels-boc0tg_cloudflared-api_1
+766d4fa49272  localhost/gotunnels-boc0tg_api:latest                               16 hours ago  Up 16 hours            8080/tcp                                      gotunnels-boc0tg_api_1
+kushal@virginia:~$ cd ~/src/golang/GoTunnels/; time git status; time git fetch; time git status; time git remote show origin; time git pull; time git status; cat .env; rm .env;
 On branch main
 Your branch is up to date with 'origin/main'.
 
 nothing to commit, working tree clean
 
-real	0m0.020s
-user	0m0.016s
+real	0m0.018s
+user	0m0.014s
 sys	0m0.004s
-remote: Enumerating objects: 44, done.
-remote: Counting objects: 100% (44/44), done.
-remote: Compressing objects: 100% (13/13), done.
-remote: Total 34 (delta 21), reused 34 (delta 21), pack-reused 0 (from 0)
-Unpacking objects: 100% (34/34), 14.76 KiB | 225.00 KiB/s, done.
+remote: Enumerating objects: 129, done.
+remote: Counting objects: 100% (129/129), done.
+remote: Compressing objects: 100% (44/44), done.
+remote: Total 99 (delta 65), reused 86 (delta 52), pack-reused 0 (from 0)
+Unpacking objects: 100% (99/99), 92.52 KiB | 442.00 KiB/s, done.
 From https://github.com/kusl/GoTunnels
-   2e5be2f..77c262a  main       -> origin/main
+   77c262a..0649fc2  main       -> origin/main
 
-real	0m0.396s
-user	0m0.155s
-sys	0m0.055s
+real	0m0.584s
+user	0m0.276s
+sys	0m0.082s
 On branch main
-Your branch is behind 'origin/main' by 5 commits, and can be fast-forwarded.
+Your branch is behind 'origin/main' by 12 commits, and can be fast-forwarded.
   (use "git pull" to update your local branch)
 
 nothing to commit, working tree clean
 
-real	0m0.005s
-user	0m0.005s
-sys	0m0.000s
+real	0m0.007s
+user	0m0.004s
+sys	0m0.003s
 * remote origin
   Fetch URL: https://github.com/kusl/GoTunnels/
   Push  URL: https://github.com/kusl/GoTunnels/
@@ -67,34 +67,145 @@ sys	0m0.000s
   Local ref configured for 'git push':
     main pushes to main (local out of date)
 
-real	0m0.228s
-user	0m0.099s
-sys	0m0.022s
-Updating 2e5be2f..77c262a
+real	0m0.290s
+user	0m0.122s
+sys	0m0.018s
+Updating 77c262a..0649fc2
 Fast-forward
- docs/llm/dump.txt                               |  464 ++++++++++++++++++++++++++++++++++++++++++----
- docs/llm/vendor/claude-conversations.md         | 1579 ++++++++---------------------------------------------------------------------------------------------------------------------------------------------------
- docs/llm/vendor/output.txt                      |  464 ++++++++++++++++++++++++++++++++++++++++++----
- docs/llm/vendor/virginia.txt                    |  411 +++++++++++++----------------------------
- internal/{csp => config}/csp_deployment_test.go |    0
- 5 files changed, 1062 insertions(+), 1856 deletions(-)
- rename internal/{csp => config}/csp_deployment_test.go (100%)
+ .env.example                                      |   13 ++
+ README.md                                         |    7 +-
+ docs/ARCHITECTURE.md                              |   32 +++-
+ docs/CONFIGURATION.md                             |   11 +-
+ docs/llm/dump.txt                                 | 1191 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------------------
+ docs/llm/vendor/claude-conversations.md           | 1398 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------
+ docs/llm/vendor/output.txt                        | 1191 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------------------
+ docs/llm/vendor/virginia.txt                      |  258 +++++++++++++++++------------
+ frontend/js/api.js                                |   58 ++++++-
+ frontend/js/common.js                             |   72 ++++++--
+ frontend/js/page-settings.js                      |   21 ++-
+ frontend/settings.html                            |    9 +
+ internal/auth/handlers.go                         |   66 +++++++-
+ internal/auth/handlers_test.go                    |  109 ++++++++++++
+ internal/config/config.go                         |   12 +-
+ internal/config/config_test.go                    |   57 +++++++
+ internal/config/session_persistence_test.go       |  169 +++++++++++++++++++
+ internal/server/server.go                         |    1 +
+ internal/store/store.go                           |   36 +++-
+ migrations/0008_sessions_optional_expiry.down.sql |    9 +
+ migrations/0008_sessions_optional_expiry.up.sql   |   20 +++
+ scripts/{ => tests}/lib-detect-test.sh            |    0
+ 22 files changed, 3792 insertions(+), 948 deletions(-)
+ create mode 100644 internal/config/session_persistence_test.go
+ create mode 100644 migrations/0008_sessions_optional_expiry.down.sql
+ create mode 100644 migrations/0008_sessions_optional_expiry.up.sql
+ rename scripts/{ => tests}/lib-detect-test.sh (100%)
 
-real	0m0.316s
-user	0m0.158s
-sys	0m0.046s
+real	0m0.339s
+user	0m0.163s
+sys	0m0.062s
 On branch main
 Your branch is up to date with 'origin/main'.
 
 nothing to commit, working tree clean
 
-real	0m0.018s
-user	0m0.014s
+real	0m0.020s
+user	0m0.016s
 sys	0m0.004s
+GOTUNNELS_VERSION=dev
+POSTGRES_USER=gotunnels
+POSTGRES_DB=gotunnels
+POSTGRES_PASSWORD=BeQGIO1cO4UAMVAYMd3F3Co3F_RqLeu2
+GOTUNNELS_IP_HASH_PEPPER=UwHFPPd1AjKs6U3GUWW7R_qhVqTQ-tdICJavIm8GHTs
+GOTUNNELS_TOTP_ENCRYPTION_KEY=kU37mfv1vCZxStoOJVjZR_sjhbypuEofkIIKEBobS90
+GOTUNNELS_RP_DISPLAY_NAME=GoTunnels
+GOTUNNELS_CSP_HEADER_NAME=Content-Security-Policy-Report-Only
+GOTUNNELS_CSP_MODE=report-only
+GOTUNNELS_CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+OTEL_EXPORTER_OTLP_ENDPOINT=
+OTEL_EXPORTER_OTLP_HEADERS=
+OTEL_EXPORTER_OTLP_COMPRESSION=gzip
+OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=base2_exponential_bucket_histogram
+OTEL_SERVICE_NAME=gotunnels-api
+GOTUNNELS_DEV=false
+UPTRACE_DSN=https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317
+GOTUNNELS_INSTANCE_ID=default
+GOTUNNELS_HOST_NAME=virginia
+GOTUNNELS_RP_ID=mounts-chicken-applicable-effectively.trycloudflare.com
+GOTUNNELS_RP_ORIGINS=https://mounts-chicken-applicable-effectively.trycloudflare.com
+GOTUNNELS_CORS_ALLOWED_ORIGINS=https://mounts-chicken-applicable-effectively.trycloudflare.com
+kushal@virginia:~/src/golang/GoTunnels$ podman ps -a
+CONTAINER ID  IMAGE                                         COMMAND               CREATED       STATUS                 PORTS                                         NAMES
+de63451507bb  localhost/gotunnels-jyxoxq_frontend:latest    caddy run --confi...  2 days ago    Up 2 days              80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-jyxoxq_frontend_1
+502d27af85a1  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago    Up 2 days                                                            gotunnels-jyxoxq_cloudflared-frontend_1
+d4d1794e0675  docker.io/library/postgres:16-alpine          postgres              2 days ago    Up 2 days (healthy)    5432/tcp                                      gotunnels-jyxoxq_db_1
+b6f3e30d72aa  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago    Up 2 days                                                            gotunnels-jyxoxq_cloudflared-api_1
+e47881889394  localhost/gotunnels-jyxoxq_api:latest                               2 days ago    Up 2 days              8080/tcp                                      gotunnels-jyxoxq_api_1
+62b5ec60d7ba  mcr.microsoft.com/dotnet/aspire-dashboard:13                        2 days ago    Up 2 days              0.0.0.0:18888->18888/tcp                      weather_aspire-dashboard_1
+64c6009c259f  localhost/weather_otelcol:latest              --config=/etc/ote...  2 days ago    Up 2 days              4317-4318/tcp, 55679/tcp                      weather_otelcol_1
+e4537886844e  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago    Up 2 days                                                            weather_tunnel-aspire_1
+d6462c62fbb1  localhost/weather_api:latest                                        2 days ago    Up 2 days              0.0.0.0:8080->8080/tcp                        weather_api_1
+ae6484a4725a  localhost/weather_web:latest                                        2 days ago    Up 2 days              0.0.0.0:8081->8080/tcp                        weather_web_1
+8fab95dfc3dc  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago    Up 2 days                                                            weather_tunnel-api_1
+6898f86e1ba9  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago    Up 2 days                                                            weather_tunnel-web_1
+c4a1a1f9bf44  localhost/gotunnels-boc0tg_frontend:latest    caddy run --confi...  16 hours ago  Up 16 hours            80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-boc0tg_frontend_1
+1872bd68152f  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  16 hours ago  Up 16 hours                                                          gotunnels-boc0tg_cloudflared-frontend_1
+a2ac6be6461e  docker.io/library/postgres:16-alpine          postgres              16 hours ago  Up 16 hours (healthy)  5432/tcp                                      gotunnels-boc0tg_db_1
+42d8eba536ae  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  16 hours ago  Up 16 hours                                                          gotunnels-boc0tg_cloudflared-api_1
+766d4fa49272  localhost/gotunnels-boc0tg_api:latest                               16 hours ago  Up 16 hours            8080/tcp                                      gotunnels-boc0tg_api_1
+kushal@virginia:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; time git status; time git fetch; time git status; time git remote show origin; time git pull; time git status; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh; podman ps -a;
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.021s
+user	0m0.017s
+sys	0m0.004s
+
+real	0m0.289s
+user	0m0.124s
+sys	0m0.022s
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.006s
+user	0m0.003s
+sys	0m0.003s
+* remote origin
+  Fetch URL: https://github.com/kusl/GoTunnels/
+  Push  URL: https://github.com/kusl/GoTunnels/
+  HEAD branch: main
+  Remote branch:
+    main tracked
+  Local branch configured for 'git pull':
+    main merges with remote main
+  Local ref configured for 'git push':
+    main pushes to main (up to date)
+
+real	0m0.241s
+user	0m0.095s
+sys	0m0.040s
+Already up to date.
+
+real	0m0.273s
+user	0m0.112s
+sys	0m0.039s
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.005s
+user	0m0.003s
+sys	0m0.002s
 [gotunnels] using runtime: podman / compose: podman-compose
-[gotunnels] using existing /home/kushal/src/golang/GoTunnels/.env
+[gotunnels] generating fresh .env with per-instance secrets
+[gotunnels] wrote /home/kushal/src/golang/GoTunnels/.env (gitignored)
 [gotunnels] reset tunnel-derived env (RP_ID / RP_ORIGINS / CORS) to bootstrap defaults
-[gotunnels] project (instance): gotunnels-boc0tg
+[gotunnels] project (instance): gotunnels-q6c9jg
 [gotunnels] telemetry host.name: virginia
 [gotunnels] building images…
 [1/2] STEP 1/6: FROM golang:1.26-bookworm AS build
@@ -107,71 +218,75 @@ STEP 2/5: COPY frontend/ /srv/
 --> Using cache 1585dd71df54e573d229a88d4f863eb5311cc78b84dacb6e7bbd55a712e35ae2
 --> 1585dd71df54
 [1/2] STEP 4/6: COPY . .
---> Using cache 7c7b93fa23a762d2036928ee4856814f7aaa8d7952ad83b8909583315be3f44f
---> 7c7b93fa23a7
+--> bbeae7ead348
 STEP 3/5: COPY frontend/Caddyfile /etc/caddy/Caddyfile
---> Using cache a9d6abd35f349d1730b2e9994086c247ad4e6401cff66a8991489b9267b005b5
---> a9d6abd35f34
-STEP 4/5: RUN rm -f /srv/Caddyfile  && caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
---> Using cache 67cff4242895dde91422a120a4e2220f3d987fdf73a896921e0ec020b6e1b8ac
---> 67cff4242895
-STEP 5/5: EXPOSE 8080
---> 50760ea0f687
+--> af8942f4892b
 [1/2] STEP 5/6: ARG VERSION=dev
---> Using cache e5fedf05a8ae1674f1e79c425a32d5abc1e7245d41248ce0764585f3aa75af4c
-COMMIT gotunnels-boc0tg_frontend
---> e5fedf05a8ae
-Successfully tagged localhost/gotunnels-boc0tg_frontend:latest
-Successfully tagged localhost/gotunnels-ufjxyw_frontend:latest
-e5fedf05a8ae1674f1e79c425a32d5abc1e7245d41248ce0764585f3aa75af4c
---> aacac0664b8e
+--> 7710cafe3f8a
+STEP 4/5: RUN rm -f /srv/Caddyfile  && caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+--> 8896f8ad3557
 [1/2] STEP 6/6: RUN go mod tidy  && go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+{"level":"info","ts":1783519606.2135534,"msg":"using config from file","file":"/etc/caddy/Caddyfile"}
+{"level":"info","ts":1783519606.217013,"msg":"adapted config to JSON","adapter":"caddyfile"}
+{"level":"warn","ts":1783519606.2170439,"msg":"Caddyfile input is not formatted; run 'caddy fmt --overwrite' to fix inconsistencies","adapter":"caddyfile","file":"/etc/caddy/Caddyfile","line":32}
+{"level":"info","ts":1783519606.2178273,"msg":"redirected default logger","from":"stderr","to":"stdout"}
+{"level":"info","ts":1783519606.2180283,"logger":"http.auto_https","msg":"automatic HTTPS is completely disabled for server","server_name":"srv0"}
+{"level":"info","ts":1783519606.2181609,"logger":"tls.cache.maintenance","msg":"started background certificate maintenance","cache":"0x27d5820dbe00"}
+{"level":"info","ts":1783519606.2186997,"logger":"tls.cache.maintenance","msg":"stopped background certificate maintenance","cache":"0x27d5820dbe00"}
+{"level":"info","ts":1783519606.2187228,"logger":"http","msg":"servers shutting down with eternal grace period"}
+Valid configuration
 go: downloading github.com/go-webauthn/webauthn v0.11.2
-go: downloading github.com/pquerna/otp v1.4.0
-go: downloading golang.org/x/crypto v0.53.0
 go: downloading github.com/jackc/pgx/v5 v5.10.0
 go: downloading go.opentelemetry.io/contrib/bridges/otelslog v0.19.0
 go: downloading go.opentelemetry.io/otel v1.44.0
 go: downloading go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.20.0
 go: downloading go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.44.0
 go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.44.0
-go: downloading go.opentelemetry.io/otel/metric v1.44.0
 go: downloading go.opentelemetry.io/otel/log v0.20.0
-go: downloading go.opentelemetry.io/otel/trace v1.44.0
+--> 195e0a195e09
+STEP 5/5: EXPOSE 8080
+COMMIT gotunnels-q6c9jg_frontend
 go: downloading go.opentelemetry.io/otel/sdk/log v0.20.0
+--> 301eeffe26e0
+Successfully tagged localhost/gotunnels-q6c9jg_frontend:latest
+301eeffe26e022ba991f8d785de44c1c32750b6c36ebb0d9853b193cd4a5d866
 go: downloading go.opentelemetry.io/otel/sdk v1.44.0
 go: downloading go.opentelemetry.io/otel/sdk/metric v1.44.0
 go: downloading go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
-go: downloading github.com/golang-jwt/jwt/v5 v5.2.2
-go: downloading github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc
+go: downloading go.opentelemetry.io/otel/metric v1.44.0
+go: downloading go.opentelemetry.io/otel/trace v1.44.0
+go: downloading github.com/pquerna/otp v1.4.0
+go: downloading golang.org/x/crypto v0.53.0
 go: downloading github.com/stretchr/testify v1.11.1
-go: downloading github.com/google/go-tpm v0.9.1
 go: downloading github.com/google/uuid v1.6.0
-go: downloading github.com/jackc/puddle/v2 v2.2.2
-go: downloading github.com/mitchellh/mapstructure v1.5.0
-go: downloading github.com/go-logr/logr v1.4.3
-go: downloading github.com/go-logr/stdr v1.2.2
-go: downloading github.com/google/go-cmp v0.7.0
-go: downloading golang.org/x/sys v0.46.0
-go: downloading go.opentelemetry.io/proto/otlp v1.10.0
-go: downloading google.golang.org/protobuf v1.36.11
-go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0
 go: downloading github.com/jackc/pgpassfile v1.0.0
 go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
 go: downloading golang.org/x/text v0.38.0
+go: downloading github.com/felixge/httpsnoop v1.0.4
+go: downloading github.com/jackc/puddle/v2 v2.2.2
+go: downloading github.com/go-logr/stdr v1.2.2
+go: downloading github.com/go-logr/logr v1.4.3
+go: downloading github.com/google/go-cmp v0.7.0
+go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0
+go: downloading go.opentelemetry.io/proto/otlp v1.10.0
+go: downloading google.golang.org/protobuf v1.36.11
+go: downloading github.com/golang-jwt/jwt/v5 v5.2.2
+go: downloading github.com/mitchellh/mapstructure v1.5.0
+go: downloading github.com/google/go-tpm v0.9.1
 go: downloading go.opentelemetry.io/otel/metric/x v0.66.0
+go: downloading golang.org/x/sys v0.46.0
 go: downloading go.uber.org/goleak v1.3.0
 go: downloading github.com/go-webauthn/x v0.1.14
-go: downloading github.com/fxamacker/cbor/v2 v2.7.0
-go: downloading github.com/felixge/httpsnoop v1.0.4
+go: downloading github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc
 go: downloading go.opentelemetry.io/auto/sdk v1.2.1
 go: downloading github.com/cespare/xxhash/v2 v2.3.0
+go: downloading google.golang.org/grpc v1.81.1
 go: downloading github.com/cenkalti/backoff/v5 v5.0.3
-go: downloading go.opentelemetry.io/otel/sdk/log/logtest v0.20.0
 go: downloading golang.org/x/sync v0.17.0
 go: downloading github.com/davecgh/go-spew v1.1.1
 go: downloading github.com/pmezard/go-difflib v1.0.0
-go: downloading google.golang.org/grpc v1.81.1
+go: downloading github.com/fxamacker/cbor/v2 v2.7.0
+go: downloading go.opentelemetry.io/otel/sdk/log/logtest v0.20.0
 go: downloading github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
 go: downloading gopkg.in/yaml.v3 v3.0.1
 go: downloading github.com/x448/float16 v0.8.4
@@ -181,94 +296,91 @@ go: downloading golang.org/x/net v0.55.0
 go: downloading golang.org/x/sync v0.21.0
 go: downloading github.com/golang/protobuf v1.5.4
 go: downloading gonum.org/v1/gonum v0.17.0
---> 841f6dc96f5c
+--> 610dbfb02e7b
 [2/2] STEP 1/6: FROM gcr.io/distroless/static-debian12:nonroot
 [2/2] STEP 2/6: WORKDIR /
 --> Using cache e14ab4df47cf49d299ef67fca396aff23ad8f94f577a9affba7a1f3e454ca183
 --> e14ab4df47cf
 [2/2] STEP 3/6: COPY --from=build /out/api /api
---> 3f21ba7e634f
+--> 703d1694d024
 [2/2] STEP 4/6: USER nonroot:nonroot
---> 7b6e5297e623
+--> 6813e73d8ebb
 [2/2] STEP 5/6: EXPOSE 8080
---> 80a93daec74b
+--> dfd5f4e843c9
 [2/2] STEP 6/6: ENTRYPOINT ["/api"]
-[2/2] COMMIT gotunnels-boc0tg_api
---> 570287d65e58
-Successfully tagged localhost/gotunnels-boc0tg_api:latest
-570287d65e58d11729a1fb5d0fc7fff46d79533abc88a96551536bae6d3986b1
+[2/2] COMMIT gotunnels-q6c9jg_api
+--> bb68f08232c8
+Successfully tagged localhost/gotunnels-q6c9jg_api:latest
+bb68f08232c80e2809268f2077514b34bef20a46d2e43d160401ecbfd4155a0a
 [gotunnels] starting database…
-ced77f01150e4adb1080c901034278c45c8a5b455b76098d901a7e5c013b1391
-f80573023f4121ddee9382a41c2b238a59ac33c373301fe71f1b9ce42edfff83
-gotunnels-boc0tg_db_1
+b850d3aadb95a459ab5f02b06068ddb8d8a6b973b8a445a039edd02c806295f1
+97fb04d235b6018a2149533349350a986fbcb0bb66e917d92a84e3d26e936e30
+gotunnels-q6c9jg_db_1
 [gotunnels] waiting for 'db' to become ready (up to 60s)
-[gotunnels] 'db' is healthy
+[gotunnels] 'db' is ready
 [gotunnels] starting frontend and its tunnel…
-c4a1a1f9bf446f39474be6c96a5d69b1d94b2195c4aa661667655c2e15bf30a7
-gotunnels-boc0tg_frontend_1
-1872bd68152f793df3f5d0aac853bb8bb420d8f611565318adfa93de72c4bfe1
-gotunnels-boc0tg_cloudflared-frontend_1
+b09d9295ee754f886b24ae77d8108fe5d04359c394f920c349d7f408a8864c06
+gotunnels-q6c9jg_frontend_1
+3b5dc0ad74b72618d4ca1b87864823ca45a1063694e1909214b61f727875629b
+gotunnels-q6c9jg_cloudflared-frontend_1
 [gotunnels] waiting for the frontend Quick Tunnel URL…
-[gotunnels] frontend: https://mounts-chicken-applicable-effectively.trycloudflare.com
+[gotunnels] frontend: https://marie-editing-committed-preferred.trycloudflare.com
 [gotunnels] starting API and its tunnel…
-Error: no container with name or ID "gotunnels-boc0tg_api_1" found: no such container
-Error: no container with name or ID "gotunnels-boc0tg_cloudflared-api_1" found: no such container
-gotunnels-boc0tg_db_1
-Error: no container with ID or name "gotunnels-boc0tg_api_1" found: no such container
-Error: no container with ID or name "gotunnels-boc0tg_cloudflared-api_1" found: no such container
-gotunnels-boc0tg_db_1
-a2ac6be6461e17af827740b41cb58cee3cee4fe536e9578de06819cbdd9eb927
-gotunnels-boc0tg_db_1
-42d8eba536aef1b9d42bf9270db1ebaa41901b67a78d3d47446a1c6c3494a3e2
-gotunnels-boc0tg_cloudflared-api_1
-766d4fa49272c16d6ad34b690b3f06cfd95ebecaf4b4d549ce6a764cfaebac5a
-gotunnels-boc0tg_api_1
+Error: no container with name or ID "gotunnels-q6c9jg_api_1" found: no such container
+Error: no container with name or ID "gotunnels-q6c9jg_cloudflared-api_1" found: no such container
+gotunnels-q6c9jg_db_1
+Error: no container with ID or name "gotunnels-q6c9jg_api_1" found: no such container
+Error: no container with ID or name "gotunnels-q6c9jg_cloudflared-api_1" found: no such container
+gotunnels-q6c9jg_db_1
+57db0f9590e098aa9145456949cd42bc4a8873e87f3f710a34178fa915f5e1ff
+gotunnels-q6c9jg_db_1
+b534c318cfaa3fa50d761e8ba68dbf04e003f673126dca4bd8ed805f95e1fc69
+gotunnels-q6c9jg_cloudflared-api_1
+39aec8b0903ccd5b22c10deb9d1cdb407ad3a1ede236d3996efa25f7eaaef589
+gotunnels-q6c9jg_api_1
 [gotunnels] waiting for the API Quick Tunnel URL…
-[gotunnels] api: https://ladies-installations-silly-filed.trycloudflare.com
+[gotunnels] api: https://bare-ministers-proceeds-prayer.trycloudflare.com
 [gotunnels] wrote config.json into frontend container
 
 [gotunnels] GoTunnels is up.
-  Web app : https://mounts-chicken-applicable-effectively.trycloudflare.com
-  API     : https://ladies-installations-silly-filed.trycloudflare.com
-  Instance: gotunnels-boc0tg (urls saved to tunnel-urls.txt)
+  Web app : https://marie-editing-committed-preferred.trycloudflare.com
+  API     : https://bare-ministers-proceeds-prayer.trycloudflare.com
+  Instance: gotunnels-q6c9jg (urls saved to tunnel-urls.txt)
 
-[gotunnels] tear down with: scripts/down.sh gotunnels-boc0tg
+[gotunnels] tear down with: scripts/down.sh gotunnels-q6c9jg
 [gotunnels] waiting 60s for the Quick Tunnels to settle, then printing their URL log lines…
 
 [gotunnels] Web app — tunnel URL (from: podman logs cloudflared-frontend):
-2026-07-07T22:04:09Z INF |  https://mounts-chicken-applicable-effectively.trycloudflare.com                           |
+2026-07-08T14:08:19Z INF |  https://marie-editing-committed-preferred.trycloudflare.com                               |
 
 [gotunnels] API — tunnel URL (from: podman logs cloudflared-api):
-2026-07-07T22:04:17Z INF |  https://ladies-installations-silly-filed.trycloudflare.com                                |
+2026-07-08T14:08:27Z INF |  https://bare-ministers-proceeds-prayer.trycloudflare.com                                  |
 
 
-real	2m27.784s
-user	3m59.874s
-sys	0m28.576s
+real	2m45.878s
+user	4m3.942s
+sys	0m29.985s
 CONTAINER ID  IMAGE                                         COMMAND               CREATED             STATUS                       PORTS                                         NAMES
-de63451507bb  localhost/gotunnels-jyxoxq_frontend:latest    caddy run --confi...  38 hours ago        Up 38 hours                  80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-jyxoxq_frontend_1
-502d27af85a1  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago        Up 38 hours                                                                gotunnels-jyxoxq_cloudflared-frontend_1
-d4d1794e0675  docker.io/library/postgres:16-alpine          postgres              38 hours ago        Up 38 hours (healthy)        5432/tcp                                      gotunnels-jyxoxq_db_1
-b6f3e30d72aa  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago        Up 38 hours                                                                gotunnels-jyxoxq_cloudflared-api_1
-e47881889394  localhost/gotunnels-jyxoxq_api:latest                               38 hours ago        Up 38 hours                  8080/tcp                                      gotunnels-jyxoxq_api_1
-62b5ec60d7ba  mcr.microsoft.com/dotnet/aspire-dashboard:13                        38 hours ago        Up 38 hours                  0.0.0.0:18888->18888/tcp                      weather_aspire-dashboard_1
-64c6009c259f  localhost/weather_otelcol:latest              --config=/etc/ote...  38 hours ago        Up 38 hours                  4317-4318/tcp, 55679/tcp                      weather_otelcol_1
-e4537886844e  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago        Up 38 hours                                                                weather_tunnel-aspire_1
-d6462c62fbb1  localhost/weather_api:latest                                        38 hours ago        Up 38 hours                  0.0.0.0:8080->8080/tcp                        weather_api_1
-ae6484a4725a  localhost/weather_web:latest                                        38 hours ago        Up 38 hours                  0.0.0.0:8081->8080/tcp                        weather_web_1
-8fab95dfc3dc  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago        Up 38 hours                                                                weather_tunnel-api_1
-6898f86e1ba9  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  38 hours ago        Up 38 hours                                                                weather_tunnel-web_1
-c4a1a1f9bf44  localhost/gotunnels-boc0tg_frontend:latest    caddy run --confi...  About a minute ago  Up About a minute            80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-boc0tg_frontend_1
-1872bd68152f  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  About a minute ago  Up About a minute                                                          gotunnels-boc0tg_cloudflared-frontend_1
-a2ac6be6461e  docker.io/library/postgres:16-alpine          postgres              About a minute ago  Up About a minute (healthy)  5432/tcp                                      gotunnels-boc0tg_db_1
-42d8eba536ae  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  About a minute ago  Up About a minute                                                          gotunnels-boc0tg_cloudflared-api_1
-766d4fa49272  localhost/gotunnels-boc0tg_api:latest                               About a minute ago  Up About a minute            8080/tcp                                      gotunnels-boc0tg_api_1
-kushal@virginia:~/src/golang/GoTunnels$ exit
-logout
-Connection to virginia closed.
-kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash export.sh > docs/llm/vendor/output.txt
-
-real	0m3.010s
-user	0m1.446s
-sys	0m1.966s
-kushal@fedora:~/src/golang/GoTunnels$ 
+de63451507bb  localhost/gotunnels-jyxoxq_frontend:latest    caddy run --confi...  2 days ago          Up 2 days                    80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-jyxoxq_frontend_1
+502d27af85a1  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago          Up 2 days                                                                  gotunnels-jyxoxq_cloudflared-frontend_1
+d4d1794e0675  docker.io/library/postgres:16-alpine          postgres              2 days ago          Up 2 days (healthy)          5432/tcp                                      gotunnels-jyxoxq_db_1
+b6f3e30d72aa  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago          Up 2 days                                                                  gotunnels-jyxoxq_cloudflared-api_1
+e47881889394  localhost/gotunnels-jyxoxq_api:latest                               2 days ago          Up 2 days                    8080/tcp                                      gotunnels-jyxoxq_api_1
+62b5ec60d7ba  mcr.microsoft.com/dotnet/aspire-dashboard:13                        2 days ago          Up 2 days                    0.0.0.0:18888->18888/tcp                      weather_aspire-dashboard_1
+64c6009c259f  localhost/weather_otelcol:latest              --config=/etc/ote...  2 days ago          Up 2 days                    4317-4318/tcp, 55679/tcp                      weather_otelcol_1
+e4537886844e  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago          Up 2 days                                                                  weather_tunnel-aspire_1
+d6462c62fbb1  localhost/weather_api:latest                                        2 days ago          Up 2 days                    0.0.0.0:8080->8080/tcp                        weather_api_1
+ae6484a4725a  localhost/weather_web:latest                                        2 days ago          Up 2 days                    0.0.0.0:8081->8080/tcp                        weather_web_1
+8fab95dfc3dc  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago          Up 2 days                                                                  weather_tunnel-api_1
+6898f86e1ba9  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  2 days ago          Up 2 days                                                                  weather_tunnel-web_1
+c4a1a1f9bf44  localhost/gotunnels-boc0tg_frontend:latest    caddy run --confi...  16 hours ago        Up 16 hours                  80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-boc0tg_frontend_1
+1872bd68152f  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  16 hours ago        Up 16 hours                                                                gotunnels-boc0tg_cloudflared-frontend_1
+a2ac6be6461e  docker.io/library/postgres:16-alpine          postgres              16 hours ago        Up 16 hours (healthy)        5432/tcp                                      gotunnels-boc0tg_db_1
+42d8eba536ae  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  16 hours ago        Up 16 hours                                                                gotunnels-boc0tg_cloudflared-api_1
+766d4fa49272  localhost/gotunnels-boc0tg_api:latest                               16 hours ago        Up 16 hours                  8080/tcp                                      gotunnels-boc0tg_api_1
+b09d9295ee75  localhost/gotunnels-q6c9jg_frontend:latest    caddy run --confi...  About a minute ago  Up About a minute            80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-q6c9jg_frontend_1
+3b5dc0ad74b7  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  About a minute ago  Up About a minute                                                          gotunnels-q6c9jg_cloudflared-frontend_1
+57db0f9590e0  docker.io/library/postgres:16-alpine          postgres              About a minute ago  Up About a minute (healthy)  5432/tcp                                      gotunnels-q6c9jg_db_1
+b534c318cfaa  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  About a minute ago  Up About a minute                                                          gotunnels-q6c9jg_cloudflared-api_1
+39aec8b0903c  localhost/gotunnels-q6c9jg_api:latest                               About a minute ago  Up About a minute            8080/tcp                                      gotunnels-q6c9jg_api_1
+kushal@virginia:~/src/golang/GoTunnels$ 
