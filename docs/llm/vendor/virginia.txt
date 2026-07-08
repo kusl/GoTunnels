@@ -383,4 +383,12 @@ b09d9295ee75  localhost/gotunnels-q6c9jg_frontend:latest    caddy run --confi...
 57db0f9590e0  docker.io/library/postgres:16-alpine          postgres              About a minute ago  Up About a minute (healthy)  5432/tcp                                      gotunnels-q6c9jg_db_1
 b534c318cfaa  docker.io/cloudflare/cloudflared:latest       tunnel --no-autou...  About a minute ago  Up About a minute                                                          gotunnels-q6c9jg_cloudflared-api_1
 39aec8b0903c  localhost/gotunnels-q6c9jg_api:latest                               About a minute ago  Up About a minute            8080/tcp                                      gotunnels-q6c9jg_api_1
-kushal@virginia:~/src/golang/GoTunnels$ 
+kushal@virginia:~/src/golang/GoTunnels$ exit
+logout
+Connection to virginia closed.
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash export.sh > docs/llm/vendor/output.txt
+
+real	0m3.200s
+user	0m1.514s
+sys	0m1.947s
+kushal@fedora:~/src/golang/GoTunnels$ 

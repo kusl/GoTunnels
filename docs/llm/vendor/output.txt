@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-08T09:56:07-04:00
+  Generated at   : 2026-07-08T10:12:24-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,36 +17,18 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : 0d06beb77fc2fa915913262c6b6d4b227dd76838
-  Commit (short) : 0d06beb
-  Commit date    : 2026-07-08 09:49:37 -0400
-  Commit message : delete test file
+  Commit (full)  : e0446d988d835ab969b4d33c1c26befe7e7bd84d
+  Commit (short) : e0446d9
+  Commit date    : 2026-07-08 10:12:21 -0400
+  Commit message : add logs
   Remote origin  : git@github.com:kusl/GoTunnels.git
-  Files included : 97
+  Files included : 99
   Excluded path  : docs/llm/
   Excluded files : yarn.lock
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
- M .env.example
- M README.md
- M docs/ARCHITECTURE.md
- M docs/CONFIGURATION.md
- M docs/llm/vendor/claude-conversations.md
  M docs/llm/vendor/output.txt
- M frontend/js/api.js
- M frontend/js/common.js
- M frontend/js/page-settings.js
- M frontend/settings.html
- M internal/auth/handlers.go
- M internal/auth/handlers_test.go
- M internal/config/config.go
- M internal/config/config_test.go
- M internal/server/server.go
- M internal/store/store.go
-?? internal/config/session_persistence_test.go
-?? migrations/0008_sessions_optional_expiry.down.sql
-?? migrations/0008_sessions_optional_expiry.up.sql
 
 ################################################################################
 # FILE: export.sh  [THIS SCRIPT — included for full context]
@@ -442,7 +424,7 @@ FOOTER
 mv -f "$TMP_FILE" "$OUTPUT_FILE"
 
 ################################################################################
-# FILE TREE  (all 97 included files)
+# FILE TREE  (all 99 included files)
 ################################################################################
 .
 .
@@ -469,7 +451,6 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 │   │   ├── api.js
 │   │   ├── common.js
 │   │   ├── config.js
-│   │   ├── csp.js
 │   │   ├── page-activity.js
 │   │   ├── page-captcha.js
 │   │   ├── page-index.js
@@ -514,7 +495,8 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 │   ├── config
 │   │   ├── config.go
 │   │   ├── config_test.go
-│   │   └── csp_deployment_test.go
+│   │   ├── csp_deployment_test.go
+│   │   └── session_persistence_test.go
 │   ├── csp
 │   │   ├── csp.go
 │   │   └── csp_test.go
@@ -557,6 +539,8 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 │   ├── 0006_captcha_and_prefs.up.sql
 │   ├── 0007_notes.down.sql
 │   ├── 0007_notes.up.sql
+│   ├── 0008_sessions_optional_expiry.down.sql
+│   ├── 0008_sessions_optional_expiry.up.sql
 │   └── embed.go
 ├── README.md
 └── scripts
@@ -1075,7 +1059,7 @@ README.md
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               8b3747b7d095f02fdfa71f3868314cb54009c6550537e82ad6790be8d0968d17
-  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 # Architecture
@@ -1409,7 +1393,7 @@ also annotate their active span (batch sizes, note ids) so traces answer
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               643e097189c0aa01b77cacbf845fc7e85d25e8f4ba9000c1e96a04755666f169
-  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 # Configuration
@@ -1582,7 +1566,7 @@ naming and the test toolchain:
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               adbc9a5d786c1d8931dbca2b0dea1b60eccc365b644b33d38d4a088aa7139053
-  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 # .env.example — shape of the environment file.
@@ -3355,7 +3339,7 @@ hr.author-sep { border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               80f36c9afa61f8d5afbb9d480b89f0416177362724862184c8dbe3c85717e8cd
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 // api.js — the single place browser code talks to the API.
@@ -3544,7 +3528,7 @@ export const Api = {
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               d5671d953f80c417713a737cbcbea96144e320c8f0103ea482f689c179456d2f
-  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 // common.js — shared helpers used by every page. Importing it also installs
@@ -3776,69 +3760,6 @@ export function loadConfig() {
   }
   return cachedPromise;
 }
-
-
-################################################################################
-# FILE: frontend/js/csp.js
-################################################################################
-
---- METADATA ---
-  File name:             csp.js
-  Relative path:         frontend/js/csp.js
-  Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/csp.js
-  Size:                  1.5 KiB (1538 bytes)
-  Last modified:         2026-07-01 14:34:59.000000000 -0400
-  Permissions:           -rw-r--r--
-  Owner:                 kushal:kushal
-  Inode:                 17805947
-  Hard links:            1
-  MIME type:             application/javascript
-  SHA-256:               3da9df70554b9ed48df12c96c64a434876aee754f093dc742ea738e6aad962ab
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
-
---- CONTENT ---
-// csp.js — reports Content-Security-Policy violations to the API.
-//
-// The CSP header carries no report-uri/report-to, because the API's public URL
-// is only known at runtime. Instead we listen for the in-page violation event
-// (which fires for both report-only and enforcing policies) and POST a compact
-// JSON body to the API's /api/csp-reports endpoint. Importing this module for
-// its side effect installs the listener.
-
-import { loadConfig } from "./config.js";
-
-async function report(e) {
-  try {
-    const cfg = await loadConfig();
-    const base = cfg.apiBase || "";
-    const body = {
-      documentURI: e.documentURI || location.href,
-      referrer: e.referrer || "",
-      blockedURI: e.blockedURI || "",
-      violatedDirective: e.violatedDirective || "",
-      effectiveDirective: e.effectiveDirective || e.violatedDirective || "",
-      originalPolicy: e.originalPolicy || "",
-      disposition: e.disposition || "",
-      sourceFile: e.sourceFile || "",
-      lineNumber: e.lineNumber || 0,
-      columnNumber: e.columnNumber || 0,
-      statusCode: e.statusCode || 0,
-      sample: e.sample || "",
-    };
-    // keepalive lets the report survive an in-flight navigation.
-    fetch(base + "/api/csp-reports", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      mode: "cors",
-      keepalive: true,
-    }).catch(() => {});
-  } catch {
-    // Reporting must never break the page.
-  }
-}
-
-document.addEventListener("securitypolicyviolation", report);
 
 
 ################################################################################
@@ -5551,7 +5472,7 @@ void main();
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               a0ee8eaa8d3a5a88094a3923bcd53451bd2f6777fccb56b726223673ce1c1547
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 import { highlightNav, renderAuthNav, requireAuth, qs, showMsg, clearMsg } from "./common.js";
@@ -6417,7 +6338,7 @@ export async function signupPasskey(username, displayName) {
   Hard links:            1
   MIME type:             text/html
   SHA-256:               d6a59ef291d0da5dd4b6d28fb399d047d70a87e6e092af674fbe272fe74ef519
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 <!doctype html>
@@ -7166,7 +7087,7 @@ func TestClientIPFallsBackToRemoteAddr(t *testing.T) {
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               c5e3efd1e69a00abf638694a537abacb22a9da9f74825d954f400f26d0bd052b
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 package auth
@@ -8228,7 +8149,7 @@ func validUsername(u string) bool {
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               437e3822e79efceec017d4ddfbdd15ae4577c0a9481909bafdedf6f7a52f7a53
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 package auth
@@ -9950,7 +9871,7 @@ func TestClamp(t *testing.T) {
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               0ebfab13508bedbeeced34b026b850db441ea9f9e29ec9388313c6fbd4e6565d
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 // Package config is the single source of truth for every runtime setting.
@@ -10390,7 +10311,7 @@ func DecodeKeyMaterial(s string) ([]byte, error) {
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               2d269475f5e971ead317af91c71b6051e614c7579d75224629f348a0893c9112
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 package config
@@ -10900,6 +10821,196 @@ func TestConfigurationDocsShowCanonicalPolicy(t *testing.T) {
 	if got != DefaultCSPPolicy {
 		t.Errorf("docs/CONFIGURATION.md policy block drifted from config.DefaultCSPPolicy\n got: %s\nwant: %s",
 			got, DefaultCSPPolicy)
+	}
+}
+
+
+################################################################################
+# FILE: internal/config/session_persistence_test.go
+################################################################################
+
+--- METADATA ---
+  File name:             session_persistence_test.go
+  Relative path:         internal/config/session_persistence_test.go
+  Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/session_persistence_test.go
+  Size:                  6.6 KiB (6815 bytes)
+  Last modified:         2026-07-08 09:53:46.382958489 -0400
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 20039445
+  Hard links:            1
+  MIME type:             text/plain
+  SHA-256:               8d873e45e12da1d0d2c7cc92f659a0ad81daf3711d263e37a05d335762121f72
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
+
+--- CONTENT ---
+package config
+
+// These tests pin the cross-file contract for the "sessions never expire until
+// the user logs out" behaviour and the "log out everywhere" control. None of
+// this can be exercised by a plain unit test in a single package: the promise
+// spans the Go config default, the store's SQL, the auth cookie logic, the HTTP
+// route table, the frontend token store, and the settings UI. Reading the real
+// files keeps those layers honest so a well-meaning refactor in any one of them
+// cannot silently reintroduce inactivity logout, per-tab token loss, or a dead
+// "log out everywhere" button.
+//
+// repoRoot and mustRead are defined in csp_deployment_test.go (same package).
+//
+// stdlib only, no network, no containers: safe under `go test ./...` both in CI
+// and in the offline sandbox.
+
+import (
+	"regexp"
+	"strings"
+	"testing"
+)
+
+// TestTokenStoredInLocalStorage pins the fix for the new-tab logout defect:
+// the Bearer token must live in localStorage (shared across tabs, survives
+// browser restart), NOT sessionStorage (per-tab, cleared on close). A single
+// mention of sessionStorage is allowed — the one-time legacy migration — but
+// the getter/setter/clearer must all use localStorage.
+func TestTokenStoredInLocalStorage(t *testing.T) {
+	api := mustRead(t, "frontend/js/api.js")
+
+	for _, want := range []string{
+		`localStorage.getItem(TOKEN_KEY)`,
+		`localStorage.setItem(TOKEN_KEY`,
+		`localStorage.removeItem(TOKEN_KEY)`,
+	} {
+		if !strings.Contains(api, want) {
+			t.Errorf("frontend/js/api.js: token store must use %q — a new tab would otherwise bounce to /login", want)
+		}
+	}
+
+	// Guard against a regression to a sessionStorage-backed getter. We allow
+	// sessionStorage in the one-time migration/cleanup code (read the legacy
+	// value once, remove it, remove any stray copy on clear = 3 code uses) but
+	// nothing more. Count only executable lines so the explanatory comments
+	// above the code do not inflate the total.
+	codeUses := 0
+	for _, line := range strings.Split(api, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "//") {
+			continue
+		}
+		codeUses += strings.Count(line, "sessionStorage")
+	}
+	if codeUses > 3 {
+		t.Errorf("frontend/js/api.js: %d sessionStorage uses in code — the primary token store must be localStorage, not sessionStorage", codeUses)
+	}
+}
+
+// TestSessionTTLDocumentedInEnvExample pins that operators can discover the
+// knob and that its default is the never-expire value.
+func TestSessionTTLDocumentedInEnvExample(t *testing.T) {
+	env := mustRead(t, ".env.example")
+	re := regexp.MustCompile(`(?m)^GOTUNNELS_SESSION_TTL=(\S+)`)
+	m := re.FindStringSubmatch(env)
+	if m == nil {
+		t.Fatal(".env.example: GOTUNNELS_SESSION_TTL is not documented")
+	}
+	if m[1] != "0" {
+		t.Errorf(".env.example: GOTUNNELS_SESSION_TTL default = %q, want 0 (never expires)", m[1])
+	}
+}
+
+// TestLogoutEverywhereRouteRegistered pins the server route that backs the new
+// settings button.
+func TestLogoutEverywhereRouteRegistered(t *testing.T) {
+	server := mustRead(t, "internal/server/server.go")
+	if !strings.Contains(server, `"POST /api/logout-all"`) {
+		t.Error(`internal/server/server.go: route "POST /api/logout-all" not found — the "log out everywhere" button would 404`)
+	}
+}
+
+// TestLogoutEverywhereWiredEndToEnd pins the rest of the chain: the store
+// method that revokes every session, the handler that calls it, the frontend
+// API wrapper, the settings-page click handler, and the button itself.
+func TestLogoutEverywhereWiredEndToEnd(t *testing.T) {
+	cases := []struct {
+		rel  string
+		want string
+		why  string
+	}{
+		{
+			"internal/store/store.go",
+			"func (s *Store) RevokeAllSessionsForUser(",
+			"the store must expose a bulk-revoke used by logout-all",
+		},
+		{
+			"internal/auth/handlers.go",
+			"func (h *Handlers) LogoutAll(",
+			"the auth package must handle the logout-all request",
+		},
+		{
+			"internal/auth/handlers.go",
+			"RevokeAllSessionsForUser(",
+			"the LogoutAll handler must actually revoke every session",
+		},
+		{
+			"frontend/js/api.js",
+			`logoutAll:`,
+			"the frontend API client must expose logoutAll()",
+		},
+		{
+			"frontend/js/page-settings.js",
+			"Api.logoutAll(",
+			"the settings page must call logoutAll on click",
+		},
+		{
+			"frontend/settings.html",
+			`id="logout-all"`,
+			"the settings page must render the log-out-everywhere button",
+		},
+	}
+	for _, tc := range cases {
+		if !strings.Contains(mustRead(t, tc.rel), tc.want) {
+			t.Errorf("%s: missing %q — %s", tc.rel, tc.want, tc.why)
+		}
+	}
+}
+
+// TestClientNeverLogsOutOnTransientError pins that the frontend only treats a
+// definitive 401 (or an absent token) as logged out. A network blip or 5xx
+// must NOT clear the token or redirect to /login — otherwise a hiccup becomes
+// an involuntary logout, which this app refuses to do. Catches a regression to
+// the old catch-all `catch { return null }`.
+func TestClientNeverLogsOutOnTransientError(t *testing.T) {
+	common := mustRead(t, "frontend/js/common.js")
+	if !strings.Contains(common, "status === 401") {
+		t.Error("frontend/js/common.js: session check must gate logout on a definitive 401, not any error")
+	}
+	if !strings.Contains(common, "uncertain") {
+		t.Error("frontend/js/common.js: a transient (uncertain) session check must keep the user on the page rather than redirect")
+	}
+}
+
+// never-expiring sessions possible: CreateSession takes a nullable expiry and
+// GetSession treats a NULL expires_at as "valid forever".
+func TestSessionStoreHonoursNullExpiry(t *testing.T) {
+	store := mustRead(t, "internal/store/store.go")
+
+	if !strings.Contains(store, "expiresAt *time.Time") {
+		t.Error("internal/store/store.go: CreateSession must accept a *time.Time expiry so NULL (never expires) is representable")
+	}
+	if !strings.Contains(store, "expires_at IS NULL OR expires_at > now()") {
+		t.Error("internal/store/store.go: GetSession must treat NULL expires_at as non-expiring (expires_at IS NULL OR expires_at > now())")
+	}
+}
+
+// TestOptionalExpiryMigrationIsReversible pins that migration 0008 drops the
+// NOT NULL constraint and ships a matching down-migration, so the schema can
+// actually hold a NULL expiry. (database_test.go independently enforces the
+// up/down pairing for every migration; this adds an intent check on 0008.)
+func TestOptionalExpiryMigrationIsReversible(t *testing.T) {
+	up := mustRead(t, "migrations/0008_sessions_optional_expiry.up.sql")
+	if !regexp.MustCompile(`(?i)alter\s+column\s+expires_at\s+drop\s+not\s+null`).MatchString(up) {
+		t.Error("migrations/0008 up: expected `ALTER COLUMN expires_at DROP NOT NULL`")
+	}
+	down := mustRead(t, "migrations/0008_sessions_optional_expiry.down.sql")
+	if !regexp.MustCompile(`(?i)set\s+not\s+null`).MatchString(down) {
+		t.Error("migrations/0008 down: expected the NOT NULL constraint to be restored")
 	}
 }
 
@@ -13292,7 +13403,7 @@ func TestValidKey(t *testing.T) {
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               bbfd656338ccc1175f0f3aa72d21ad76a245d7278643e0d4b82a0b3e479a9dc3
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 // Package server assembles the HTTP routes and middleware into a ready-to-run
@@ -13478,7 +13589,7 @@ func noteRateKey() func(*http.Request) string {
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               c928e3f6e313fead221416c00c7c33d8db76daa8ad109104f285bd2ff9d213c0
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 // Package store is the single data-access layer. Every SQL query in the
@@ -15738,6 +15849,77 @@ CREATE INDEX notes_user_id_idx ON notes (user_id);
 
 
 ################################################################################
+# FILE: migrations/0008_sessions_optional_expiry.down.sql
+################################################################################
+
+--- METADATA ---
+  File name:             0008_sessions_optional_expiry.down.sql
+  Relative path:         migrations/0008_sessions_optional_expiry.down.sql
+  Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0008_sessions_optional_expiry.down.sql
+  Size:                  503 B (503 bytes)
+  Last modified:         2026-07-08 09:53:17.977067221 -0400
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 20039418
+  Hard links:            1
+  MIME type:             text/plain
+  SHA-256:               7996d4b8c021c8d3fdfdb5875b6ee3b4c06c181e7a52d5625b4c4d4c6ec141f8
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
+
+--- CONTENT ---
+-- 0008_sessions_optional_expiry.down.sql
+-- Reverse the optional-expiry change. Any persistent (NULL) sessions must be
+-- given a concrete expiry before NOT NULL can be restored; one year out keeps
+-- existing logins working across the rollback.
+UPDATE sessions SET expires_at = now() + interval '365 days' WHERE expires_at IS NULL;
+ALTER TABLE sessions ALTER COLUMN expires_at SET NOT NULL;
+
+DROP INDEX IF EXISTS sessions_expires_at_idx;
+CREATE INDEX sessions_expires_at_idx ON sessions (expires_at);
+
+
+################################################################################
+# FILE: migrations/0008_sessions_optional_expiry.up.sql
+################################################################################
+
+--- METADATA ---
+  File name:             0008_sessions_optional_expiry.up.sql
+  Relative path:         migrations/0008_sessions_optional_expiry.up.sql
+  Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0008_sessions_optional_expiry.up.sql
+  Size:                  1.1 KiB (1225 bytes)
+  Last modified:         2026-07-08 09:53:16.909066441 -0400
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 20039412
+  Hard links:            1
+  MIME type:             text/plain
+  SHA-256:               7c39db968acc03fde44602f2cdf73b3fdcb2d1f1d2e6349201c6891eb5494ee3
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
+
+--- CONTENT ---
+-- 0008_sessions_optional_expiry.up.sql
+-- Make session expiry OPTIONAL so a session can be persistent: it lives until
+-- the user explicitly logs out and never dies on its own. Before this,
+-- expires_at was NOT NULL and every session expired at a fixed wall-clock time
+-- (24h after login by default) regardless of activity — the behaviour we are
+-- deliberately moving away from.
+--
+-- A NULL expires_at now means "no expiry". The live-session lookup in
+-- internal/store treats (expires_at IS NULL OR expires_at > now()) as valid.
+-- Existing rows keep their concrete expiry, so this migration is backward
+-- compatible; only sessions minted while GOTUNNELS_SESSION_TTL=0 (the new
+-- default) are written with NULL.
+ALTER TABLE sessions ALTER COLUMN expires_at DROP NOT NULL;
+
+-- Recreate the expiry index as a PARTIAL index over non-NULL expiries: rows
+-- that never expire carry no entry, so the index stays small and the
+-- "expires_at > now()" half of the lookup stays a tight range scan. Recreated
+-- rather than left in place so the intent is explicit in the schema history.
+DROP INDEX IF EXISTS sessions_expires_at_idx;
+CREATE INDEX sessions_expires_at_idx ON sessions (expires_at) WHERE expires_at IS NOT NULL;
+
+
+################################################################################
 # FILE: migrations/embed.go
 ################################################################################
 
@@ -15784,7 +15966,7 @@ var FS embed.FS
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               ca744b2489536fe11f8fa76bdbf2e5c5fcb25ca016eddfdb369d67fa4667555e
-  Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
+  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
 
 --- CONTENT ---
 # GoTunnels
@@ -17474,10 +17656,10 @@ done
 ################################################################################
 # DUMP SUMMARY
 ################################################################################
-  Files dumped   : 97
-  Total size     : 545.9 KiB (559062 bytes)
+  Files dumped   : 99
+  Total size     : 552.7 KiB (566067 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-08T09:56:10-04:00
+  Completed at   : 2026-07-08T10:12:27-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
