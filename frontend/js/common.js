@@ -5,11 +5,33 @@
 // browser reports natively to the same-origin /csp-report path, which Caddy
 // proxies to the API (see frontend/Caddyfile).
 
-import { Api, getToken } from "./api.js";
+import { Api, getToken, TOKEN_KEY } from "./api.js";
 
 export function qs(sel, root = document) {
   return root.querySelector(sel);
 }
+
+/* =====================================================================
+   Cross-tab session sync
+   ===================================================================== */
+
+// localStorage fires a `storage` event in OTHER tabs of this origin whenever a
+// key changes. When one tab logs out — here, or "everywhere" from settings —
+// the token is removed; reflect that in every other open tab immediately so a
+// stale tab cannot keep showing a signed-in UI. We react ONLY to the token
+// being cleared (oldValue present, newValue gone), never to a login, and
+// reload so each page re-runs its own auth logic: public pages re-render as
+// logged-out, protected pages redirect to /login via requireAuth().
+export function installSessionSync() {
+  window.addEventListener("storage", (e) => {
+    if (e.key !== TOKEN_KEY) return;
+    if (e.newValue === null && e.oldValue) {
+      location.reload();
+    }
+  });
+}
+
+void installSessionSync();
 
 export function showMsg(el, text, kind = "error") {
   if (!el) return;
@@ -33,22 +55,52 @@ export function highlightNav() {
   });
 }
 
-export async function currentUser() {
-  if (!getToken()) return null;
+// resolveSession classifies the current session into one of three outcomes,
+// which is what lets us honor the rule that a user is NEVER logged out unless
+// they ask to be:
+//   { user }            -> authenticated
+//   { user: null }      -> definitely logged out: no token at all, or the API
+//                          rejected the token with 401 (revoked / expired). The
+//                          dead token is cleared in that case.
+//   { uncertain: true } -> we could not confirm (offline, 5xx, rate-limited).
+//                          The token is left UNTOUCHED so a refresh once the
+//                          network recovers restores the session.
+// The critical point: a transient failure must never clear the token or be
+// treated as a logout.
+async function resolveSession() {
+  if (!getToken()) return { user: null };
   try {
-    return await Api.me();
-  } catch {
-    return null;
+    return { user: await Api.me() };
+  } catch (err) {
+    if (err && err.status === 401) {
+      clearToken();
+      return { user: null };
+    }
+    return { uncertain: true };
   }
 }
 
+export async function currentUser() {
+  const s = await resolveSession();
+  // Nav rendering only needs user|null. "Uncertain" has no user object to show,
+  // but the token stays put, so this never signs anyone out.
+  return s.user ?? null;
+}
+
 export async function requireAuth() {
-  const u = await currentUser();
-  if (!u) {
-    location.href = "/login";
+  const s = await resolveSession();
+  if (s.user) return s.user;
+  if (s.uncertain) {
+    // Could not verify the session (offline / server error). Do NOT bounce to
+    // /login — that would be an involuntary logout, which this app refuses to
+    // do. Stay on the page; a refresh once the API is reachable loads it, and
+    // the token is untouched throughout.
+    console.warn("session check could not reach the API; staying put");
     return null;
   }
-  return u;
+  // Genuinely logged out (no token, or the token was rejected with 401).
+  location.href = "/login";
+  return null;
 }
 
 // renderAuthNav toggles elements marked with data-auth="in" | "out" based on

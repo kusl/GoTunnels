@@ -55,9 +55,39 @@ the browser fetches same-origin `/config.json` to learn the API base.
 Because the frontend and API are different origins, a session **cookie** would
 be a third-party cookie from the API's perspective — increasingly blocked by
 browsers. So the primary session transport is an opaque **Bearer token**
-returned in the login/signup JSON body and stored in `sessionStorage`; every API
+returned in the login/signup JSON body and stored in `localStorage`; every API
 call sends `Authorization: Bearer <token>`. The server also sets a
 `SameSite=None; Secure` cookie as a secondary path, but nothing depends on it.
+
+**Why `localStorage` and not `sessionStorage`.** `sessionStorage` is scoped to a
+single tab and is cleared when that tab closes, which produced two bugs: opening
+any in-app link in a new tab landed on an empty store and bounced to `/login`
+even though the user was signed in, and closing the browser silently logged the
+user out. `localStorage` is shared across every tab/window of the origin and
+survives a restart, so a signed-in user stays signed in everywhere. A one-time
+migration in `api.js` moves any legacy `sessionStorage` token over on first
+load. A `storage`-event listener (`installSessionSync` in `common.js`) also
+keeps tabs in sync: when one tab clears the token (logout), the others reload
+and fall back to the public view.
+
+**Sessions do not expire on their own.** This is a deliberate anti–password-
+fatigue choice for a public, shared, single-feed sandbox: the more often we
+force re-authentication, the worse the passwords people pick. `GOTUNNELS_SESSION_TTL`
+defaults to `0`, which means *never expires* — no inactivity timeout, no expiry
+on browser close. A session ends only when the user explicitly logs out. In the
+database this is stored as a `NULL` `expires_at` (migration `0008` drops the old
+`NOT NULL` constraint); `GetSession` treats `expires_at IS NULL` as valid
+forever. Setting `GOTUNNELS_SESSION_TTL` to any positive Go duration (e.g.
+`720h`) opts back into an absolute expiry; negative values are rejected. The
+mapping from TTL to the DB expiry and cookie lifetime is the pure, unit-tested
+`computeSessionExpiry`.
+
+**Logging out.** `POST /api/logout` revokes the current session and clears the
+cookie. `POST /api/logout-all` (the "log out everywhere" button on the settings
+page) calls `RevokeAllSessionsForUser`, revoking every active session for the
+account across all devices in one shot — the escape hatch that non-expiring
+sessions make necessary. Revocation is a soft delete (`revoked_at`), and every
+logout is recorded to the activity log.
 
 The token is random 256-bit material. The database stores only `sha256(token)`
 as the session's primary key, so a database leak does not expose usable tokens.

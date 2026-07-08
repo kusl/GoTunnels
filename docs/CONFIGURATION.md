@@ -39,7 +39,16 @@ the scripts. See also [`.env.example`](../.env.example).
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `GOTUNNELS_SESSION_COOKIE_NAME` | `gotunnels_session` | Name of the secondary session cookie. |
-| `GOTUNNELS_SESSION_TTL` | `24h` | Session lifetime. |
+| `GOTUNNELS_SESSION_TTL` | `0` | Session lifetime. `0` (the default) means sessions **never expire** — they end only on an explicit logout. Any positive Go duration (e.g. `720h`) opts into an absolute expiry. Negative values are rejected. |
+
+By default (`0`) a signed-in user stays signed in indefinitely: no inactivity
+timeout and no logout when the browser closes. This is intentional for a public,
+shared sandbox — see the Sessions section of `docs/ARCHITECTURE.md` for the
+rationale and the `localStorage` token store that backs it. The database records
+a `NULL` `expires_at` for a non-expiring session; `GetSession` treats `NULL` as
+valid forever. Because such sessions never lapse on their own, the settings page
+offers **"log out everywhere"** (`POST /api/logout-all`), which revokes every
+active session for the account across all devices.
 
 ## Secrets (generated per instance; never commit real values)
 

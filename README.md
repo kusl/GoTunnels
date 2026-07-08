@@ -22,7 +22,12 @@ ten independent instances side by side without configuring anything.
   (argon2id), and optional **TOTP** two-factor (RFC 6238, works with Aegis /
   Google Authenticator), with single-use recovery codes.
 - **Server-side sessions** using an opaque Bearer token that works cross-origin
-  (the frontend and API are on different tunnel domains).
+  (the frontend and API are on different tunnel domains). The token lives in
+  `localStorage`, so a session persists across tabs and browser restarts and
+  **never expires on its own** — you stay signed in until you explicitly log
+  out (a deliberate anti–password-fatigue choice; tunable via
+  `GOTUNNELS_SESSION_TTL`). Settings includes **"log out everywhere"** to revoke
+  every session across all devices at once.
 - **Privacy-preserving audit log**: client IPs are never stored raw — only
   `sha256(pepper || ip)`, and the hash is shown to you plainly on your own
   activity page.

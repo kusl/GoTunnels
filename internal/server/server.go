@@ -75,6 +75,7 @@ func New(d Deps) *http.Server {
 	// --- authenticated ---
 	authed := d.Auth.RequireAuth
 	mux.Handle("POST /api/logout", authed(http.HandlerFunc(d.Auth.Logout)))
+	mux.Handle("POST /api/logout-all", authed(http.HandlerFunc(d.Auth.LogoutAll)))
 	mux.Handle("GET /api/me", authed(http.HandlerFunc(d.Auth.Me)))
 	mux.Handle("GET /api/activity", authed(http.HandlerFunc(d.Auth.Activity)))
 	mux.Handle("POST /api/passkey/register/begin", authed(http.HandlerFunc(d.Auth.PasskeyRegisterBegin)))

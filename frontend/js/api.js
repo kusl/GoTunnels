@@ -1,22 +1,69 @@
 // api.js — the single place browser code talks to the API.
 //
-// The primary session transport is a Bearer token kept in sessionStorage. The
+// The primary session transport is a Bearer token kept in localStorage. The
 // server also sets a cross-site cookie as a secondary path, so we send
 // credentials too; but because third-party cookies are increasingly blocked,
 // the Bearer token is what we rely on.
+//
+// Why localStorage (not sessionStorage)?
+//   - localStorage is shared across every tab and window of this origin, so
+//     opening a link in a new tab — or a second window — stays signed in.
+//     sessionStorage is scoped to a single tab, which made every new tab open
+//     as logged out (e.g. right-clicking a nav link -> "open in new tab" bounced
+//     you to /login even though you were signed in).
+//   - localStorage also survives closing and reopening the browser, so a
+//     session is never dropped just because a tab or the browser was closed.
+// GoTunnels only ends a session when the user explicitly logs out (via the
+// settings page, here, or "everywhere") — never for inactivity, never on close.
 
 import { loadConfig } from "./config.js";
 
-const TOKEN_KEY = "gotunnels_token";
+export const TOKEN_KEY = "gotunnels_token";
+
+// One-time migration: earlier builds stored the token in sessionStorage. If a
+// tab still has one there and localStorage does not, carry it over so the
+// storage switch does not sign anyone out on their next visit.
+(function migrateLegacyToken() {
+  try {
+    if (!localStorage.getItem(TOKEN_KEY)) {
+      const legacy = sessionStorage.getItem(TOKEN_KEY);
+      if (legacy) {
+        localStorage.setItem(TOKEN_KEY, legacy);
+        sessionStorage.removeItem(TOKEN_KEY);
+      }
+    }
+  } catch {
+    // Storage can be unavailable (private mode); callers degrade gracefully.
+  }
+})();
 
 export function getToken() {
-  return sessionStorage.getItem(TOKEN_KEY) || "";
+  try {
+    return localStorage.getItem(TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
 }
 export function setToken(t) {
-  if (t) sessionStorage.setItem(TOKEN_KEY, t);
+  if (!t) return;
+  try {
+    localStorage.setItem(TOKEN_KEY, t);
+  } catch {
+    // Quota/private mode: the in-memory fetch below still carries no token,
+    // so the user simply is not "remembered" — acceptable degradation.
+  }
 }
 export function clearToken() {
-  sessionStorage.removeItem(TOKEN_KEY);
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  try {
+    sessionStorage.removeItem(TOKEN_KEY); // clean up any legacy copy too
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 // apiFetch performs a JSON request against the API base and throws an Error
@@ -74,6 +121,7 @@ export const Api = {
   signup: (b) => apiFetch("/api/signup", { method: "POST", body: b }),
   login: (b) => apiFetch("/api/login", { method: "POST", body: b }),
   logout: () => apiFetch("/api/logout", { method: "POST" }),
+  logoutAll: () => apiFetch("/api/logout-all", { method: "POST" }),
   me: () => apiFetch("/api/me"),
   activity: () => apiFetch("/api/activity"),
   info: () => apiFetch("/api/info"),

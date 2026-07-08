@@ -1253,7 +1253,154 @@ Note the rm frontend/js/csp.js cleanup (orphaned dead code)
 Flag that the Uptrace DSN in virginia.txt should be rotated
 If you re-run me, I'll pick up at the delivery step and hand you all the full files plus the table. The full CSP explanation (why neither your console script nor the DevTools inline-style edits triggered anything — console JS and DevTools DOM edits are both exempt from CSP, and it's in report-only mode besides) is also queued to go in that final writeup.
 
-Claude reached its tool-use limit for this turn.
+please continue
+
+
+Orchestrated comprehensive validation and file delivery strategy
+Orchestrated comprehensive validation and file delivery strategy
+I'm doing a final validation sweep across all the edited files, then I'll emit each one at its exact repo path along with a summary table of what changed. I need to make sure I capture the frontend/js/csp.js deletion, flag the Uptrace DSN rotation in virginia.txt, and include the CSP explanation.
+
+Now I'm enumerating all the changed files: the Go source files for config, store, auth handlers, and server routing; the test files covering config validation, session persistence, and handler behavior; the new migration files for the optional expiry schema change; and the migration down file.
+
+On the frontend side, I'm updating the API layer to handle token storage and logout functionality, refactoring the session sync and auth resolution logic, adding the logout-all handler to settings, and updating the settings UI to display the sessions card.
+
+For documentation and configuration, I'm adding the SESSION_TTL environment variable to the example config, rewriting the sessions section in the architecture docs, documenting the new configuration option, and updating the README. That brings me to 17 files total, and I should do a final validation pass before generating them all. I'm also noting that the local go.mod needs careful handling since it was patched to go 1.22.
+
+2 for offline testing — I won't include that in the deliverables. All 17 changed files are legitimate and ready to emit, though some like handlers.go, store.go, and the documentation files are quite large.
+
+The user needs complete files at exact repo paths since they'll commit them verbatim, so I have to output the full content of each changed file rather than diffs, even though that's a lot of material. I'm weighing whether to present these files as downloadable artifacts or inline code blocks. Since some files like store.go are nearly a thousand lines, dumping them all inline would be unwieldy. The better approach is to copy all the changed files to the outputs folder preserving their repo structure, so the user can download them and commit them directly at the correct paths. I'm settling on delivering all changed files as downloads with repo-relative paths, a summary table mapping filenames to their locations, the CSP explanation, and cleanup notes—this aligns with the expected format of full files at exact paths that Kushal commits verbatim.
+
+Show less
+Done
+Let me run a final comprehensive validation pass across everything before I stage the deliverables.
+
+
+Validated code references and scrutinized for security vulnerabilities
+Validated code references and scrutinized for security vulnerabilities
+
+Final full validation across Go, JS, and SQL
+
+Script
+I'm verifying the cross-references between the HTML, JavaScript, and API layers—checking that the logout buttons are properly wired through the event handlers and API calls. I should also scan the codebase for any accidentally committed secrets and review the migration SQL one more time to ensure everything's clean.
+
+Done
+All green. Let me do a final cross-reference + secrets scan on the changed files, and confirm the migration SQL.
+
+
+Validated security concerns and prepared files for output
+Validated security concerns and prepared files for output
+
+Cross-reference IDs, scan for secrets, show migration SQL
+
+Script
+The "secret" flagged by the scanner is actually a false positive—it's just a test fixture in the existing config_test.go file with a placeholder token, not something I introduced. The cross-reference check between settings.html and page-settings.js looks good, with all the IDs matching up correctly.
+
+Everything checks out now. I'm preparing to copy all 17 modified files into the output directory while maintaining the repository structure.
+
+Done
+All clean — the one scan hit is a pre-existing test fixture (tok placeholder in parseHeaders), not a real secret, and it's in code I didn't author. Cross-reference matches exactly. Now let me stage all changed files preserving repo-relative paths.
+
+
+Orchestrated file compilation and documentation synthesis
+Orchestrated file compilation and documentation synthesis
+
+Copy all 17 changed files into outputs preserving repo structure
+
+Script
+
+Presented 17 files
+Now I'm putting together the final summary with the file table, explaining the CSP changes, noting what needs to be cleaned up, and reminding about secret rotation before deployment.
+
+Done
+All 17 files are attached, each at its exact repo-relative path (drop them in at the same paths and commit). Here's the map:
+
+#	Path	Change
+1	frontend/js/api.js	Token store moved sessionStorage → localStorage; one-time legacy migration; logoutAll() added
+2	frontend/js/common.js	installSessionSync() (cross-tab logout); resolveSession() split so only a real 401 logs you out
+3	frontend/js/page-settings.js	"Log out everywhere" click handler
+4	frontend/settings.html	New Sessions card with both logout buttons
+5	internal/config/config.go	GOTUNNELS_SESSION_TTL defaults to 0 (never expires); Validate rejects only negatives
+6	internal/store/store.go	Session.ExpiresAt → *time.Time; CreateSession takes *time.Time; GetSession honors NULL; RevokeAllSessionsForUser
+7	internal/auth/handlers.go	computeSessionExpiry, persistentSessionCookieTTL, cookie Max-Age, LogoutAll handler
+8	internal/server/server.go	Route POST /api/logout-all
+9	migrations/0008_..._optional_expiry.up.sql	expires_at DROP NOT NULL + partial index
+10	migrations/0008_..._optional_expiry.down.sql	Reversible: backfill NULLs → +365d, restore NOT NULL
+11	internal/config/config_test.go	+3 tests (TTL validate / default / override)
+12	internal/config/session_persistence_test.go	New cross-file pin: localStorage token, logout-all wired end-to-end, NULL-expiry SQL, .env documented, 401-only logout, migration reversibility
+13	internal/auth/handlers_test.go	+3 tests (compute-expiry / cookie attrs / expired-cookie)
+14	.env.example	GOTUNNELS_SESSION_TTL=0 block
+15	docs/ARCHITECTURE.md	Sessions section rewritten
+16	docs/CONFIGURATION.md	Sessions table + prose
+17	README.md	Sessions bullet updated
+One deletion to run yourself (I can't express a removal as a full file): rm frontend/js/csp.js — it's orphaned dead code, unreferenced by any page, and the docs already describe it as gone.
+
+Why your CSP experiment triggered nothing
+Nothing you did was capable of tripping the policy, and the policy is fine:
+
+Console JS is exempt. Anything you run in the DevTools console executes in a privileged context that CSP deliberately doesn't govern — that's a browser design decision, not a hole in your config.
+DevTools DOM edits are trusted. Adding style="…" by hand in the Elements panel is treated as a user/devtools action, so it bypasses style-src even though the policy has no 'unsafe-inline'.
+Scripted actions aren't resources. Your timestamp script's getElementById, .value =, dispatchEvent, .click(), and programmatic el.style.x are CSSOM/DOM operations. CSP restricts where resources load from and inline script/style in served markup — not what already-running JS does to the page.
+The note-posting was just an authenticated user posting at the allowed rate. Your setInterval(…, 2000) matches the server's sustained limit exactly (NewRateLimiter(0.5, 5) = one note / 2s, burst 5, keyed per user), so it's permitted by design. That's rate limiting, not CSP.
+A real test needs a cross-origin <img> or an inline <script> in served HTML (committed + redeployed), not injected via DevTools. And it'll only report, not block, until you flip the header to Content-Security-Policy — it currently ships as Content-Security-Policy-Report-Only. If the public feed ever feels spammy, lower the limiter in cmd/api/main.go; I left it unchanged since it's deliberate and documented.
+
+Validation
+gofmt clean on all 7 Go files; internal/config passes go vet + full offline go test including the new tests; the auth cookie/expiry tests were run against verbatim logic in a scratch stdlib module (they'll pass in CI where the module graph resolves); all JS passes node --check; HTML ids ↔ JS bindings cross-checked; migration up/down paired. I also mutation-tested every pin — reverting each fix made the matching test fail, then pass on restore.
+
+Security note (unchanged from before)
+Never-expiring sessions on a shared public feed is a deliberate tradeoff you've chosen — a stolen token stays valid until logout, which is why "log out everywhere" matters as the escape hatch. That's honored as your default. Separately: the Uptrace DSN in virginia.txt is still sitting in plaintext and should be rotated (that file isn't among these deliverables). Per your note, I'm leaving your read-only PAT alone.
+
+
+Api
+JS 
+
+Common
+JS 
+
+Config
+Code · GO 
+
+Store
+Code · GO 
+
+Handlers
+Code · GO 
+
+Server
+Code · GO 
+
+0008 sessions optional expiry.up
+Code · SQL 
+
+0008 sessions optional expiry.down
+Code · SQL 
+
+Session persistence test
+Code · GO 
+
+Config test
+Code · GO 
+
+Handlers test
+Code · GO 
+
+Page settings
+JS 
+
+Settings
+Code · HTML 
+
+.env
+EXAMPLE 
+
+Architecture
+Document · MD 
+
+Configuration
+Document · MD 
+
+Readme
+Document · MD 
+
 
 Want to be notified when Claude responds?
 
@@ -1270,3 +1417,6 @@ Claude is AI and can make mistakes. Please double-check responses.
 
 
 
+82
+71
+100

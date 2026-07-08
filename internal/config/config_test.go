@@ -290,3 +290,60 @@ func TestPerInterval(t *testing.T) {
 		}
 	}
 }
+
+func TestValidate_SessionTTL(t *testing.T) {
+	// A session TTL of zero is the new default and means "never expires":
+	// sessions live until an explicit logout. It must pass validation.
+	base := func() *Config {
+		return &Config{
+			DatabaseURL: "x",
+			HTTPAddr:    ":8080",
+			RPOrigins:   []string{"http://localhost"},
+			CSPMode:     "report-only",
+		}
+	}
+
+	zero := base()
+	zero.SessionTTL = 0
+	if err := zero.Validate(); err != nil {
+		t.Fatalf("SessionTTL=0 (never expires) must be valid: %v", err)
+	}
+
+	positive := base()
+	positive.SessionTTL = 48 * time.Hour
+	if err := positive.Validate(); err != nil {
+		t.Fatalf("SessionTTL=48h must be valid: %v", err)
+	}
+
+	negative := base()
+	negative.SessionTTL = -time.Second
+	if err := negative.Validate(); err == nil {
+		t.Fatal("negative SessionTTL must fail validation")
+	}
+}
+
+func TestLoad_SessionTTLDefaultsToNeverExpire(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	// Deliberately do NOT set GOTUNNELS_SESSION_TTL.
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.SessionTTL != 0 {
+		t.Fatalf("default SessionTTL = %v, want 0 (never expires)", c.SessionTTL)
+	}
+}
+
+func TestLoad_SessionTTLOverride(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	t.Setenv("GOTUNNELS_SESSION_TTL", "48h")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.SessionTTL != 48*time.Hour {
+		t.Fatalf("SessionTTL override = %v, want 48h", c.SessionTTL)
+	}
+}

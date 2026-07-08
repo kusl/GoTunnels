@@ -98,7 +98,7 @@ async function main() {
     }
   });
 
-  // ---- logout ----
+  // ---- logout (this browser) ----
   qs("#logout").addEventListener("click", async () => {
     try {
       await Api.logout();
@@ -108,6 +108,25 @@ async function main() {
     clearToken();
     location.href = "/login";
   });
+
+  // ---- logout everywhere (all devices) ----
+  const logoutAllBtn = qs("#logout-all");
+  if (logoutAllBtn) {
+    logoutAllBtn.addEventListener("click", async () => {
+      logoutAllBtn.disabled = true;
+      clearMsg(msg);
+      try {
+        const res = await Api.logoutAll();
+        const n = (res && res.sessions_revoked) || 0;
+        showMsg(msg, `Signed out of ${n} session${n === 1 ? "" : "s"} everywhere. Redirecting…`, "ok");
+      } catch {
+        // Even if the call fails, drop the local token so this browser is
+        // signed out; the redirect below sends the user to log in again.
+      }
+      clearToken();
+      setTimeout(() => (location.href = "/login"), 600);
+    });
+  }
 }
 
 main();

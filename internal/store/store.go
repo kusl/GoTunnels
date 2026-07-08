@@ -49,14 +49,16 @@ type User struct {
 	CreatedAt   time.Time
 }
 
-// Session is a server-side session record.
+// Session is a server-side session record. ExpiresAt is a pointer because
+// expiry is optional: a nil ExpiresAt means the session never expires and
+// lives until it is explicitly revoked (logout). See CreateSession/GetSession.
 type Session struct {
 	ID         string
 	UserID     string
 	AuthMethod string
 	CreatedAt  time.Time
 	LastSeenAt time.Time
-	ExpiresAt  time.Time
+	ExpiresAt  *time.Time
 	RevokedAt  *time.Time
 }
 
@@ -511,8 +513,11 @@ func (s *Store) UseRecoveryCode(ctx context.Context, userID, codeHash string) (b
 // Sessions
 // ---------------------------------------------------------------------------
 
-// CreateSession inserts a new session row.
-func (s *Store) CreateSession(ctx context.Context, id, userID, authMethod string, expiresAt time.Time) error {
+// CreateSession inserts a new session row. A nil expiresAt is stored as SQL
+// NULL, which GetSession treats as "never expires"; a non-nil expiresAt is an
+// absolute expiry. pgx encodes a nil *time.Time as NULL, so the same statement
+// serves both persistent and expiring sessions.
+func (s *Store) CreateSession(ctx context.Context, id, userID, authMethod string, expiresAt *time.Time) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO sessions (id, user_id, auth_method, expires_at)
 		VALUES ($1, $2::uuid, $3, $4)`,
@@ -520,13 +525,16 @@ func (s *Store) CreateSession(ctx context.Context, id, userID, authMethod string
 	return err
 }
 
-// GetSession fetches a live (non-revoked, non-expired) session.
+// GetSession fetches a live session. A session is live when it is not revoked
+// and either has no expiry (expires_at IS NULL — a persistent session) or its
+// expiry is still in the future. This is the one place that decides whether a
+// token is still good, so the "never expires" rule lives here in SQL.
 func (s *Store) GetSession(ctx context.Context, id string) (Session, error) {
 	var sess Session
 	err := s.pool.QueryRow(ctx, `
 		SELECT id, user_id::text, auth_method, created_at, last_seen_at, expires_at, revoked_at
 		FROM sessions
-		WHERE id = $1 AND revoked_at IS NULL AND expires_at > now()`, id,
+		WHERE id = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`, id,
 	).Scan(&sess.ID, &sess.UserID, &sess.AuthMethod, &sess.CreatedAt,
 		&sess.LastSeenAt, &sess.ExpiresAt, &sess.RevokedAt)
 	return sess, mapErr(err)
@@ -544,6 +552,22 @@ func (s *Store) RevokeSession(ctx context.Context, id string) error {
 	_, err := s.pool.Exec(ctx,
 		`UPDATE sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, id)
 	return err
+}
+
+// RevokeAllSessionsForUser revokes every currently-active session for a user —
+// the "log out everywhere" action. It returns how many sessions were revoked
+// so the caller can tell the person exactly what happened. Already-revoked and
+// already-expired-but-not-revoked rows are left untouched (the WHERE clause
+// only touches rows with revoked_at IS NULL), and the whole thing is a single
+// statement so there is no read-then-write race.
+func (s *Store) RevokeAllSessionsForUser(ctx context.Context, userID string) (int64, error) {
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE sessions SET revoked_at = now() WHERE user_id = $1::uuid AND revoked_at IS NULL`,
+		userID)
+	if err != nil {
+		return 0, err
+	}
+	return ct.RowsAffected(), nil
 }
 
 // ---------------------------------------------------------------------------

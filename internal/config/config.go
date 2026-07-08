@@ -36,6 +36,12 @@ type Config struct {
 	DBConnectTimeout time.Duration
 
 	// Sessions -----------------------------------------------------------
+	// SessionTTL is how long a session stays valid after it is issued. A value
+	// of 0 (the default) means sessions never expire on their own: they live
+	// until the user explicitly logs out (here or "everywhere"). GoTunnels
+	// never logs anyone out for inactivity — this is a deliberate product
+	// choice (see docs/ARCHITECTURE.md). Set a positive duration to opt into
+	// expiring sessions instead.
 	SessionCookieName string
 	SessionTTL        time.Duration
 
@@ -128,7 +134,7 @@ func Load() (*Config, error) {
 		DBMinConns:           int32(getint("GOTUNNELS_DB_MIN_CONNS", 2)),
 		DBConnectTimeout:     getdur("GOTUNNELS_DB_CONNECT_TIMEOUT", 30*time.Second),
 		SessionCookieName:    getenv("GOTUNNELS_SESSION_COOKIE_NAME", "gotunnels_session"),
-		SessionTTL:           getdur("GOTUNNELS_SESSION_TTL", 24*time.Hour),
+		SessionTTL:           getdur("GOTUNNELS_SESSION_TTL", 0), // 0 = never expires (see field doc)
 		CORSAllowedOrigins:   splitList(getenv("GOTUNNELS_CORS_ALLOWED_ORIGINS", "*")),
 		RPID:                 getenv("GOTUNNELS_RP_ID", "localhost"),
 		RPDisplayName:        getenv("GOTUNNELS_RP_DISPLAY_NAME", "GoTunnels"),
@@ -240,8 +246,8 @@ func (c *Config) Validate() error {
 	if c.HTTPAddr == "" {
 		return fmt.Errorf("config: GOTUNNELS_HTTP_ADDR is required")
 	}
-	if c.SessionTTL <= 0 {
-		return fmt.Errorf("config: GOTUNNELS_SESSION_TTL must be positive")
+	if c.SessionTTL < 0 {
+		return fmt.Errorf("config: GOTUNNELS_SESSION_TTL must not be negative (0 disables expiry — sessions live until logout)")
 	}
 	switch c.CSPMode {
 	case "report-only", "enforce":

@@ -145,8 +145,10 @@ type userResponse struct {
 }
 
 type sessionResponse struct {
-	Token     string       `json:"token"`
-	ExpiresAt time.Time    `json:"expires_at"`
+	Token string `json:"token"`
+	// ExpiresAt is omitted entirely for a persistent (never-expiring) session,
+	// so clients can distinguish "no expiry" from a concrete time.
+	ExpiresAt *time.Time   `json:"expires_at,omitempty"`
 	User      userResponse `json:"user"`
 }
 
@@ -258,6 +260,33 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, h.expiredCookie())
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "logged_out"})
+}
+
+// LogoutAll revokes every currently-active session for the current user across
+// all their devices and browsers — the "log out everywhere" action exposed on
+// the settings page. This is the ONLY logout GoTunnels performs beyond a
+// single explicit Logout, and it too is entirely user-initiated: the app never
+// ends a session on its own. The response reports how many sessions were
+// revoked. The current session is included in that set, so this also logs the
+// caller out here; the frontend drops its local token and the expired cookie
+// clears the secondary transport.
+func (h *Handlers) LogoutAll(w http.ResponseWriter, r *http.Request) {
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	n, err := h.store.RevokeAllSessionsForUser(r.Context(), user.ID)
+	if err != nil {
+		h.serverError(w, r, "logout_all: revoke sessions", err)
+		return
+	}
+	h.record(r, &user.ID, user.Username, "logout_all", "", "success", map[string]any{"sessions_revoked": n})
+	http.SetCookie(w, h.expiredCookie())
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"status":           "logged_out_everywhere",
+		"sessions_revoked": n,
+	})
 }
 
 // Me returns the current user's profile.
@@ -746,25 +775,48 @@ func (h *Handlers) issueSession(w http.ResponseWriter, r *http.Request, user sto
 		h.serverError(w, r, "session: token", err)
 		return
 	}
-	expires := time.Now().Add(h.set.SessionTTL)
-	if err := h.store.CreateSession(r.Context(), id, user.ID, method, expires); err != nil {
+	dbExpiry, cookieExpiry, cookieMaxAge := computeSessionExpiry(time.Now(), h.set.SessionTTL)
+	if err := h.store.CreateSession(r.Context(), id, user.ID, method, dbExpiry); err != nil {
 		h.serverError(w, r, "session: create", err)
 		return
 	}
-	http.SetCookie(w, h.sessionCookie(token, expires))
+	http.SetCookie(w, h.sessionCookie(token, cookieExpiry, cookieMaxAge))
 	httpx.WriteJSON(w, http.StatusOK, sessionResponse{
 		Token:     token,
-		ExpiresAt: expires,
+		ExpiresAt: dbExpiry, // nil (omitted) when the session never expires
 		User:      h.userResponse(r.Context(), user),
 	})
 }
 
-func (h *Handlers) sessionCookie(token string, expires time.Time) *http.Cookie {
+// persistentSessionCookieTTL is how far in the future the secondary session
+// cookie is dated when the session itself never expires. The server-side
+// session (the source of truth) has no expiry and the frontend's Bearer token
+// lives in localStorage indefinitely; this only affects the cookie, which
+// browsers additionally clamp to their own maximum (commonly ~400 days). It is
+// re-set on every login, so a returning user's cookie stays fresh.
+const persistentSessionCookieTTL = 365 * 24 * time.Hour
+
+// computeSessionExpiry maps the configured session TTL to the database expiry
+// (nil = never expires, stored as SQL NULL) and the cookie's Expires/Max-Age.
+// A TTL of zero or less means the session never expires on its own: no logout
+// for inactivity, no logout on browser close — only an explicit logout ends
+// it. A positive TTL opts into an absolute expiry. Pure and time-injected so
+// it is trivially unit-testable.
+func computeSessionExpiry(now time.Time, ttl time.Duration) (dbExpiry *time.Time, cookieExpiry time.Time, cookieMaxAge int) {
+	if ttl > 0 {
+		exp := now.Add(ttl)
+		return &exp, exp, int(ttl.Seconds())
+	}
+	return nil, now.Add(persistentSessionCookieTTL), int(persistentSessionCookieTTL.Seconds())
+}
+
+func (h *Handlers) sessionCookie(token string, expires time.Time, maxAge int) *http.Cookie {
 	return &http.Cookie{
 		Name:     h.set.CookieName,
 		Value:    token,
 		Path:     "/",
 		Expires:  expires,
+		MaxAge:   maxAge, // Max-Age wins over Expires in modern browsers; both set for reach
 		HttpOnly: true,
 		Secure:   h.set.CookieSecure,
 		SameSite: http.SameSiteNoneMode, // cross-site: frontend and API differ

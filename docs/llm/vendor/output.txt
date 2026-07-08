@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-07-08T08:56:14-04:00
+  Generated at   : 2026-07-08T09:56:07-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : beefa4a06b8b80bd24a6aabb8ecf8a8e9cb88fef
-  Commit (short) : beefa4a
-  Commit date    : 2026-07-07 18:22:10 -0400
-  Commit message : run dump
+  Commit (full)  : 0d06beb77fc2fa915913262c6b6d4b227dd76838
+  Commit (short) : 0d06beb
+  Commit date    : 2026-07-08 09:49:37 -0400
+  Commit message : delete test file
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 97
   Excluded path  : docs/llm/
@@ -28,7 +28,25 @@ REPOSITORY METADATA
 
 GIT WORKING TREE STATUS (first 20 lines)
 ═════════════════════════════════════════════════════════════════════════════════
+ M .env.example
+ M README.md
+ M docs/ARCHITECTURE.md
+ M docs/CONFIGURATION.md
+ M docs/llm/vendor/claude-conversations.md
  M docs/llm/vendor/output.txt
+ M frontend/js/api.js
+ M frontend/js/common.js
+ M frontend/js/page-settings.js
+ M frontend/settings.html
+ M internal/auth/handlers.go
+ M internal/auth/handlers_test.go
+ M internal/config/config.go
+ M internal/config/config_test.go
+ M internal/server/server.go
+ M internal/store/store.go
+?? internal/config/session_persistence_test.go
+?? migrations/0008_sessions_optional_expiry.down.sql
+?? migrations/0008_sessions_optional_expiry.up.sql
 
 ################################################################################
 # FILE: export.sh  [THIS SCRIPT — included for full context]
@@ -1049,14 +1067,14 @@ README.md
   File name:             ARCHITECTURE.md
   Relative path:         docs/ARCHITECTURE.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/docs/ARCHITECTURE.md
-  Size:                  14.9 KiB (15276 bytes)
-  Last modified:         2026-07-07 17:51:30.250430556 -0400
+  Size:                  16.8 KiB (17264 bytes)
+  Last modified:         2026-07-08 09:55:34.426167617 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19931454
+  Inode:                 20039597
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               25a94804664ec489a433198638115d7ffb8b04e01f383572f46f221306f676a5
+  SHA-256:               8b3747b7d095f02fdfa71f3868314cb54009c6550537e82ad6790be8d0968d17
   Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
@@ -1117,9 +1135,39 @@ the browser fetches same-origin `/config.json` to learn the API base.
 Because the frontend and API are different origins, a session **cookie** would
 be a third-party cookie from the API's perspective — increasingly blocked by
 browsers. So the primary session transport is an opaque **Bearer token**
-returned in the login/signup JSON body and stored in `sessionStorage`; every API
+returned in the login/signup JSON body and stored in `localStorage`; every API
 call sends `Authorization: Bearer <token>`. The server also sets a
 `SameSite=None; Secure` cookie as a secondary path, but nothing depends on it.
+
+**Why `localStorage` and not `sessionStorage`.** `sessionStorage` is scoped to a
+single tab and is cleared when that tab closes, which produced two bugs: opening
+any in-app link in a new tab landed on an empty store and bounced to `/login`
+even though the user was signed in, and closing the browser silently logged the
+user out. `localStorage` is shared across every tab/window of the origin and
+survives a restart, so a signed-in user stays signed in everywhere. A one-time
+migration in `api.js` moves any legacy `sessionStorage` token over on first
+load. A `storage`-event listener (`installSessionSync` in `common.js`) also
+keeps tabs in sync: when one tab clears the token (logout), the others reload
+and fall back to the public view.
+
+**Sessions do not expire on their own.** This is a deliberate anti–password-
+fatigue choice for a public, shared, single-feed sandbox: the more often we
+force re-authentication, the worse the passwords people pick. `GOTUNNELS_SESSION_TTL`
+defaults to `0`, which means *never expires* — no inactivity timeout, no expiry
+on browser close. A session ends only when the user explicitly logs out. In the
+database this is stored as a `NULL` `expires_at` (migration `0008` drops the old
+`NOT NULL` constraint); `GetSession` treats `expires_at IS NULL` as valid
+forever. Setting `GOTUNNELS_SESSION_TTL` to any positive Go duration (e.g.
+`720h`) opts back into an absolute expiry; negative values are rejected. The
+mapping from TTL to the DB expiry and cookie lifetime is the pure, unit-tested
+`computeSessionExpiry`.
+
+**Logging out.** `POST /api/logout` revokes the current session and clears the
+cookie. `POST /api/logout-all` (the "log out everywhere" button on the settings
+page) calls `RevokeAllSessionsForUser`, revoking every active session for the
+account across all devices in one shot — the escape hatch that non-expiring
+sessions make necessary. Revocation is a soft delete (`revoked_at`), and every
+logout is recorded to the activity log.
 
 The token is random 256-bit material. The database stores only `sha256(token)`
 as the session's primary key, so a database leak does not expose usable tokens.
@@ -1353,14 +1401,14 @@ also annotate their active span (batch sizes, note ids) so traces answer
   File name:             CONFIGURATION.md
   Relative path:         docs/CONFIGURATION.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/docs/CONFIGURATION.md
-  Size:                  7.9 KiB (8101 bytes)
-  Last modified:         2026-07-07 17:51:37.195689713 -0400
+  Size:                  8.6 KiB (8898 bytes)
+  Last modified:         2026-07-08 09:55:40.105589534 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19931461
+  Inode:                 20039608
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               fe577c1f1b822d327adbe3e294ec054fb2dcf38019ecf25679a9c6b68e73e745
+  SHA-256:               643e097189c0aa01b77cacbf845fc7e85d25e8f4ba9000c1e96a04755666f169
   Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
@@ -1405,7 +1453,16 @@ the scripts. See also [`.env.example`](../.env.example).
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `GOTUNNELS_SESSION_COOKIE_NAME` | `gotunnels_session` | Name of the secondary session cookie. |
-| `GOTUNNELS_SESSION_TTL` | `24h` | Session lifetime. |
+| `GOTUNNELS_SESSION_TTL` | `0` | Session lifetime. `0` (the default) means sessions **never expire** — they end only on an explicit logout. Any positive Go duration (e.g. `720h`) opts into an absolute expiry. Negative values are rejected. |
+
+By default (`0`) a signed-in user stays signed in indefinitely: no inactivity
+timeout and no logout when the browser closes. This is intentional for a public,
+shared sandbox — see the Sessions section of `docs/ARCHITECTURE.md` for the
+rationale and the `localStorage` token store that backs it. The database records
+a `NULL` `expires_at` for a non-expiring session; `GetSession` treats `NULL` as
+valid forever. Because such sessions never lapse on their own, the settings page
+offers **"log out everywhere"** (`POST /api/logout-all`), which revokes every
+active session for the account across all devices.
 
 ## Secrets (generated per instance; never commit real values)
 
@@ -1517,14 +1574,14 @@ naming and the test toolchain:
   File name:             .env.example
   Relative path:         .env.example
   Absolute path:         /home/kushal/src/golang/GoTunnels/.env.example
-  Size:                  3.8 KiB (3967 bytes)
-  Last modified:         2026-07-07 17:49:44.946703520 -0400
+  Size:                  4.7 KiB (4828 bytes)
+  Last modified:         2026-07-08 09:55:02.220336748 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19931334
+  Inode:                 20039537
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               069f65dd3104b508a185918af42d31bde2f5e5657a8688df2f943f7d60751325
+  SHA-256:               adbc9a5d786c1d8931dbca2b0dea1b60eccc365b644b33d38d4a088aa7139053
   Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
@@ -1560,6 +1617,19 @@ GOTUNNELS_RP_ID=localhost
 GOTUNNELS_RP_DISPLAY_NAME=GoTunnels
 GOTUNNELS_RP_ORIGINS=http://localhost:8080
 GOTUNNELS_CORS_ALLOWED_ORIGINS=*
+
+# --- Sessions ----------------------------------------------------------------
+# How long a session stays valid after it is issued.
+#   0  (default) = sessions NEVER expire on their own. No logout for inactivity,
+#                  no logout on browser close — a session ends only when the user
+#                  explicitly logs out (this browser) or "logs out everywhere".
+#                  The DB stores NULL for expires_at and the frontend keeps its
+#                  Bearer token in localStorage, which survives restarts.
+#   >0           = opt into an absolute expiry, e.g. 720h for 30 days. Accepts
+#                  any Go duration (s, m, h). Negative values are rejected.
+# This is a public, shared, single-feed learning sandbox: never-expiring
+# sessions are a deliberate anti-password-fatigue choice, not an oversight.
+GOTUNNELS_SESSION_TTL=0
 
 # --- Content Security Policy (central configuration) -------------------------
 # Header name selects report-only vs enforcing:
@@ -3277,36 +3347,83 @@ hr.author-sep { border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
   File name:             api.js
   Relative path:         frontend/js/api.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/api.js
-  Size:                  4.4 KiB (4584 bytes)
-  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Size:                  6.2 KiB (6380 bytes)
+  Last modified:         2026-07-08 09:50:03.160769258 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816316
+  Inode:                 20039041
   Hard links:            1
   MIME type:             application/javascript
-  SHA-256:               135a01d0f75f0119ffc4497cac1a5cdbef6eaaedbb23bcd36db2c12fcb65abf7
+  SHA-256:               80f36c9afa61f8d5afbb9d480b89f0416177362724862184c8dbe3c85717e8cd
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
 // api.js — the single place browser code talks to the API.
 //
-// The primary session transport is a Bearer token kept in sessionStorage. The
+// The primary session transport is a Bearer token kept in localStorage. The
 // server also sets a cross-site cookie as a secondary path, so we send
 // credentials too; but because third-party cookies are increasingly blocked,
 // the Bearer token is what we rely on.
+//
+// Why localStorage (not sessionStorage)?
+//   - localStorage is shared across every tab and window of this origin, so
+//     opening a link in a new tab — or a second window — stays signed in.
+//     sessionStorage is scoped to a single tab, which made every new tab open
+//     as logged out (e.g. right-clicking a nav link -> "open in new tab" bounced
+//     you to /login even though you were signed in).
+//   - localStorage also survives closing and reopening the browser, so a
+//     session is never dropped just because a tab or the browser was closed.
+// GoTunnels only ends a session when the user explicitly logs out (via the
+// settings page, here, or "everywhere") — never for inactivity, never on close.
 
 import { loadConfig } from "./config.js";
 
-const TOKEN_KEY = "gotunnels_token";
+export const TOKEN_KEY = "gotunnels_token";
+
+// One-time migration: earlier builds stored the token in sessionStorage. If a
+// tab still has one there and localStorage does not, carry it over so the
+// storage switch does not sign anyone out on their next visit.
+(function migrateLegacyToken() {
+  try {
+    if (!localStorage.getItem(TOKEN_KEY)) {
+      const legacy = sessionStorage.getItem(TOKEN_KEY);
+      if (legacy) {
+        localStorage.setItem(TOKEN_KEY, legacy);
+        sessionStorage.removeItem(TOKEN_KEY);
+      }
+    }
+  } catch {
+    // Storage can be unavailable (private mode); callers degrade gracefully.
+  }
+})();
 
 export function getToken() {
-  return sessionStorage.getItem(TOKEN_KEY) || "";
+  try {
+    return localStorage.getItem(TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
 }
 export function setToken(t) {
-  if (t) sessionStorage.setItem(TOKEN_KEY, t);
+  if (!t) return;
+  try {
+    localStorage.setItem(TOKEN_KEY, t);
+  } catch {
+    // Quota/private mode: the in-memory fetch below still carries no token,
+    // so the user simply is not "remembered" — acceptable degradation.
+  }
 }
 export function clearToken() {
-  sessionStorage.removeItem(TOKEN_KEY);
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  try {
+    sessionStorage.removeItem(TOKEN_KEY); // clean up any legacy copy too
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 // apiFetch performs a JSON request against the API base and throws an Error
@@ -3364,6 +3481,7 @@ export const Api = {
   signup: (b) => apiFetch("/api/signup", { method: "POST", body: b }),
   login: (b) => apiFetch("/api/login", { method: "POST", body: b }),
   logout: () => apiFetch("/api/logout", { method: "POST" }),
+  logoutAll: () => apiFetch("/api/logout-all", { method: "POST" }),
   me: () => apiFetch("/api/me"),
   activity: () => apiFetch("/api/activity"),
   info: () => apiFetch("/api/info"),
@@ -3418,14 +3536,14 @@ export const Api = {
   File name:             common.js
   Relative path:         frontend/js/common.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/common.js
-  Size:                  4.3 KiB (4475 bytes)
-  Last modified:         2026-07-07 17:48:18.453631703 -0400
+  Size:                  6.8 KiB (7042 bytes)
+  Last modified:         2026-07-08 09:50:03.977924507 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19931215
+  Inode:                 20039046
   Hard links:            1
   MIME type:             application/javascript
-  SHA-256:               6c60f5143683833619f92daec6382358af406a342b25620f09b4cd8ee70264ab
+  SHA-256:               d5671d953f80c417713a737cbcbea96144e320c8f0103ea482f689c179456d2f
   Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
 
 --- CONTENT ---
@@ -3436,11 +3554,33 @@ export const Api = {
 // browser reports natively to the same-origin /csp-report path, which Caddy
 // proxies to the API (see frontend/Caddyfile).
 
-import { Api, getToken } from "./api.js";
+import { Api, getToken, TOKEN_KEY } from "./api.js";
 
 export function qs(sel, root = document) {
   return root.querySelector(sel);
 }
+
+/* =====================================================================
+   Cross-tab session sync
+   ===================================================================== */
+
+// localStorage fires a `storage` event in OTHER tabs of this origin whenever a
+// key changes. When one tab logs out — here, or "everywhere" from settings —
+// the token is removed; reflect that in every other open tab immediately so a
+// stale tab cannot keep showing a signed-in UI. We react ONLY to the token
+// being cleared (oldValue present, newValue gone), never to a login, and
+// reload so each page re-runs its own auth logic: public pages re-render as
+// logged-out, protected pages redirect to /login via requireAuth().
+export function installSessionSync() {
+  window.addEventListener("storage", (e) => {
+    if (e.key !== TOKEN_KEY) return;
+    if (e.newValue === null && e.oldValue) {
+      location.reload();
+    }
+  });
+}
+
+void installSessionSync();
 
 export function showMsg(el, text, kind = "error") {
   if (!el) return;
@@ -3464,22 +3604,52 @@ export function highlightNav() {
   });
 }
 
-export async function currentUser() {
-  if (!getToken()) return null;
+// resolveSession classifies the current session into one of three outcomes,
+// which is what lets us honor the rule that a user is NEVER logged out unless
+// they ask to be:
+//   { user }            -> authenticated
+//   { user: null }      -> definitely logged out: no token at all, or the API
+//                          rejected the token with 401 (revoked / expired). The
+//                          dead token is cleared in that case.
+//   { uncertain: true } -> we could not confirm (offline, 5xx, rate-limited).
+//                          The token is left UNTOUCHED so a refresh once the
+//                          network recovers restores the session.
+// The critical point: a transient failure must never clear the token or be
+// treated as a logout.
+async function resolveSession() {
+  if (!getToken()) return { user: null };
   try {
-    return await Api.me();
-  } catch {
-    return null;
+    return { user: await Api.me() };
+  } catch (err) {
+    if (err && err.status === 401) {
+      clearToken();
+      return { user: null };
+    }
+    return { uncertain: true };
   }
 }
 
+export async function currentUser() {
+  const s = await resolveSession();
+  // Nav rendering only needs user|null. "Uncertain" has no user object to show,
+  // but the token stays put, so this never signs anyone out.
+  return s.user ?? null;
+}
+
 export async function requireAuth() {
-  const u = await currentUser();
-  if (!u) {
-    location.href = "/login";
+  const s = await resolveSession();
+  if (s.user) return s.user;
+  if (s.uncertain) {
+    // Could not verify the session (offline / server error). Do NOT bounce to
+    // /login — that would be an involuntary logout, which this app refuses to
+    // do. Stay on the page; a refresh once the API is reachable loads it, and
+    // the token is untouched throughout.
+    console.warn("session check could not reach the API; staying put");
     return null;
   }
-  return u;
+  // Genuinely logged out (no token, or the token was rejected with 401).
+  location.href = "/login";
+  return null;
 }
 
 // renderAuthNav toggles elements marked with data-auth="in" | "out" based on
@@ -5373,14 +5543,14 @@ void main();
   File name:             page-settings.js
   Relative path:         frontend/js/page-settings.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-settings.js
-  Size:                  3.2 KiB (3368 bytes)
-  Last modified:         2026-07-01 14:35:59.000000000 -0400
+  Size:                  3.9 KiB (4086 bytes)
+  Last modified:         2026-07-08 09:50:47.661709079 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17805949
+  Inode:                 20039230
   Hard links:            1
   MIME type:             application/javascript
-  SHA-256:               e23da3e04d9b7ac3818fb57b6e8001e5e06aff812d92033da84c0a9995c57131
+  SHA-256:               a0ee8eaa8d3a5a88094a3923bcd53451bd2f6777fccb56b726223673ce1c1547
   Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
 
 --- CONTENT ---
@@ -5484,7 +5654,7 @@ async function main() {
     }
   });
 
-  // ---- logout ----
+  // ---- logout (this browser) ----
   qs("#logout").addEventListener("click", async () => {
     try {
       await Api.logout();
@@ -5494,6 +5664,25 @@ async function main() {
     clearToken();
     location.href = "/login";
   });
+
+  // ---- logout everywhere (all devices) ----
+  const logoutAllBtn = qs("#logout-all");
+  if (logoutAllBtn) {
+    logoutAllBtn.addEventListener("click", async () => {
+      logoutAllBtn.disabled = true;
+      clearMsg(msg);
+      try {
+        const res = await Api.logoutAll();
+        const n = (res && res.sessions_revoked) || 0;
+        showMsg(msg, `Signed out of ${n} session${n === 1 ? "" : "s"} everywhere. Redirecting…`, "ok");
+      } catch {
+        // Even if the call fails, drop the local token so this browser is
+        // signed out; the redirect below sends the user to log in again.
+      }
+      clearToken();
+      setTimeout(() => (location.href = "/login"), 600);
+    });
+  }
 }
 
 main();
@@ -6220,14 +6409,14 @@ export async function signupPasskey(username, displayName) {
   File name:             settings.html
   Relative path:         frontend/settings.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/settings.html
-  Size:                  3.8 KiB (3965 bytes)
-  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Size:                  4.3 KiB (4454 bytes)
+  Last modified:         2026-07-08 09:51:06.552056754 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816326
+  Inode:                 20039246
   Hard links:            1
   MIME type:             text/html
-  SHA-256:               b5a29a4ff74223be378de0cbb83d8f3e9e7d730547dd4fefdd99ab4ef085ca2b
+  SHA-256:               d6a59ef291d0da5dd4b6d28fb399d047d70a87e6e092af674fbe272fe74ef519
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
@@ -6324,8 +6513,17 @@ export async function signupPasskey(username, displayName) {
       </div>
 
       <div class="card">
+        <h2>Sessions</h2>
+        <p class="lead">
+          You stay signed in on this browser until you log out — GoTunnels never
+          signs you out for inactivity or when you close the tab. Use
+          <strong>Log out everywhere</strong> to end every session on every
+          device and browser you are signed in on (handy after using a shared or
+          lost device).
+        </p>
         <div class="btn-row">
           <button id="logout" class="ghost" type="button">Log out</button>
+          <button id="logout-all" class="danger" type="button">Log out everywhere</button>
         </div>
       </div>
     </main>
@@ -6960,14 +7158,14 @@ func TestClientIPFallsBackToRemoteAddr(t *testing.T) {
   File name:             handlers.go
   Relative path:         internal/auth/handlers.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/handlers.go
-  Size:                  31.8 KiB (32573 bytes)
-  Last modified:         2026-07-06 02:21:29.000000000 -0400
+  Size:                  34.5 KiB (35381 bytes)
+  Last modified:         2026-07-08 09:52:08.964016452 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816330
+  Inode:                 20039319
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               dff34c4eb03f6cc2a1ae7186d055e14c91beda9a82f9746379d9d4ee459399e1
+  SHA-256:               c5e3efd1e69a00abf638694a537abacb22a9da9f74825d954f400f26d0bd052b
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
@@ -7118,8 +7316,10 @@ type userResponse struct {
 }
 
 type sessionResponse struct {
-	Token     string       `json:"token"`
-	ExpiresAt time.Time    `json:"expires_at"`
+	Token string `json:"token"`
+	// ExpiresAt is omitted entirely for a persistent (never-expiring) session,
+	// so clients can distinguish "no expiry" from a concrete time.
+	ExpiresAt *time.Time   `json:"expires_at,omitempty"`
 	User      userResponse `json:"user"`
 }
 
@@ -7231,6 +7431,33 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, h.expiredCookie())
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "logged_out"})
+}
+
+// LogoutAll revokes every currently-active session for the current user across
+// all their devices and browsers — the "log out everywhere" action exposed on
+// the settings page. This is the ONLY logout GoTunnels performs beyond a
+// single explicit Logout, and it too is entirely user-initiated: the app never
+// ends a session on its own. The response reports how many sessions were
+// revoked. The current session is included in that set, so this also logs the
+// caller out here; the frontend drops its local token and the expired cookie
+// clears the secondary transport.
+func (h *Handlers) LogoutAll(w http.ResponseWriter, r *http.Request) {
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	n, err := h.store.RevokeAllSessionsForUser(r.Context(), user.ID)
+	if err != nil {
+		h.serverError(w, r, "logout_all: revoke sessions", err)
+		return
+	}
+	h.record(r, &user.ID, user.Username, "logout_all", "", "success", map[string]any{"sessions_revoked": n})
+	http.SetCookie(w, h.expiredCookie())
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"status":           "logged_out_everywhere",
+		"sessions_revoked": n,
+	})
 }
 
 // Me returns the current user's profile.
@@ -7719,25 +7946,48 @@ func (h *Handlers) issueSession(w http.ResponseWriter, r *http.Request, user sto
 		h.serverError(w, r, "session: token", err)
 		return
 	}
-	expires := time.Now().Add(h.set.SessionTTL)
-	if err := h.store.CreateSession(r.Context(), id, user.ID, method, expires); err != nil {
+	dbExpiry, cookieExpiry, cookieMaxAge := computeSessionExpiry(time.Now(), h.set.SessionTTL)
+	if err := h.store.CreateSession(r.Context(), id, user.ID, method, dbExpiry); err != nil {
 		h.serverError(w, r, "session: create", err)
 		return
 	}
-	http.SetCookie(w, h.sessionCookie(token, expires))
+	http.SetCookie(w, h.sessionCookie(token, cookieExpiry, cookieMaxAge))
 	httpx.WriteJSON(w, http.StatusOK, sessionResponse{
 		Token:     token,
-		ExpiresAt: expires,
+		ExpiresAt: dbExpiry, // nil (omitted) when the session never expires
 		User:      h.userResponse(r.Context(), user),
 	})
 }
 
-func (h *Handlers) sessionCookie(token string, expires time.Time) *http.Cookie {
+// persistentSessionCookieTTL is how far in the future the secondary session
+// cookie is dated when the session itself never expires. The server-side
+// session (the source of truth) has no expiry and the frontend's Bearer token
+// lives in localStorage indefinitely; this only affects the cookie, which
+// browsers additionally clamp to their own maximum (commonly ~400 days). It is
+// re-set on every login, so a returning user's cookie stays fresh.
+const persistentSessionCookieTTL = 365 * 24 * time.Hour
+
+// computeSessionExpiry maps the configured session TTL to the database expiry
+// (nil = never expires, stored as SQL NULL) and the cookie's Expires/Max-Age.
+// A TTL of zero or less means the session never expires on its own: no logout
+// for inactivity, no logout on browser close — only an explicit logout ends
+// it. A positive TTL opts into an absolute expiry. Pure and time-injected so
+// it is trivially unit-testable.
+func computeSessionExpiry(now time.Time, ttl time.Duration) (dbExpiry *time.Time, cookieExpiry time.Time, cookieMaxAge int) {
+	if ttl > 0 {
+		exp := now.Add(ttl)
+		return &exp, exp, int(ttl.Seconds())
+	}
+	return nil, now.Add(persistentSessionCookieTTL), int(persistentSessionCookieTTL.Seconds())
+}
+
+func (h *Handlers) sessionCookie(token string, expires time.Time, maxAge int) *http.Cookie {
 	return &http.Cookie{
 		Name:     h.set.CookieName,
 		Value:    token,
 		Path:     "/",
 		Expires:  expires,
+		MaxAge:   maxAge, // Max-Age wins over Expires in modern browsers; both set for reach
 		HttpOnly: true,
 		Secure:   h.set.CookieSecure,
 		SameSite: http.SameSiteNoneMode, // cross-site: frontend and API differ
@@ -7970,14 +8220,14 @@ func validUsername(u string) bool {
   File name:             handlers_test.go
   Relative path:         internal/auth/handlers_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/handlers_test.go
-  Size:                  4.3 KiB (4496 bytes)
-  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Size:                  8.2 KiB (8430 bytes)
+  Last modified:         2026-07-08 09:54:39.951127549 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816331
+  Inode:                 20039512
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               70065018664c2dd83d554c495bca74997939d987abbde01bc2d647b68bcc3406
+  SHA-256:               437e3822e79efceec017d4ddfbdd15ae4577c0a9481909bafdedf6f7a52f7a53
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
@@ -7990,6 +8240,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidUsername(t *testing.T) {
@@ -8134,6 +8385,114 @@ func TestNewUUIDv4(t *testing.T) {
 			t.Fatalf("duplicate uuid generated: %s", id)
 		}
 		seen[id] = true
+	}
+}
+
+// TestComputeSessionExpiry pins the mapping from configured TTL to the DB
+// expiry and cookie lifetime. The zero/negative cases are the "never expires"
+// contract: a nil DB expiry (stored as SQL NULL) and a far-future,
+// positively-aged cookie so the session survives a browser restart.
+func TestComputeSessionExpiry(t *testing.T) {
+	now := time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC)
+
+	t.Run("never expires when ttl is zero", func(t *testing.T) {
+		db, cookieExp, maxAge := computeSessionExpiry(now, 0)
+		if db != nil {
+			t.Errorf("dbExpiry = %v, want nil (NULL / never expires)", db)
+		}
+		if maxAge <= 0 {
+			t.Errorf("cookie MaxAge = %d, want a large positive value", maxAge)
+		}
+		if !cookieExp.After(now.AddDate(0, 6, 0)) {
+			t.Errorf("cookie expiry %v should be many months in the future", cookieExp)
+		}
+		if want := int(persistentSessionCookieTTL.Seconds()); maxAge != want {
+			t.Errorf("cookie MaxAge = %d, want %d (persistent)", maxAge, want)
+		}
+	})
+
+	t.Run("never expires when ttl is negative", func(t *testing.T) {
+		db, _, maxAge := computeSessionExpiry(now, -time.Hour)
+		if db != nil {
+			t.Errorf("dbExpiry = %v, want nil for a non-positive ttl", db)
+		}
+		if maxAge <= 0 {
+			t.Errorf("cookie MaxAge = %d, want positive", maxAge)
+		}
+	})
+
+	t.Run("absolute expiry when ttl is positive", func(t *testing.T) {
+		ttl := 48 * time.Hour
+		db, cookieExp, maxAge := computeSessionExpiry(now, ttl)
+		if db == nil {
+			t.Fatal("dbExpiry = nil, want an absolute time for a positive ttl")
+		}
+		if !db.Equal(now.Add(ttl)) {
+			t.Errorf("dbExpiry = %v, want %v", *db, now.Add(ttl))
+		}
+		if !cookieExp.Equal(now.Add(ttl)) {
+			t.Errorf("cookie expiry = %v, want %v (aligned with DB expiry)", cookieExp, now.Add(ttl))
+		}
+		if maxAge != int(ttl.Seconds()) {
+			t.Errorf("cookie MaxAge = %d, want %d", maxAge, int(ttl.Seconds()))
+		}
+	})
+}
+
+// TestSessionCookieAttributes pins the security-relevant cookie attributes.
+// The frontend and API live on different origins, so the cookie must be
+// SameSite=None; that in turn requires Secure, which tracks CookieSecure.
+func TestSessionCookieAttributes(t *testing.T) {
+	h := &Handlers{set: Settings{CookieName: "gotunnels_session", CookieSecure: true}}
+	exp := time.Now().Add(persistentSessionCookieTTL)
+	c := h.sessionCookie("tok-123", exp, int(persistentSessionCookieTTL.Seconds()))
+
+	if c.Name != "gotunnels_session" {
+		t.Errorf("cookie name = %q", c.Name)
+	}
+	if c.Value != "tok-123" {
+		t.Errorf("cookie value = %q", c.Value)
+	}
+	if c.Path != "/" {
+		t.Errorf("cookie path = %q, want /", c.Path)
+	}
+	if !c.HttpOnly {
+		t.Error("session cookie must be HttpOnly")
+	}
+	if c.SameSite != http.SameSiteNoneMode {
+		t.Errorf("SameSite = %v, want None (cross-site frontend/API)", c.SameSite)
+	}
+	if !c.Secure {
+		t.Error("Secure must be true when CookieSecure is set (required for SameSite=None)")
+	}
+	if c.MaxAge <= 0 {
+		t.Errorf("MaxAge = %d, want positive for a persistent cookie", c.MaxAge)
+	}
+
+	// When CookieSecure is false (local dev over http), Secure must follow.
+	insecure := &Handlers{set: Settings{CookieName: "gotunnels_session", CookieSecure: false}}
+	if insecure.sessionCookie("t", exp, 100).Secure {
+		t.Error("Secure should be false when CookieSecure is false")
+	}
+}
+
+// TestExpiredCookieClears pins that logout / logout-all emit a cookie the
+// browser will delete immediately: empty value and a negative Max-Age.
+func TestExpiredCookieClears(t *testing.T) {
+	h := &Handlers{set: Settings{CookieName: "gotunnels_session", CookieSecure: true}}
+	c := h.expiredCookie()
+
+	if c.Value != "" {
+		t.Errorf("cleared cookie value = %q, want empty", c.Value)
+	}
+	if c.MaxAge >= 0 {
+		t.Errorf("cleared cookie MaxAge = %d, want negative (delete now)", c.MaxAge)
+	}
+	if c.Name != "gotunnels_session" {
+		t.Errorf("cleared cookie name = %q", c.Name)
+	}
+	if c.Path != "/" {
+		t.Errorf("cleared cookie path = %q, want / so it overwrites the original", c.Path)
 	}
 }
 
@@ -9583,14 +9942,14 @@ func TestClamp(t *testing.T) {
   File name:             config.go
   Relative path:         internal/config/config.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/config.go
-  Size:                  15.3 KiB (15670 bytes)
-  Last modified:         2026-07-06 02:21:29.000000000 -0400
+  Size:                  15.7 KiB (16155 bytes)
+  Last modified:         2026-07-08 09:51:25.776984689 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816335
+  Inode:                 20039277
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               9ef2272639edfa87e6bebb7f9344c7870f55e336e64f7f25fa6aa1ad2d35d5b5
+  SHA-256:               0ebfab13508bedbeeced34b026b850db441ea9f9e29ec9388313c6fbd4e6565d
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
@@ -9632,6 +9991,12 @@ type Config struct {
 	DBConnectTimeout time.Duration
 
 	// Sessions -----------------------------------------------------------
+	// SessionTTL is how long a session stays valid after it is issued. A value
+	// of 0 (the default) means sessions never expire on their own: they live
+	// until the user explicitly logs out (here or "everywhere"). GoTunnels
+	// never logs anyone out for inactivity — this is a deliberate product
+	// choice (see docs/ARCHITECTURE.md). Set a positive duration to opt into
+	// expiring sessions instead.
 	SessionCookieName string
 	SessionTTL        time.Duration
 
@@ -9724,7 +10089,7 @@ func Load() (*Config, error) {
 		DBMinConns:           int32(getint("GOTUNNELS_DB_MIN_CONNS", 2)),
 		DBConnectTimeout:     getdur("GOTUNNELS_DB_CONNECT_TIMEOUT", 30*time.Second),
 		SessionCookieName:    getenv("GOTUNNELS_SESSION_COOKIE_NAME", "gotunnels_session"),
-		SessionTTL:           getdur("GOTUNNELS_SESSION_TTL", 24*time.Hour),
+		SessionTTL:           getdur("GOTUNNELS_SESSION_TTL", 0), // 0 = never expires (see field doc)
 		CORSAllowedOrigins:   splitList(getenv("GOTUNNELS_CORS_ALLOWED_ORIGINS", "*")),
 		RPID:                 getenv("GOTUNNELS_RP_ID", "localhost"),
 		RPDisplayName:        getenv("GOTUNNELS_RP_DISPLAY_NAME", "GoTunnels"),
@@ -9836,8 +10201,8 @@ func (c *Config) Validate() error {
 	if c.HTTPAddr == "" {
 		return fmt.Errorf("config: GOTUNNELS_HTTP_ADDR is required")
 	}
-	if c.SessionTTL <= 0 {
-		return fmt.Errorf("config: GOTUNNELS_SESSION_TTL must be positive")
+	if c.SessionTTL < 0 {
+		return fmt.Errorf("config: GOTUNNELS_SESSION_TTL must not be negative (0 disables expiry — sessions live until logout)")
 	}
 	switch c.CSPMode {
 	case "report-only", "enforce":
@@ -10017,14 +10382,14 @@ func DecodeKeyMaterial(s string) ([]byte, error) {
   File name:             config_test.go
   Relative path:         internal/config/config_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/config_test.go
-  Size:                  8.0 KiB (8289 bytes)
-  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Size:                  9.5 KiB (9822 bytes)
+  Last modified:         2026-07-08 09:54:02.810100211 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816336
+  Inode:                 20039464
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               facb0e055fb34d0ad7e2d2b9e9bdf232f36d3e6964084c365ca9f69b90091865
+  SHA-256:               2d269475f5e971ead317af91c71b6051e614c7579d75224629f348a0893c9112
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
@@ -10318,6 +10683,63 @@ func TestPerInterval(t *testing.T) {
 		if got := PerInterval(tc.in); got != tc.want {
 			t.Errorf("PerInterval(%v) = %v, want %v", tc.in, got, tc.want)
 		}
+	}
+}
+
+func TestValidate_SessionTTL(t *testing.T) {
+	// A session TTL of zero is the new default and means "never expires":
+	// sessions live until an explicit logout. It must pass validation.
+	base := func() *Config {
+		return &Config{
+			DatabaseURL: "x",
+			HTTPAddr:    ":8080",
+			RPOrigins:   []string{"http://localhost"},
+			CSPMode:     "report-only",
+		}
+	}
+
+	zero := base()
+	zero.SessionTTL = 0
+	if err := zero.Validate(); err != nil {
+		t.Fatalf("SessionTTL=0 (never expires) must be valid: %v", err)
+	}
+
+	positive := base()
+	positive.SessionTTL = 48 * time.Hour
+	if err := positive.Validate(); err != nil {
+		t.Fatalf("SessionTTL=48h must be valid: %v", err)
+	}
+
+	negative := base()
+	negative.SessionTTL = -time.Second
+	if err := negative.Validate(); err == nil {
+		t.Fatal("negative SessionTTL must fail validation")
+	}
+}
+
+func TestLoad_SessionTTLDefaultsToNeverExpire(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	// Deliberately do NOT set GOTUNNELS_SESSION_TTL.
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.SessionTTL != 0 {
+		t.Fatalf("default SessionTTL = %v, want 0 (never expires)", c.SessionTTL)
+	}
+}
+
+func TestLoad_SessionTTLOverride(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	t.Setenv("GOTUNNELS_SESSION_TTL", "48h")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.SessionTTL != 48*time.Hour {
+		t.Fatalf("SessionTTL override = %v, want 48h", c.SessionTTL)
 	}
 }
 
@@ -12862,14 +13284,14 @@ func TestValidKey(t *testing.T) {
   File name:             server.go
   Relative path:         internal/server/server.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/server/server.go
-  Size:                  6.8 KiB (7060 bytes)
-  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Size:                  6.9 KiB (7140 bytes)
+  Last modified:         2026-07-08 09:52:49.008930889 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816347
+  Inode:                 20039356
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               842761dd89f822d81eb3bacee0be501c5f536ff2e08aa5fd50dc1477b8672a97
+  SHA-256:               bbfd656338ccc1175f0f3aa72d21ad76a245d7278643e0d4b82a0b3e479a9dc3
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
@@ -12950,6 +13372,7 @@ func New(d Deps) *http.Server {
 	// --- authenticated ---
 	authed := d.Auth.RequireAuth
 	mux.Handle("POST /api/logout", authed(http.HandlerFunc(d.Auth.Logout)))
+	mux.Handle("POST /api/logout-all", authed(http.HandlerFunc(d.Auth.LogoutAll)))
 	mux.Handle("GET /api/me", authed(http.HandlerFunc(d.Auth.Me)))
 	mux.Handle("GET /api/activity", authed(http.HandlerFunc(d.Auth.Activity)))
 	mux.Handle("POST /api/passkey/register/begin", authed(http.HandlerFunc(d.Auth.PasskeyRegisterBegin)))
@@ -13047,14 +13470,14 @@ func noteRateKey() func(*http.Request) string {
   File name:             store.go
   Relative path:         internal/store/store.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/store/store.go
-  Size:                  33.1 KiB (33982 bytes)
-  Last modified:         2026-07-06 02:21:29.000000000 -0400
+  Size:                  34.5 KiB (35421 bytes)
+  Last modified:         2026-07-08 09:51:50.287053568 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19816349
+  Inode:                 20039300
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               e47e80cc38efb7e6be36dccdd29a334f839ec8f6a41f382a383b46de5b42164d
+  SHA-256:               c928e3f6e313fead221416c00c7c33d8db76daa8ad109104f285bd2ff9d213c0
   Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
 
 --- CONTENT ---
@@ -13109,14 +13532,16 @@ type User struct {
 	CreatedAt   time.Time
 }
 
-// Session is a server-side session record.
+// Session is a server-side session record. ExpiresAt is a pointer because
+// expiry is optional: a nil ExpiresAt means the session never expires and
+// lives until it is explicitly revoked (logout). See CreateSession/GetSession.
 type Session struct {
 	ID         string
 	UserID     string
 	AuthMethod string
 	CreatedAt  time.Time
 	LastSeenAt time.Time
-	ExpiresAt  time.Time
+	ExpiresAt  *time.Time
 	RevokedAt  *time.Time
 }
 
@@ -13571,8 +13996,11 @@ func (s *Store) UseRecoveryCode(ctx context.Context, userID, codeHash string) (b
 // Sessions
 // ---------------------------------------------------------------------------
 
-// CreateSession inserts a new session row.
-func (s *Store) CreateSession(ctx context.Context, id, userID, authMethod string, expiresAt time.Time) error {
+// CreateSession inserts a new session row. A nil expiresAt is stored as SQL
+// NULL, which GetSession treats as "never expires"; a non-nil expiresAt is an
+// absolute expiry. pgx encodes a nil *time.Time as NULL, so the same statement
+// serves both persistent and expiring sessions.
+func (s *Store) CreateSession(ctx context.Context, id, userID, authMethod string, expiresAt *time.Time) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO sessions (id, user_id, auth_method, expires_at)
 		VALUES ($1, $2::uuid, $3, $4)`,
@@ -13580,13 +14008,16 @@ func (s *Store) CreateSession(ctx context.Context, id, userID, authMethod string
 	return err
 }
 
-// GetSession fetches a live (non-revoked, non-expired) session.
+// GetSession fetches a live session. A session is live when it is not revoked
+// and either has no expiry (expires_at IS NULL — a persistent session) or its
+// expiry is still in the future. This is the one place that decides whether a
+// token is still good, so the "never expires" rule lives here in SQL.
 func (s *Store) GetSession(ctx context.Context, id string) (Session, error) {
 	var sess Session
 	err := s.pool.QueryRow(ctx, `
 		SELECT id, user_id::text, auth_method, created_at, last_seen_at, expires_at, revoked_at
 		FROM sessions
-		WHERE id = $1 AND revoked_at IS NULL AND expires_at > now()`, id,
+		WHERE id = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`, id,
 	).Scan(&sess.ID, &sess.UserID, &sess.AuthMethod, &sess.CreatedAt,
 		&sess.LastSeenAt, &sess.ExpiresAt, &sess.RevokedAt)
 	return sess, mapErr(err)
@@ -13604,6 +14035,22 @@ func (s *Store) RevokeSession(ctx context.Context, id string) error {
 	_, err := s.pool.Exec(ctx,
 		`UPDATE sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, id)
 	return err
+}
+
+// RevokeAllSessionsForUser revokes every currently-active session for a user —
+// the "log out everywhere" action. It returns how many sessions were revoked
+// so the caller can tell the person exactly what happened. Already-revoked and
+// already-expired-but-not-revoked rows are left untouched (the WHERE clause
+// only touches rows with revoked_at IS NULL), and the whole thing is a single
+// statement so there is no read-then-write race.
+func (s *Store) RevokeAllSessionsForUser(ctx context.Context, userID string) (int64, error) {
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE sessions SET revoked_at = now() WHERE user_id = $1::uuid AND revoked_at IS NULL`,
+		userID)
+	if err != nil {
+		return 0, err
+	}
+	return ct.RowsAffected(), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -15329,14 +15776,14 @@ var FS embed.FS
   File name:             README.md
   Relative path:         README.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/README.md
-  Size:                  11.1 KiB (11464 bytes)
-  Last modified:         2026-07-04 17:16:39.000000000 -0400
+  Size:                  11.5 KiB (11828 bytes)
+  Last modified:         2026-07-08 09:55:36.069168825 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 19406588
+  Inode:                 20039602
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               524537a383cee3afaf6fc76dfca9a488f224db92035d3aa7a67eee5a1e7811ce
+  SHA-256:               ca744b2489536fe11f8fa76bdbf2e5c5fcb25ca016eddfdb369d67fa4667555e
   Last git commit:       8f17e75 2026-07-04 17:45:11 -0400 add all changes
 
 --- CONTENT ---
@@ -15364,7 +15811,12 @@ ten independent instances side by side without configuring anything.
   (argon2id), and optional **TOTP** two-factor (RFC 6238, works with Aegis /
   Google Authenticator), with single-use recovery codes.
 - **Server-side sessions** using an opaque Bearer token that works cross-origin
-  (the frontend and API are on different tunnel domains).
+  (the frontend and API are on different tunnel domains). The token lives in
+  `localStorage`, so a session persists across tabs and browser restarts and
+  **never expires on its own** — you stay signed in until you explicitly log
+  out (a deliberate anti–password-fatigue choice; tunable via
+  `GOTUNNELS_SESSION_TTL`). Settings includes **"log out everywhere"** to revoke
+  every session across all devices at once.
 - **Privacy-preserving audit log**: client IPs are never stored raw — only
   `sha256(pepper || ip)`, and the hash is shown to you plainly on your own
   activity page.
@@ -17023,9 +17475,9 @@ done
 # DUMP SUMMARY
 ################################################################################
   Files dumped   : 97
-  Total size     : 526.5 KiB (539203 bytes)
+  Total size     : 545.9 KiB (559062 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-07-08T08:56:18-04:00
+  Completed at   : 2026-07-08T09:56:10-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################

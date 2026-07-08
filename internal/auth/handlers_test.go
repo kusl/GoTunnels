@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidUsername(t *testing.T) {
@@ -151,5 +152,113 @@ func TestNewUUIDv4(t *testing.T) {
 			t.Fatalf("duplicate uuid generated: %s", id)
 		}
 		seen[id] = true
+	}
+}
+
+// TestComputeSessionExpiry pins the mapping from configured TTL to the DB
+// expiry and cookie lifetime. The zero/negative cases are the "never expires"
+// contract: a nil DB expiry (stored as SQL NULL) and a far-future,
+// positively-aged cookie so the session survives a browser restart.
+func TestComputeSessionExpiry(t *testing.T) {
+	now := time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC)
+
+	t.Run("never expires when ttl is zero", func(t *testing.T) {
+		db, cookieExp, maxAge := computeSessionExpiry(now, 0)
+		if db != nil {
+			t.Errorf("dbExpiry = %v, want nil (NULL / never expires)", db)
+		}
+		if maxAge <= 0 {
+			t.Errorf("cookie MaxAge = %d, want a large positive value", maxAge)
+		}
+		if !cookieExp.After(now.AddDate(0, 6, 0)) {
+			t.Errorf("cookie expiry %v should be many months in the future", cookieExp)
+		}
+		if want := int(persistentSessionCookieTTL.Seconds()); maxAge != want {
+			t.Errorf("cookie MaxAge = %d, want %d (persistent)", maxAge, want)
+		}
+	})
+
+	t.Run("never expires when ttl is negative", func(t *testing.T) {
+		db, _, maxAge := computeSessionExpiry(now, -time.Hour)
+		if db != nil {
+			t.Errorf("dbExpiry = %v, want nil for a non-positive ttl", db)
+		}
+		if maxAge <= 0 {
+			t.Errorf("cookie MaxAge = %d, want positive", maxAge)
+		}
+	})
+
+	t.Run("absolute expiry when ttl is positive", func(t *testing.T) {
+		ttl := 48 * time.Hour
+		db, cookieExp, maxAge := computeSessionExpiry(now, ttl)
+		if db == nil {
+			t.Fatal("dbExpiry = nil, want an absolute time for a positive ttl")
+		}
+		if !db.Equal(now.Add(ttl)) {
+			t.Errorf("dbExpiry = %v, want %v", *db, now.Add(ttl))
+		}
+		if !cookieExp.Equal(now.Add(ttl)) {
+			t.Errorf("cookie expiry = %v, want %v (aligned with DB expiry)", cookieExp, now.Add(ttl))
+		}
+		if maxAge != int(ttl.Seconds()) {
+			t.Errorf("cookie MaxAge = %d, want %d", maxAge, int(ttl.Seconds()))
+		}
+	})
+}
+
+// TestSessionCookieAttributes pins the security-relevant cookie attributes.
+// The frontend and API live on different origins, so the cookie must be
+// SameSite=None; that in turn requires Secure, which tracks CookieSecure.
+func TestSessionCookieAttributes(t *testing.T) {
+	h := &Handlers{set: Settings{CookieName: "gotunnels_session", CookieSecure: true}}
+	exp := time.Now().Add(persistentSessionCookieTTL)
+	c := h.sessionCookie("tok-123", exp, int(persistentSessionCookieTTL.Seconds()))
+
+	if c.Name != "gotunnels_session" {
+		t.Errorf("cookie name = %q", c.Name)
+	}
+	if c.Value != "tok-123" {
+		t.Errorf("cookie value = %q", c.Value)
+	}
+	if c.Path != "/" {
+		t.Errorf("cookie path = %q, want /", c.Path)
+	}
+	if !c.HttpOnly {
+		t.Error("session cookie must be HttpOnly")
+	}
+	if c.SameSite != http.SameSiteNoneMode {
+		t.Errorf("SameSite = %v, want None (cross-site frontend/API)", c.SameSite)
+	}
+	if !c.Secure {
+		t.Error("Secure must be true when CookieSecure is set (required for SameSite=None)")
+	}
+	if c.MaxAge <= 0 {
+		t.Errorf("MaxAge = %d, want positive for a persistent cookie", c.MaxAge)
+	}
+
+	// When CookieSecure is false (local dev over http), Secure must follow.
+	insecure := &Handlers{set: Settings{CookieName: "gotunnels_session", CookieSecure: false}}
+	if insecure.sessionCookie("t", exp, 100).Secure {
+		t.Error("Secure should be false when CookieSecure is false")
+	}
+}
+
+// TestExpiredCookieClears pins that logout / logout-all emit a cookie the
+// browser will delete immediately: empty value and a negative Max-Age.
+func TestExpiredCookieClears(t *testing.T) {
+	h := &Handlers{set: Settings{CookieName: "gotunnels_session", CookieSecure: true}}
+	c := h.expiredCookie()
+
+	if c.Value != "" {
+		t.Errorf("cleared cookie value = %q, want empty", c.Value)
+	}
+	if c.MaxAge >= 0 {
+		t.Errorf("cleared cookie MaxAge = %d, want negative (delete now)", c.MaxAge)
+	}
+	if c.Name != "gotunnels_session" {
+		t.Errorf("cleared cookie name = %q", c.Name)
+	}
+	if c.Path != "/" {
+		t.Errorf("cleared cookie path = %q, want / so it overwrites the original", c.Path)
 	}
 }
