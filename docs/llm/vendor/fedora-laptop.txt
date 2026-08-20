@@ -182,4 +182,49 @@ gotunnels-zmfs9g_api_1
 real	1m57.300s
 user	1m26.373s
 sys	0m28.552s
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash export.sh > docs/llm/vendor/output.txt
+
+real	0m3.103s
+user	0m1.581s
+sys	0m1.896s
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/down.sh 
+[gotunnels] using runtime: podman / compose: podman-compose
+[gotunnels] tearing down instance: gotunnels-9w4rvw
+Error: no container with name or ID "gotunnels-9w4rvw_api_1" found: no such container
+Error: no container with name or ID "gotunnels-9w4rvw_cloudflared-api_1" found: no such container
+Error: no container with name or ID "gotunnels-9w4rvw_db_1" found: no such container
+Error: no container with name or ID "gotunnels-9w4rvw_frontend_1" found: no such container
+Error: no container with name or ID "gotunnels-9w4rvw_cloudflared-frontend_1" found: no such container
+Error: no container with ID or name "gotunnels-9w4rvw_cloudflared-frontend_1" found: no such container
+Error: no container with ID or name "gotunnels-9w4rvw_api_1" found: no such container
+Error: no container with ID or name "gotunnels-9w4rvw_cloudflared-api_1" found: no such container
+Error: no container with ID or name "gotunnels-9w4rvw_frontend_1" found: no such container
+Error: no container with ID or name "gotunnels-9w4rvw_db_1" found: no such container
+Error: no pod with name or ID pod_gotunnels-9w4rvw found: no such pod
+[gotunnels] instance 'gotunnels-9w4rvw' removed (containers + volumes).
+
+real	0m0.589s
+user	0m0.551s
+sys	0m0.297s
+kushal@fedora:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/down.sh gotunnels-zmfs9g
+[gotunnels] using runtime: podman / compose: podman-compose
+[gotunnels] tearing down instance: gotunnels-zmfs9g
+gotunnels-zmfs9g_frontend_1
+gotunnels-zmfs9g_db_1
+gotunnels-zmfs9g_cloudflared-frontend_1
+gotunnels-zmfs9g_api_1
+gotunnels-zmfs9g_cloudflared-api_1
+gotunnels-zmfs9g_cloudflared-frontend_1
+gotunnels-zmfs9g_api_1
+gotunnels-zmfs9g_cloudflared-api_1
+gotunnels-zmfs9g_frontend_1
+gotunnels-zmfs9g_db_1
+gotunnels-zmfs9g_pgdata
+c91a1850217c846ccb88b87e622f21b8c5a64240b8c12db9b2660d3b6cb23854
+gotunnels-zmfs9g_default
+[gotunnels] instance 'gotunnels-zmfs9g' removed (containers + volumes).
+
+real	0m1.975s
+user	0m0.748s
+sys	0m0.635s
 kushal@fedora:~/src/golang/GoTunnels$ 
