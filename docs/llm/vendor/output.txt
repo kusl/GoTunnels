@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-08-20T08:51:09-04:00
+  Generated at   : 2026-08-20T08:59:58-04:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,10 +17,10 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : bd2c9cf7dfaff775c754b205447a231951aebe5d
-  Commit (short) : bd2c9cf
-  Commit date    : 2026-08-20 08:50:11 -0400
-  Commit message : Bump actions/setup-go from 6 to 7
+  Commit (full)  : 3e7081a1881ee384cb2e9379b376ac1dc2b39eb5
+  Commit (short) : 3e7081a
+  Commit date    : 2026-08-20 08:59:37 -0400
+  Commit message : use golang 1.27
   Remote origin  : git@github.com:kusl/GoTunnels.git
   Files included : 99
   Excluded path  : docs/llm/
@@ -914,14 +914,14 @@ volumes:
   Relative path:         Containerfile.api
   Absolute path:         /home/kushal/src/golang/GoTunnels/Containerfile.api
   Size:                  979 B (979 bytes)
-  Last modified:         2026-07-01 17:33:27.472441212 -0400
+  Last modified:         2026-08-20 08:57:39.290314415 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805971
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               14bd260997a957b541f8139b5f269d02fc23dff51bd2421795c5535d80accead
-  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
+  SHA-256:               2b9dc80595b2df28e6c5d9bc47f3c2d03befd7ecfc52bf70b7d74e4e9e9bdf3e
+  Last git commit:       3e7081a 2026-08-20 08:59:37 -0400 use golang 1.27
 
 --- CONTENT ---
 # Containerfile.api — multi-stage build for the GoTunnels API.
@@ -932,7 +932,7 @@ volumes:
 # graph, then produces a static binary. The final image is distroless: no
 # shell, no package manager, minimal attack surface, runs as nonroot.
 
-FROM golang:1.26-bookworm AS build
+FROM golang:1.27-bookworm AS build
 WORKDIR /src
 
 # Keep the bundled toolchain (no surprise network toolchain downloads) and
@@ -1386,14 +1386,14 @@ also annotate their active span (batch sizes, note ids) so traces answer
   Relative path:         docs/CONFIGURATION.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/docs/CONFIGURATION.md
   Size:                  8.6 KiB (8898 bytes)
-  Last modified:         2026-07-08 09:55:40.105589534 -0400
+  Last modified:         2026-08-20 08:58:00.372102915 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 20039608
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               643e097189c0aa01b77cacbf845fc7e85d25e8f4ba9000c1e96a04755666f169
-  Last git commit:       0649fc2 2026-07-08 09:57:01 -0400 add claude response
+  SHA-256:               ae2bc5ca9d0a4aa4fed2ddbbd63f1fd63968729d1c28b4249b365dbc20834abb
+  Last git commit:       3e7081a 2026-08-20 08:59:37 -0400 use golang 1.27
 
 --- CONTENT ---
 # Configuration
@@ -1546,7 +1546,7 @@ naming and the test toolchain:
 | Variable | Meaning |
 | --- | --- |
 | `GOTUNNELS_PROJECT` | Explicit Compose project name (else derived from the instance id or generated). |
-| `GO_IMAGE` | Go image used by `scripts/test.sh` when no host Go toolchain is present (default `golang:1.26-bookworm`). |
+| `GO_IMAGE` | Go image used by `scripts/test.sh` when no host Go toolchain is present (default `golang:1.27-bookworm`). |
 | `CR` / `COMPOSE` | Override the detected container runtime / compose command. |
 
 
@@ -6831,19 +6831,19 @@ docs/llm/dump.txt
   Relative path:         go.mod
   Absolute path:         /home/kushal/src/golang/GoTunnels/go.mod
   Size:                  1.6 KiB (1690 bytes)
-  Last modified:         2026-07-01 18:10:14.362721541 -0400
+  Last modified:         2026-08-20 08:57:31.820620055 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 17805927
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               2e7f00bbee5a68d0b67f92a293a0df5da0a5689e603d00677cda688d196bb373
-  Last git commit:       995655c 2026-07-01 18:11:28 -0400 add claude response
+  SHA-256:               793f3db33bb83d7b528a93a32738b345f54c4d12f34095aaeba0d6ebd4f09e8d
+  Last git commit:       3e7081a 2026-08-20 08:59:37 -0400 use golang 1.27
 
 --- CONTENT ---
 module github.com/kusl/GoTunnels
 
-go 1.26.0
+go 1.27.0
 
 // NOTE: go.sum is intentionally not committed on first import. Run
 // `go mod tidy` once (the local network can reach the Go module proxy) to
@@ -14748,14 +14748,14 @@ func TestMultiHandler_Enabled(t *testing.T) {
   Relative path:         internal/telemetry/telemetry.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/telemetry/telemetry.go
   Size:                  10.2 KiB (10544 bytes)
-  Last modified:         2026-07-06 02:21:30.000000000 -0400
+  Last modified:         2026-08-20 08:58:43.414336864 -0400
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
   Inode:                 19816351
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               94f504ef187759a620f08d0b2330de00ae360160e76350571cb2f1cb306c9c29
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  SHA-256:               72112c81fe75898e31a0c3d934549427a46f985cde2311172d6f2fcdb214744a
+  Last git commit:       3e7081a 2026-08-20 08:59:37 -0400 use golang 1.27
 
 --- CONTENT ---
 // Package telemetry wires the vendor-neutral OpenTelemetry Go SDK for all three
@@ -14794,7 +14794,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
 )
 
 // scopeName is the instrumentation scope for logs/traces/metrics we emit
@@ -17107,14 +17107,14 @@ bash "$SCRIPT_DIR/up.sh" "$PROJECT"
   Relative path:         scripts/test.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/test.sh
   Size:                  2.2 KiB (2305 bytes)
-  Last modified:         2026-07-01 17:33:36.640546100 -0400
+  Last modified:         2026-08-20 08:58:50.171561088 -0400
   Permissions:           -rwxr-xr-x
   Owner:                 kushal:kushal
   Inode:                 17805977
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               8fd091516b3174b9577849add2b5af3f00e80291653871f15e90c67cc344e37a
-  Last git commit:       0a9400c 2026-07-01 17:34:37 -0400 add response by claude
+  SHA-256:               b807dcd8accfc9dbe0c2b929a867bee1ebd570cd1ef7812b6f06c46b94bebae2
+  Last git commit:       3e7081a 2026-08-20 08:59:37 -0400 use golang 1.27
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -17134,7 +17134,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 . "$SCRIPT_DIR/lib.sh"
 
-GO_IMAGE="${GO_IMAGE:-docker.io/library/golang:1.26-bookworm}"
+GO_IMAGE="${GO_IMAGE:-docker.io/library/golang:1.27-bookworm}"
 
 # run_go "<go shell snippet>" — execute a snippet with a Go toolchain, on host
 # if available else in a container mounting the repo.
@@ -17659,7 +17659,7 @@ done
   Files dumped   : 99
   Total size     : 552.7 KiB (566067 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-08-20T08:51:12-04:00
+  Completed at   : 2026-08-20T09:00:01-04:00
 ################################################################################
 # END OF DUMP
 ################################################################################
