@@ -393,4 +393,352 @@ fc28fb12fe69  docker.io/cloudflare/cloudflared:latest     tunnel --no-autou...  
 c54f7eaedb6f  docker.io/library/postgres:16-alpine        postgres              About a minute ago  Up About a minute (healthy)  5432/tcp                                      gotunnels-ogz9jw_db_1
 2a1d0fd39f56  docker.io/cloudflare/cloudflared:latest     tunnel --no-autou...  About a minute ago  Up About a minute                                                          gotunnels-ogz9jw_cloudflared-api_1
 e79cac8a9cd7  localhost/gotunnels-ogz9jw_api:latest                             About a minute ago  Up About a minute            8080/tcp                                      gotunnels-ogz9jw_api_1
-kushal@virginia:~/src/golang/GoTunnels$ 
+kushal@virginia:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; time git status; time git fetch; time git status; time git remote show origin; time git pull; time git status; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh; podman ps -a;
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.019s
+user	0m0.009s
+sys	0m0.010s
+remote: Enumerating objects: 118, done.
+remote: Counting objects: 100% (118/118), done.
+remote: Compressing objects: 100% (41/41), done.
+remote: Total 118 (delta 73), reused 118 (delta 73), pack-reused 0 (from 0)
+Receiving objects: 100% (118/118), 246.00 KiB | 2.39 MiB/s, done.
+Resolving deltas: 100% (73/73), completed with 47 local objects.
+From https://github.com/kusl/GoTunnels
+   8e9afe7..c13164e  main       -> origin/main
+
+real	0m0.623s
+user	0m0.223s
+sys	0m0.073s
+On branch main
+Your branch is behind 'origin/main' by 9 commits, and can be fast-forwarded.
+  (use "git pull" to update your local branch)
+
+nothing to commit, working tree clean
+
+real	0m0.007s
+user	0m0.000s
+sys	0m0.007s
+* remote origin
+  Fetch URL: https://github.com/kusl/GoTunnels/
+  Push  URL: https://github.com/kusl/GoTunnels/
+  HEAD branch: main
+  Remote branch:
+    main tracked
+  Local branch configured for 'git pull':
+    main merges with remote main
+  Local ref configured for 'git push':
+    main pushes to main (local out of date)
+
+real	0m0.317s
+user	0m0.118s
+sys	0m0.016s
+Updating 8e9afe7..c13164e
+Fast-forward
+ .env.example                                  |   14 +
+ .github/dependabot.yml                        |   12 +-
+ Containerfile.api                             |   18 +-
+ README.md                                     |   38 +-
+ cmd/api/main.go                               |   41 +-
+ compose.yaml                                  |   22 +-
+ docs/ARCHITECTURE.md                          |   40 +-
+ docs/CONFIGURATION.md                         |   32 +-
+ docs/llm/dump.txt                             | 3418 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----------------------------------------------------
+ docs/llm/vendor/claude-conversations.md       |  878 +++++++++++++++++++++++++++++++++++++++++
+ docs/llm/vendor/gotunnels-2026-10-16-a.tar.gz |  Bin 0 -> 174877 bytes
+ docs/llm/vendor/output.txt                    | 3418 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----------------------------------------------------
+ docs/llm/vendor/terminal.txt                  |    1 +
+ docs/llm/vendor/virginia.txt                  |  568 +++++++++++++-------------
+ export.sh                                     |    0
+ frontend/js/api.js                            |   22 --
+ frontend/js/common.js                         |    2 +-
+ frontend/js/page-settings.js                  |   11 +-
+ frontend/js/webauthn.js                       |   11 +-
+ go.mod                                        |   46 +--
+ internal/activity/activity.go                 |   23 +-
+ internal/activity/activity_test.go            |   12 +
+ internal/auth/handlers.go                     |  700 ++++++++++++++++++--------------
+ internal/auth/handlers_test.go                |   83 ++--
+ internal/auth/totp.go                         |   36 +-
+ internal/auth/totp_test.go                    |   30 ++
+ internal/captcha/captcha.go                   |    6 +-
+ internal/config/config.go                     |  201 +++++++---
+ internal/config/config_test.go                |   89 ++++-
+ internal/config/session_persistence_test.go   |   27 ++
+ internal/csp/csp.go                           |   13 +-
+ internal/database/database.go                 |   93 +++--
+ internal/health/health.go                     |   11 +-
+ internal/httpx/middleware.go                  |  122 +++++-
+ internal/httpx/middleware_test.go             |   96 +++++
+ internal/maintenance/maintenance.go           |   88 +++++
+ internal/maintenance/maintenance_test.go      |   93 +++++
+ internal/notes/notes.go                       |   35 +-
+ internal/notes/notes_test.go                  |   13 +
+ internal/prefs/prefs.go                       |    6 +-
+ internal/server/server.go                     |   35 +-
+ internal/store/store.go                       |  310 ++++++++-------
+ internal/telemetry/telemetry.go               |   18 +-
+ internal/telemetry/telemetry_test.go          |   57 +++
+ migrations/0009_totp_replay_guard.down.sql    |    2 +
+ migrations/0009_totp_replay_guard.up.sql      |    5 +
+ scripts/ci-container-test.sh                  |   51 ++-
+ scripts/down.sh                               |    0
+ scripts/run.sh                                |    0
+ scripts/test.sh                               |   10 +-
+ scripts/up.sh                                 |   63 ++-
+ 51 files changed, 7594 insertions(+), 3326 deletions(-)
+ create mode 100644 docs/llm/vendor/gotunnels-2026-10-16-a.tar.gz
+ create mode 100644 docs/llm/vendor/terminal.txt
+ mode change 100755 => 100644 export.sh
+ create mode 100644 internal/maintenance/maintenance.go
+ create mode 100644 internal/maintenance/maintenance_test.go
+ create mode 100644 internal/telemetry/telemetry_test.go
+ create mode 100644 migrations/0009_totp_replay_guard.down.sql
+ create mode 100644 migrations/0009_totp_replay_guard.up.sql
+ mode change 100755 => 100644 scripts/down.sh
+ mode change 100755 => 100644 scripts/run.sh
+ mode change 100755 => 100644 scripts/test.sh
+
+real	0m0.345s
+user	0m0.161s
+sys	0m0.044s
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.022s
+user	0m0.018s
+sys	0m0.004s
+[gotunnels] using runtime: podman / compose: podman-compose
+[gotunnels] using existing /home/kushal/src/golang/GoTunnels/.env
+[gotunnels] reset tunnel-derived env (RP_ID / RP_ORIGINS / CORS) to bootstrap defaults
+[gotunnels] project (instance): gotunnels-7yivoa
+[gotunnels] telemetry host.name: virginia
+[gotunnels] removing any previous deployment of gotunnels-7yivoa (containers + volumes)…
+[gotunnels] clean slate
+[gotunnels] pulling images and building…
+Trying to pull docker.io/cloudflare/cloudflared:2026.10.1...
+Trying to pull docker.io/library/postgres:18-alpine...
+Getting image source signatures
+Copying blob 2780920e5dbf skipped: already exists  
+Copying blob 2780920e5dbf skipped: already exists  
+Copying blob 218cf840d0d9 skipped: already exists  
+Copying blob d6b1b89eccac skipped: already exists  
+Copying blob c172f21841df skipped: already exists  
+Copying blob f6069939f718 skipped: already exists  
+Copying blob 7c12895b777b skipped: already exists  
+Copying blob b839dfae01f6 skipped: already exists  
+Copying blob 3214acf345c0 skipped: already exists  
+Copying blob 52630fc75a18 skipped: already exists  
+Copying blob dd64bf2dd177 skipped: already exists  
+Copying blob bd8962e29291 skipped: already exists  
+Copying blob cac2ae0193cb skipped: already exists  
+Copying blob ebddc55facdc skipped: already exists  
+Copying blob c4bc6f35ff5e skipped: already exists  
+Copying blob b96fe2995f90 skipped: already exists  
+Copying blob 58c0c263dc73 skipped: already exists  
+Copying blob 375845a3fd7c skipped: already exists  
+Copying blob 2780920e5dbf skipped: already exists  
+Copying blob 218cf840d0d9 skipped: already exists  
+Copying blob d6b1b89eccac skipped: already exists  
+Copying blob e5545be08ab6 [--------------------------------------] 0.0b / 18.6KiB
+Copying blob e5545be08ab6 done   | 
+Copying blob 30b4807a96db done   | 
+Copying blob d8f47ca787e9 done   | 
+Copying blob 23ebd6772525 done   | 
+Copying blob e2de96513ba9 skipped: already exists  
+Copying blob 976cd45ecd0f done   | 
+Copying blob a7fe94998417 done   | 
+Copying blob 176ab66edd39 done   | 
+Copying blob 5ef7ae0adbc8 done   | 
+Copying config c293117fce done   | 
+Writing manifest to image destination
+c293117fcecda7344b5480222e813b9f673d7abd69b1dd95eff239b768b04f59
+[1/2] STEP 1/8: FROM docker.io/library/golang:1.27-trixie AS build
+STEP 1/5: FROM docker.io/library/caddy:2-alpine
+Trying to pull docker.io/library/golang:1.27-trixie...
+STEP 2/5: COPY frontend/ /srv/
+--> 485809b4f6c0
+STEP 3/5: COPY frontend/Caddyfile /etc/caddy/Caddyfile
+Getting image source signatures
+Copying blob 801401a9a8ba [--------------------------------------] 0.0b / 127.0b
+Copying blob 801401a9a8ba done   | 
+Copying blob 801401a9a8ba done   | 
+Copying blob 4846f2900730 [==>-----------------------------------] 3.7MiB / 47.1MiB | 20.2 MiB/s
+Copying blob 4dc3950125eb [--------------------------------------] 726.0KiB / 64.7MiB | 902.3 KiB/s
+Copying blob b2b6413ae8f3 skipped: already exists  
+Copying blob a6132307e9f8 [--------------------------------------] 542.5KiB / 97.7MiB | 2.1 MiB/s
+Copying blob 62fe2e747f69 [--------------------------------------] 303.4KiB / 24.5MiB | 1.2 MiB/s
+Copying blob 4f4fb700ef54 skipped: already exists  
+{"level":"info","ts":1792167766.2959104,"msg":"using config from file","file":"/etc/caddy/Caddyfile"}
+{"level":"info","ts":1792167766.2987154,"msg":"adapted config to JSON","adapter":"caddyfile"}
+Copying blob 801401a9a8ba done   | 
+Copying blob 4846f2900730 [====>---------------------------------] 6.1MiB / 47.1MiB | 9.3 MiB/s
+Copying blob 4dc3950125eb [>-------------------------------------] 1.2MiB / 64.7MiB | 1.6 MiB/s
+Copying blob b2b6413ae8f3 skipped: already exists  
+Copying blob a6132307e9f8 [--------------------------------------] 913.4KiB / 97.7MiB | 919.3 KiB/s
+Copying blob 801401a9a8ba done   | 
+Copying blob 801401a9a8ba done   | 
+Copying blob 4846f2900730 done   | 
+Copying blob 4dc3950125eb done   | 
+Copying blob b2b6413ae8f3 skipped: already exists  
+Copying blob a6132307e9f8 done   | 
+Copying blob 62fe2e747f69 done   | 
+Copying blob 4f4fb700ef54 skipped: already exists  
+Copying config 99668476f0 done   | 
+Writing manifest to image destination
+[1/2] STEP 2/8: WORKDIR /src
+--> e981120a48f1
+[1/2] STEP 3/8: ENV CGO_ENABLED=0     GOFLAGS=-mod=mod     GOTOOLCHAIN=local
+--> 89f63bedd8f4
+[1/2] STEP 4/8: COPY go.mod ./
+--> 8176d21bea1e
+[1/2] STEP 5/8: RUN go mod download
+--> f35e7ec68e02
+[1/2] STEP 6/8: COPY . .
+--> 0f4dfcf8e2fb
+[1/2] STEP 7/8: ARG VERSION=dev
+--> e24a80ca7e84
+[1/2] STEP 8/8: RUN go mod tidy  && go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
+go: downloading github.com/stretchr/testify v1.12.1
+go: downloading github.com/felixge/httpsnoop v1.1.0
+go: downloading github.com/google/uuid v1.6.0
+go: downloading github.com/tinylib/msgp v1.6.4
+go: downloading github.com/go-webauthn/x v0.3.1
+go: downloading go.uber.org/mock v0.6.0
+go: downloading golang.org/x/sync v0.17.0
+go: downloading github.com/jackc/puddle/v2 v2.2.2
+go: downloading github.com/jackc/pgpassfile v1.0.0
+go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
+go: downloading golang.org/x/text v0.43.0
+go: downloading github.com/go-viper/mapstructure/v2 v2.5.0
+go: downloading github.com/golang-jwt/jwt/v5 v5.3.1
+go: downloading github.com/google/go-tpm v0.9.8
+go: downloading github.com/fxamacker/cbor/v2 v2.9.4
+go: downloading github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc
+go: downloading github.com/go-logr/logr v1.4.4
+go: downloading github.com/go-logr/stdr v1.2.2
+go: downloading github.com/google/go-cmp v0.7.0
+go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.47.0
+go: downloading go.opentelemetry.io/proto/otlp v1.11.0
+go: downloading google.golang.org/protobuf v1.36.12
+go: downloading go.opentelemetry.io/otel/metric/x v0.69.0
+go: downloading golang.org/x/sys v0.49.0
+go: downloading go.uber.org/goleak v1.3.0
+go: downloading go.opentelemetry.io/auto/sdk v1.2.1
+go: downloading github.com/cespare/xxhash/v2 v2.3.0
+go: downloading github.com/philhofer/fwd v1.2.0
+go: downloading google.golang.org/grpc v1.83.2
+go: downloading github.com/cenkalti/backoff/v5 v5.0.3
+go: downloading github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0
+go: downloading github.com/x448/float16 v0.8.4
+go: downloading go.opentelemetry.io/otel/sdk/log/logtest v0.23.0
+go: downloading go.yaml.in/yaml/v3 v3.0.5
+go: downloading golang.org/x/net v0.60.0
+go: downloading google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc
+go: downloading google.golang.org/genproto/googleapis/api v0.0.0-20260928230214-8a89bd6388cc
+go: downloading golang.org/x/sync v0.24.0
+go: downloading github.com/google/go-tpm-tools v0.3.13-0.20230620182252-4639ecce2aba
+go: downloading github.com/golang/protobuf v1.5.4
+go: downloading gonum.org/v1/gonum v0.17.0
+--> 011b06bff1b1
+[2/2] STEP 1/6: FROM gcr.io/distroless/static-debian13:nonroot
+Trying to pull gcr.io/distroless/static-debian13:nonroot...
+Getting image source signatures
+Copying blob 2780920e5dbf skipped: already exists  
+Copying blob c172f21841df skipped: already exists  
+Copying blob d6b1b89eccac skipped: already exists  
+Copying blob f6069939f718 skipped: already exists  
+Copying blob 218cf840d0d9 skipped: already exists  
+Copying blob dd64bf2dd177 skipped: already exists  
+Copying blob 52630fc75a18 skipped: already exists  
+Copying blob 7c12895b777b skipped: already exists  
+Copying blob 3214acf345c0 skipped: already exists  
+Copying blob c4bc6f35ff5e skipped: already exists  
+Copying blob ebddc55facdc skipped: already exists  
+Copying blob b839dfae01f6 skipped: already exists  
+Copying blob 2cc7ee286bf3 skipped: already exists  
+Copying config 55a757dc8a done   | 
+Writing manifest to image destination
+[2/2] STEP 2/6: WORKDIR /
+--> 0f513518bc9b
+[2/2] STEP 3/6: COPY --from=build /out/api /api
+--> dc4e12114d81
+[2/2] STEP 4/6: USER nonroot:nonroot
+--> 4bcd88f829f7
+[2/2] STEP 5/6: EXPOSE 8080
+--> a8b66401d645
+[2/2] STEP 6/6: ENTRYPOINT ["/api"]
+[2/2] COMMIT gotunnels-7yivoa_api
+--> f53d8b8cae7a
+Successfully tagged localhost/gotunnels-7yivoa_api:latest
+f53d8b8cae7a3d0a76a03cc731732e386e1cd6b74cc5e1546ee53476d9998608
+[gotunnels] starting database…
+458dac1de9ae5afa67c4b6b6b05b178195edd903b7e54a899416eb6c34dd6ca2
+8ceb9e2efe467165e93a18aabf5ae4bd440e1ba71410edf3088cfb75e2a5405e
+gotunnels-7yivoa_db_1
+[gotunnels] waiting for 'db' to become ready (up to 60s)
+[gotunnels] 'db' is ready
+[gotunnels] starting frontend and its tunnel…
+3c3fec595725727ce5a12dab37ba6ae85095a63323a17259f6b9da75e20060fe
+gotunnels-7yivoa_frontend_1
+da2dd63fa4f91e9daa91c662c9dc33e3999cfa0b24b8bed05de1fa891010c6ac
+gotunnels-7yivoa_cloudflared-frontend_1
+[gotunnels] waiting for the frontend Quick Tunnel URL…
+[gotunnels] frontend: https://supervisor-brooks-utils-recruitment.trycloudflare.com
+[gotunnels] starting API and its tunnel…
+Error: no container with name or ID "gotunnels-7yivoa_api_1" found: no such container
+Error: no container with name or ID "gotunnels-7yivoa_cloudflared-api_1" found: no such container
+gotunnels-7yivoa_db_1
+Error: no container with ID or name "gotunnels-7yivoa_api_1" found: no such container
+Error: no container with ID or name "gotunnels-7yivoa_cloudflared-api_1" found: no such container
+gotunnels-7yivoa_db_1
+c6cb21de4d3a3e934c22c05f5cb36598182a2ae3872b39dedd959352d60b7938
+gotunnels-7yivoa_db_1
+bb957e44fa15b304e3855dc19b89785da69e0a7073717e825389a323f2fd1d43
+gotunnels-7yivoa_cloudflared-api_1
+52def067c2cccff597601a6934154e4b73e524940cf35450d3227e31e63f1dea
+gotunnels-7yivoa_api_1
+[gotunnels] did not observe API listening log yet
+[gotunnels] waiting for the API Quick Tunnel URL…
+[gotunnels] api: https://gras-composed-ultimate-millions.trycloudflare.com
+[gotunnels] wrote config.json into frontend container
+
+[gotunnels] GoTunnels is up.
+  Web app : https://supervisor-brooks-utils-recruitment.trycloudflare.com
+  API     : https://gras-composed-ultimate-millions.trycloudflare.com
+  Instance: gotunnels-7yivoa (urls saved to tunnel-urls.txt)
+
+[gotunnels] tear down with: scripts/down.sh gotunnels-7yivoa
+[gotunnels] waiting 60s for the Quick Tunnels to settle, then printing their URL log lines…
+
+[gotunnels] Web app — tunnel URL (from: podman logs cloudflared-frontend):
+2026-10-16T16:24:49Z INF |  https://supervisor-brooks-utils-recruitment.trycloudflare.com                             |
+
+[gotunnels] API — tunnel URL (from: podman logs cloudflared-api):
+2026-10-16T16:24:56Z INF |  https://gras-composed-ultimate-millions.trycloudflare.com                                 |
+
+
+real	5m11.100s
+user	6m5.580s
+sys	0m55.576s
+CONTAINER ID  IMAGE                                       COMMAND               CREATED         STATUS                             PORTS                                         NAMES
+572fb3a4b748  localhost/gotunnels-ogz9jw_frontend:latest  caddy run --confi...  10 minutes ago  Up 10 minutes                      80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-ogz9jw_frontend_1
+fc28fb12fe69  docker.io/cloudflare/cloudflared:latest     tunnel --no-autou...  10 minutes ago  Up 10 minutes                                                                    gotunnels-ogz9jw_cloudflared-frontend_1
+c54f7eaedb6f  docker.io/library/postgres:16-alpine        postgres              9 minutes ago   Up 9 minutes (healthy)             5432/tcp                                      gotunnels-ogz9jw_db_1
+2a1d0fd39f56  docker.io/cloudflare/cloudflared:latest     tunnel --no-autou...  9 minutes ago   Up 9 minutes                                                                     gotunnels-ogz9jw_cloudflared-api_1
+e79cac8a9cd7  localhost/gotunnels-ogz9jw_api:latest                             9 minutes ago   Up 9 minutes                       8080/tcp                                      gotunnels-ogz9jw_api_1
+3c3fec595725  localhost/gotunnels-7yivoa_frontend:latest  caddy run --confi...  2 minutes ago   Up 2 minutes                       80/tcp, 443/tcp, 2019/tcp, 8080/tcp, 443/udp  gotunnels-7yivoa_frontend_1
+da2dd63fa4f9  docker.io/cloudflare/cloudflared:2026.10.1  tunnel --no-autou...  2 minutes ago   Up 2 minutes                                                                     gotunnels-7yivoa_cloudflared-frontend_1
+c6cb21de4d3a  docker.io/library/postgres:18-alpine        postgres              2 minutes ago   Up 2 minutes (healthy)             5432/tcp                                      gotunnels-7yivoa_db_1
+bb957e44fa15  docker.io/cloudflare/cloudflared:2026.10.1  tunnel --no-autou...  2 minutes ago   Up 2 minutes                                                                     gotunnels-7yivoa_cloudflared-api_1
+52def067c2cc  localhost/gotunnels-7yivoa_api:latest                             2 minutes ago   Exited (1) Less than a second ago  8080/tcp                                      gotunnels-7yivoa_api_1
+kushal@virginia:~/src/golang/GoTunnels$ exit
+logout
+Connection to virginia closed.
+kushal@fedora:~/src/golang/GoTunnels$ 
