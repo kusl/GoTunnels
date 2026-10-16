@@ -1,0 +1,1 @@
+cd ~/src/golang/GoTunnels/; time bash export.sh > docs/llm/vendor/output.txt
