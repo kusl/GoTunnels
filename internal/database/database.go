@@ -14,6 +14,7 @@ import (
 	"github.com/kusl/GoTunnels/internal/config"
 	"github.com/kusl/GoTunnels/migrations"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -64,11 +65,39 @@ type migration struct {
 	sql     string
 }
 
+// migrationLockKey is the pg_advisory_lock key that serialises migrations
+// across concurrently starting API instances sharing one database.
+const migrationLockKey int64 = 0x476f54756e6e656c
+
 // Migrate applies all pending up-migrations found in the embedded FS. It is
 // idempotent: already-applied versions are skipped. Each migration runs inside
-// its own transaction so a failure leaves the schema at the last good version.
+// its own transaction so a failure leaves the schema at the last good version,
+// and the whole run holds a session-level advisory lock so two instances
+// booting at once cannot race each other.
 func Migrate(ctx context.Context, pool *pgxpool.Pool) (applied []int64, err error) {
-	if _, err = pool.Exec(ctx, `
+	migs, err := loadUpMigrations()
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("database: acquire connection for migrations: %w", err)
+	}
+	defer conn.Release()
+
+	if _, err = conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, migrationLockKey); err != nil {
+		return nil, fmt.Errorf("database: acquire migration lock: %w", err)
+	}
+	defer func() {
+		unlockCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if _, uerr := conn.Exec(unlockCtx, `SELECT pg_advisory_unlock($1)`, migrationLockKey); uerr != nil {
+			conn.Conn().Close(unlockCtx)
+		}
+	}()
+
+	if _, err = conn.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version    bigint PRIMARY KEY,
 			name       text NOT NULL,
@@ -77,52 +106,48 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) (applied []int64, err erro
 		return nil, fmt.Errorf("database: ensure schema_migrations: %w", err)
 	}
 
-	migs, err := loadUpMigrations()
-	if err != nil {
-		return nil, err
-	}
-
-	done := map[int64]bool{}
-	rows, err := pool.Query(ctx, `SELECT version FROM schema_migrations`)
+	rows, err := conn.Query(ctx, `SELECT version FROM schema_migrations`)
 	if err != nil {
 		return nil, fmt.Errorf("database: read applied migrations: %w", err)
 	}
-	for rows.Next() {
-		var v int64
-		if err := rows.Scan(&v); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		done[v] = true
+	done, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("database: read applied migrations: %w", err)
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
+	isDone := make(map[int64]bool, len(done))
+	for _, v := range done {
+		isDone[v] = true
 	}
 
 	for _, m := range migs {
-		if done[m.version] {
+		if isDone[m.version] {
 			continue
 		}
-		tx, err := pool.Begin(ctx)
-		if err != nil {
-			return applied, fmt.Errorf("database: begin tx for migration %d: %w", m.version, err)
-		}
-		if _, err := tx.Exec(ctx, m.sql); err != nil {
-			_ = tx.Rollback(ctx)
-			return applied, fmt.Errorf("database: apply migration %d (%s): %w", m.version, m.name, err)
-		}
-		if _, err := tx.Exec(ctx,
-			`INSERT INTO schema_migrations (version, name) VALUES ($1, $2)`, m.version, m.name); err != nil {
-			_ = tx.Rollback(ctx)
-			return applied, fmt.Errorf("database: record migration %d: %w", m.version, err)
-		}
-		if err := tx.Commit(ctx); err != nil {
-			return applied, fmt.Errorf("database: commit migration %d: %w", m.version, err)
+		if err := applyMigration(ctx, conn.Conn(), m); err != nil {
+			return applied, err
 		}
 		applied = append(applied, m.version)
 	}
 	return applied, nil
+}
+
+func applyMigration(ctx context.Context, conn *pgx.Conn, m migration) error {
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("database: begin tx for migration %d: %w", m.version, err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, m.sql); err != nil {
+		return fmt.Errorf("database: apply migration %d (%s): %w", m.version, m.name, err)
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO schema_migrations (version, name) VALUES ($1, $2)`, m.version, m.name); err != nil {
+		return fmt.Errorf("database: record migration %d: %w", m.version, err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("database: commit migration %d: %w", m.version, err)
+	}
+	return nil
 }
 
 func loadUpMigrations() ([]migration, error) {

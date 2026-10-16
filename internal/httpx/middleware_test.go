@@ -3,8 +3,11 @@ package httpx
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -260,5 +263,98 @@ func TestChainOrderOutermostFirst(t *testing.T) {
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 	if len(order) != 3 || order[0] != "outer" || order[1] != "inner" || order[2] != "handler" {
 		t.Fatalf("execution order = %v, want [outer inner handler]", order)
+	}
+}
+
+func TestRequestIDRejectsUnsafeInbound(t *testing.T) {
+	for _, bad := range []string{"has space", "line\nbreak", strings.Repeat("a", maxRequestIDLen+1), "quote\""} {
+		var seen string
+		h := RequestID()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			seen = RequestIDFromContext(r.Context())
+		}))
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("X-Request-Id", bad)
+		h.ServeHTTP(httptest.NewRecorder(), req)
+		if seen == bad || seen == "" {
+			t.Errorf("inbound id %q must be replaced, got %q", bad, seen)
+		}
+	}
+}
+
+func TestRateLimiterSweepsFullBuckets(t *testing.T) {
+	now := time.Unix(1_000, 0)
+	rl := NewRateLimiter(1, 2)
+	rl.now = func() time.Time { return now }
+	for i := 0; i < 100; i++ {
+		rl.Allow(strconv.Itoa(i))
+	}
+	if rl.Len() != 100 {
+		t.Fatalf("Len = %d, want 100", rl.Len())
+	}
+	now = now.Add(2 * sweepInterval)
+	rl.Allow("fresh")
+	if rl.Len() != 1 {
+		t.Fatalf("after sweep Len = %d, want 1 (only the fresh key)", rl.Len())
+	}
+}
+
+func TestRateLimiterSweepKeepsDrainedBuckets(t *testing.T) {
+	now := time.Unix(1_000, 0)
+	rl := NewRateLimiter(0.001, 1)
+	rl.now = func() time.Time { return now }
+	rl.Allow("hot")
+	now = now.Add(2 * sweepInterval)
+	if rl.Allow("hot") {
+		t.Fatal("a drained bucket must survive the sweep and keep limiting")
+	}
+}
+
+func TestSecurityHeaders(t *testing.T) {
+	h := SecurityHeaders()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	for k, v := range map[string]string{
+		"X-Content-Type-Options": "nosniff",
+		"Cache-Control":          "no-store",
+		"Referrer-Policy":        "no-referrer",
+	} {
+		if got := rec.Header().Get(k); got != v {
+			t.Errorf("%s = %q, want %q", k, got, v)
+		}
+	}
+}
+
+func TestRecovererRepanicsAbortHandler(t *testing.T) {
+	h := Recoverer(slog.New(slog.DiscardHandler))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic(http.ErrAbortHandler)
+	}))
+	defer func() {
+		if rec := recover(); rec != http.ErrAbortHandler {
+			t.Fatalf("expected ErrAbortHandler to propagate, got %v", rec)
+		}
+	}()
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+}
+
+func TestCORSAlwaysVaryOrigin(t *testing.T) {
+	h := CORS([]string{"https://ok.example"}, false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Header().Get("Vary") != "Origin" {
+		t.Fatalf("Vary = %q, want Origin even for disallowed origins", rec.Header().Get("Vary"))
+	}
+}
+
+func TestDecodeJSONRejectsTrailingData(t *testing.T) {
+	var dst map[string]any
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"a":1}{"b":2}`))
+	if DecodeJSON(rec, req, &dst, 0) {
+		t.Fatal("trailing JSON must be rejected")
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d", rec.Code)
 	}
 }

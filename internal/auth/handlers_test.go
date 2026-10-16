@@ -2,12 +2,16 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/kusl/GoTunnels/internal/store"
 )
 
 func TestValidUsername(t *testing.T) {
@@ -86,7 +90,6 @@ func TestExtractToken(t *testing.T) {
 func TestFlowEnvelopeRoundTrip(t *testing.T) {
 	sess := json.RawMessage(`{"challenge":"abc","user_id":"aWQ="}`)
 	env := flowEnvelope{
-		V:       1,
 		Origin:  "https://tart-panda.trycloudflare.com",
 		Signup:  &signupFlowData{UserID: "11111111-2222-4333-8444-555555555555", Username: "alice", DisplayName: "Alice"},
 		Session: sess,
@@ -95,45 +98,56 @@ func TestFlowEnvelopeRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	got := decodeFlowEnvelope(blob)
-	if got.V != 1 || got.Origin != env.Origin {
-		t.Fatalf("roundtrip lost header fields: %+v", got)
+	got, sd, err := decodeFlowEnvelope(blob)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Origin != env.Origin {
+		t.Fatalf("roundtrip lost origin: %+v", got)
 	}
 	if got.Signup == nil || got.Signup.Username != "alice" || got.Signup.UserID != env.Signup.UserID {
 		t.Fatalf("roundtrip lost signup data: %+v", got.Signup)
 	}
-	if string(got.Session) != string(sess) {
-		t.Fatalf("roundtrip changed session blob: %s", got.Session)
+	if sd == nil || sd.Challenge != "abc" {
+		t.Fatalf("roundtrip lost session data: %+v", sd)
 	}
 }
 
-func TestDecodeFlowEnvelopeLegacyBlob(t *testing.T) {
-	// Flows stored before the envelope existed were the bare
-	// webauthn.SessionData JSON. They must wrap on the fly with no pinned
-	// origin (which resolves to the static relying party).
-	legacy := []byte(`{"challenge":"xyz","user_id":"aWQ=","expires":"0001-01-01T00:00:00Z"}`)
-	env := decodeFlowEnvelope(legacy)
-	if env.Origin != "" {
-		t.Fatalf("legacy blob must carry no origin, got %q", env.Origin)
-	}
-	if env.Signup != nil {
-		t.Fatal("legacy blob must carry no signup data")
-	}
-	if string(env.Session) != string(legacy) {
-		t.Fatalf("legacy blob must become the session verbatim, got %s", env.Session)
-	}
-	if _, err := env.sessionData(); err != nil {
-		t.Fatalf("legacy session must still unpack: %v", err)
+func TestDecodeFlowEnvelopeRejectsMalformed(t *testing.T) {
+	for _, blob := range []string{"not json at all", `{"origin":"https://a.example"}`, `{"session":"nope"}`} {
+		if _, _, err := decodeFlowEnvelope([]byte(blob)); err == nil {
+			t.Errorf("decodeFlowEnvelope(%q) must fail", blob)
+		}
 	}
 }
 
-func TestDecodeFlowEnvelopeGarbage(t *testing.T) {
-	env := decodeFlowEnvelope([]byte("not json at all"))
-	if string(env.Session) != "not json at all" {
-		t.Fatalf("garbage should be preserved as the session blob, got %q", env.Session)
+func TestNormalizeIdentity(t *testing.T) {
+	u, d, p := normalizeIdentity("  alice ", "  ")
+	if p != "" || u != "alice" || d != "alice" {
+		t.Fatalf("got (%q, %q, %q)", u, d, p)
 	}
-	if _, err := env.sessionData(); err == nil {
-		t.Fatal("unpacking a garbage session must error")
+	if _, d, p := normalizeIdentity("bob", " Bob B. "); p != "" || d != "Bob B." {
+		t.Fatalf("display name not trimmed: %q %q", d, p)
+	}
+	for _, dn := range []string{strings.Repeat("x", maxDisplayNameRune+1), "bad\x00name", "esc\u009bname"} {
+		if _, _, p := normalizeIdentity("carol", dn); p == "" {
+			t.Errorf("display name %q must be rejected", dn)
+		}
+	}
+	if _, _, p := normalizeIdentity("x", ""); p == "" {
+		t.Error("short username must be rejected")
+	}
+}
+
+func TestValidatePassword(t *testing.T) {
+	if validatePassword("short") == "" {
+		t.Error("short password must be rejected")
+	}
+	if validatePassword(strings.Repeat("a", maxPasswordBytes+1)) == "" {
+		t.Error("oversized password must be rejected")
+	}
+	if p := validatePassword("long-enough-password"); p != "" {
+		t.Errorf("unexpected rejection: %s", p)
 	}
 }
 
@@ -260,5 +274,22 @@ func TestExpiredCookieClears(t *testing.T) {
 	}
 	if c.Path != "/" {
 		t.Errorf("cleared cookie path = %q, want / so it overwrites the original", c.Path)
+	}
+}
+
+func TestAuthLookupFailedDistinguishesMissingFromOutage(t *testing.T) {
+	h := &Handlers{log: slog.New(slog.DiscardHandler)}
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+
+	rec := httptest.NewRecorder()
+	h.authLookupFailed(rec, req, "invalid or expired session", store.ErrNotFound)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("missing session: status = %d, want 401", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	h.authLookupFailed(rec, req, "invalid or expired session", errors.New("connection refused"))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("database outage: status = %d, want 503 (a 401 would log the user out)", rec.Code)
 	}
 }

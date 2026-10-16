@@ -21,6 +21,7 @@ import (
 	"github.com/kusl/GoTunnels/internal/database"
 	"github.com/kusl/GoTunnels/internal/health"
 	"github.com/kusl/GoTunnels/internal/httpx"
+	"github.com/kusl/GoTunnels/internal/maintenance"
 	"github.com/kusl/GoTunnels/internal/notes"
 	"github.com/kusl/GoTunnels/internal/prefs"
 	"github.com/kusl/GoTunnels/internal/server"
@@ -57,6 +58,7 @@ func run() error {
 		return err
 	}
 	log := tel.Logger
+	slog.SetDefault(log)
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -126,15 +128,26 @@ func run() error {
 	notesHandlers := notes.NewHandlers(st, log)
 	prefsHandlers := prefs.NewHandlers(st, log)
 
-	// Signup limiters: nil disables a guard (config maps a zero interval to
-	// "off"). PerInterval converts "one every N" into the limiter's rate/sec.
-	var signupIP, signupGlobal *httpx.RateLimiter
-	if cfg.SignupIPInterval > 0 {
-		signupIP = httpx.NewRateLimiter(config.PerInterval(cfg.SignupIPInterval), float64(cfg.SignupIPBurst))
-	}
-	if cfg.SignupGlobalInterval > 0 {
-		signupGlobal = httpx.NewRateLimiter(config.PerInterval(cfg.SignupGlobalInterval), float64(cfg.SignupGlobalBurst))
-	}
+	signupIP := intervalLimiter(cfg.SignupIPInterval, cfg.SignupIPBurst)
+	signupGlobal := intervalLimiter(cfg.SignupGlobalInterval, cfg.SignupGlobalBurst)
+	authLimiter := intervalLimiter(cfg.AuthAttemptInterval, cfg.AuthAttemptBurst)
+
+	janitorCtx, stopJanitor := context.WithCancel(rootCtx)
+	defer stopJanitor()
+	janitor := maintenance.New(st, log, maintenance.Config{
+		Interval:           cfg.MaintenanceInterval,
+		HealthLogRetention: cfg.HealthLogRetention,
+		CSPReportRetention: cfg.CSPReportRetention,
+	})
+	janitorDone := make(chan struct{})
+	go func() {
+		defer close(janitorDone)
+		janitor.Run(janitorCtx)
+	}()
+	defer func() {
+		stopJanitor()
+		<-janitorDone
+	}()
 
 	srv := server.New(server.Deps{
 		Config:         cfg,
@@ -150,6 +163,7 @@ func run() error {
 		NotesRateLimiter:    httpx.NewRateLimiter(0.5, 5),
 		SignupIPLimiter:     signupIP,
 		SignupGlobalLimiter: signupGlobal,
+		AuthLimiter:         authLimiter,
 		Pepper:              cfg.IPHashPepper(),
 	})
 
@@ -179,4 +193,13 @@ func run() error {
 	}
 	log.Info("shutdown complete")
 	return nil
+}
+
+// intervalLimiter builds a "one every interval, with burst" limiter, or nil
+// (guard disabled) when the interval is zero.
+func intervalLimiter(interval time.Duration, burst int) *httpx.RateLimiter {
+	if interval <= 0 {
+		return nil
+	}
+	return httpx.NewRateLimiter(config.PerInterval(interval), float64(burst))
 }

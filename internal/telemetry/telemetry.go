@@ -34,7 +34,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 )
 
 // scopeName is the instrumentation scope for logs/traces/metrics we emit
@@ -89,7 +89,7 @@ func Setup(ctx context.Context, cfg *config.Config) (*Providers, error) {
 	// ---- Traces -------------------------------------------------------
 	traceExp, err := otlptracehttp.New(ctx, traceHTTPOpts(cfg)...)
 	if err != nil {
-		return fallback(stdoutHandler, cfg, err), nil
+		return p.fallback(ctx, stdoutHandler, cfg, err), nil
 	}
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(traceExp),
@@ -104,7 +104,7 @@ func Setup(ctx context.Context, cfg *config.Config) (*Providers, error) {
 	// ---- Metrics ------------------------------------------------------
 	metricExp, err := otlpmetrichttp.New(ctx, metricHTTPOpts(cfg)...)
 	if err != nil {
-		return fallback(stdoutHandler, cfg, err), nil
+		return p.fallback(ctx, stdoutHandler, cfg, err), nil
 	}
 	mp := sdkmetric.NewMeterProvider(
 		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExp,
@@ -117,7 +117,7 @@ func Setup(ctx context.Context, cfg *config.Config) (*Providers, error) {
 	// ---- Logs ---------------------------------------------------------
 	logExp, err := otlploghttp.New(ctx, logHTTPOpts(cfg)...)
 	if err != nil {
-		return fallback(stdoutHandler, cfg, err), nil
+		return p.fallback(ctx, stdoutHandler, cfg, err), nil
 	}
 	lp := sdklog.NewLoggerProvider(
 		sdklog.WithProcessor(sdklog.NewBatchProcessor(logExp)),
@@ -128,7 +128,7 @@ func Setup(ctx context.Context, cfg *config.Config) (*Providers, error) {
 
 	// Fan out slog to BOTH stdout and the OTel log bridge.
 	otelHandler := otelslog.NewHandler(scopeName, otelslog.WithLoggerProvider(lp))
-	p.Logger = slog.New(NewMultiHandler(stdoutHandler, otelHandler)).With(
+	p.Logger = slog.New(slog.NewMultiHandler(stdoutHandler, otelHandler)).With(
 		slog.String("service.name", cfg.ServiceName),
 		slog.String("service.instance.id", cfg.InstanceID),
 	)
@@ -142,8 +142,14 @@ func Setup(ctx context.Context, cfg *config.Config) (*Providers, error) {
 	return p, nil
 }
 
-func fallback(h slog.Handler, cfg *config.Config, cause error) *Providers {
+// fallback shuts down whichever providers were already started, so a failure
+// halfway through setup leaves no exporter goroutines running, and returns a
+// stdout-only logger.
+func (p *Providers) fallback(ctx context.Context, h slog.Handler, cfg *config.Config, cause error) *Providers {
 	l := slog.New(h).With(slog.String("service.name", cfg.ServiceName))
+	if err := p.Shutdown(ctx); err != nil {
+		l.Warn("telemetry: shutting down partially started providers", slog.Any("err", err))
+	}
 	l.Error("telemetry: exporter setup failed; continuing with stdout logging", slog.Any("err", cause))
 	return &Providers{Logger: l}
 }

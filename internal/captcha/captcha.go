@@ -226,9 +226,5 @@ func clamp(v, lo, hi int64) int64 {
 }
 
 func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg string, err error) {
-	h.log.ErrorContext(r.Context(), msg,
-		slog.String("error", err.Error()),
-		slog.String("request_id", httpx.RequestIDFromContext(r.Context())),
-	)
-	httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
+	httpx.ServerError(w, r, h.log, msg, err)
 }

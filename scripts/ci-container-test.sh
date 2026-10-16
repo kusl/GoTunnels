@@ -35,7 +35,7 @@ export GOTUNNELS_INSTANCE_ID="${GOTUNNELS_INSTANCE_ID:-$PROJECT}"
 NET="${PROJECT}_default"
 # Pinned, fully qualified (podman does not assume docker.io). busybox wget in
 # the caddy image can't do PUT/DELETE, hence a real curl.
-CURL_IMAGE="docker.io/curlimages/curl:8.10.1"
+CURL_IMAGE="docker.io/curlimages/curl:8.23.0"
 
 log "container test instance: $PROJECT"
 
@@ -152,10 +152,10 @@ db_cid="$(cid_of "$PROJECT" db)"
 mig="$("$CR" exec "$db_cid" psql -U "${POSTGRES_USER:-gotunnels}" -d "${POSTGRES_DB:-gotunnels}" \
   -tAc 'SELECT COALESCE(max(version), 0) FROM schema_migrations' | tr -d '[:space:]')"
 log "schema_migrations max(version) = $mig"
-if [ "${mig:-0}" -ge 7 ] 2>/dev/null; then
-  ok "PASS: migrations applied (>= 7)"
+if [ "${mig:-0}" -ge 9 ] 2>/dev/null; then
+  ok "PASS: migrations applied (>= 9)"
 else
-  err "FAIL: expected migration version >= 7, got '$mig'"
+  err "FAIL: expected migration version >= 9, got '$mig'"
   FAILED=1
 fi
 
@@ -180,6 +180,38 @@ else
   die "cannot continue without a session token"
 fi
 AUTH="Authorization: Bearer $TOKEN"
+
+me_hdrs="$(ccurl -D - -o /dev/null -H "$AUTH" http://api:8080/api/me)"
+assert_icontains "$me_hdrs" 'x-content-type-options: nosniff' "API responses carry nosniff"
+assert_icontains "$me_hdrs" 'cache-control: no-store'         "API responses are not cacheable"
+
+me_body="$(ccurl -H "$AUTH" http://api:8080/api/me)"
+assert_contains "$me_body" '"username":"ciuser"' "GET /api/me returns the signed-up user"
+
+bad_login_code="$(ccurl -o /dev/null -w '%{http_code}' -X POST http://api:8080/api/login \
+  -H 'Content-Type: application/json' -d '{"username":"ciuser","password":"wrong-password"}')"
+assert_eq "$bad_login_code" "401" "wrong password is rejected"
+
+login_resp="$(ccurl -X POST http://api:8080/api/login \
+  -H 'Content-Type: application/json' -d '{"username":"ciuser","password":"ci-password-123"}')"
+TOKEN2="$(printf '%s' "$login_resp" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')"
+if [ -n "$TOKEN2" ]; then
+  ok "PASS: password login issued a second session"
+else
+  err "FAIL: password login did not return a token"
+  FAILED=1
+fi
+
+enroll="$(ccurl -X POST -H "$AUTH" http://api:8080/api/totp/enroll)"
+assert_contains "$enroll" '"otpauth_url"' "TOTP enrollment returns a provisioning URL"
+
+dup_code="$(ccurl -o /dev/null -w '%{http_code}' -X POST http://api:8080/api/signup \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"ciuser","password":"ci-password-123"}')"
+case "$dup_code" in
+  409|429) ok "PASS: duplicate signup refused ($dup_code)" ;;
+  *) err "FAIL: duplicate signup returned $dup_code, want 409 or 429"; FAILED=1 ;;
+esac
 
 # ---------------------------------------------------------------------------
 # 6) captcha sync — REGRESSION for the 'unknown + unknown' 500.
@@ -250,6 +282,17 @@ fi
 pre_code="$(ccurl -o /dev/null -w '%{http_code}' -X OPTIONS http://api:8080/api/signup \
   -H 'Origin: https://example.com' -H 'Access-Control-Request-Method: POST')"
 assert_eq "$pre_code" "204" "CORS preflight answered with 204"
+
+# ---------------------------------------------------------------------------
+# 9b) logout revokes the session: the token must stop working (401)
+# ---------------------------------------------------------------------------
+if [ -n "${TOKEN2:-}" ]; then
+  ccurl -o /dev/null -X POST -H "Authorization: Bearer $TOKEN2" http://api:8080/api/logout
+  after_code="$(ccurl -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN2" http://api:8080/api/me)"
+  assert_eq "$after_code" "401" "a logged-out token is rejected"
+  still_code="$(ccurl -o /dev/null -w '%{http_code}' -H "$AUTH" http://api:8080/api/me)"
+  assert_eq "$still_code" "200" "logging out one session leaves the other signed in"
+fi
 
 # ---------------------------------------------------------------------------
 # 10) frontend serves the app with the CSP header, wired for native reporting

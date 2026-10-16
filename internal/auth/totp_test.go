@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -136,5 +137,34 @@ func TestGenerateRecoveryCodesDefaultCount(t *testing.T) {
 	}
 	if len(codes) != 10 {
 		t.Fatalf("expected default of 10 codes, got %d", len(codes))
+	}
+}
+
+func TestMatchTOTPStepWindowAndStep(t *testing.T) {
+	sec, err := GenerateTOTP("GoTunnels", "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_800_000_015, 0)
+	base := now.Unix() / totpPeriod
+	opts := totp.ValidateOpts{Period: totpPeriod, Digits: otp.DigitsSix, Algorithm: otp.AlgorithmSHA1}
+	for _, d := range []int64{-1, 0, 1} {
+		code, err := totp.GenerateCodeCustom(sec.Secret, time.Unix((base+d)*totpPeriod, 0), opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		step, ok := MatchTOTPStep(code, sec.Secret, now)
+		if !ok || step != base+d {
+			t.Errorf("offset %d: got step=%d ok=%v, want step=%d", d, step, ok, base+d)
+		}
+	}
+	far, _ := totp.GenerateCodeCustom(sec.Secret, time.Unix((base+3)*totpPeriod, 0), opts)
+	if _, ok := MatchTOTPStep(far, sec.Secret, now); ok {
+		t.Error("a code three steps ahead must be rejected")
+	}
+	for _, bad := range []string{"", "12345", "1234567", "abcdef"} {
+		if _, ok := MatchTOTPStep(bad, sec.Secret, now); ok {
+			t.Errorf("%q must not match", bad)
+		}
 	}
 }

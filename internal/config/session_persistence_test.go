@@ -167,3 +167,30 @@ func TestOptionalExpiryMigrationIsReversible(t *testing.T) {
 		t.Error("migrations/0008 down: expected the NOT NULL constraint to be restored")
 	}
 }
+
+// TestFrontendImportsWhatItCalls pins the fix for a defect where common.js
+// called clearToken() on a 401 without importing it: the ReferenceError meant
+// a revoked session was never cleared. Every api.js export a module calls must
+// appear in that module's import list.
+func TestFrontendImportsWhatItCalls(t *testing.T) {
+	exports := []string{"clearToken", "setToken", "getToken", "apiFetch"}
+	importRe := regexp.MustCompile(`(?s)import\s*\{([^}]*)\}\s*from\s*"\./api\.js"`)
+	for _, f := range []string{
+		"frontend/js/common.js", "frontend/js/page-login.js", "frontend/js/page-signup.js",
+		"frontend/js/page-settings.js", "frontend/js/page-notes.js", "frontend/js/page-captcha.js",
+		"frontend/js/page-activity.js", "frontend/js/page-passkeys.js", "frontend/js/page-index.js",
+		"frontend/js/webauthn.js",
+	} {
+		src := mustRead(t, f)
+		imported := ""
+		if m := importRe.FindStringSubmatch(src); m != nil {
+			imported = m[1]
+		}
+		for _, name := range exports {
+			called := regexp.MustCompile(`\b` + name + `\(`).MatchString(src)
+			if called && !regexp.MustCompile(`\b`+name+`\b`).MatchString(imported) {
+				t.Errorf("%s calls %s() but does not import it from ./api.js", f, name)
+			}
+		}
+	}
+}

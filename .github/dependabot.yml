@@ -1,7 +1,7 @@
 # Dependabot covers the surfaces where reachability analysis does not apply:
-# container base images and the GitHub Actions versions themselves. The Go
-# module graph is handled by govulncheck instead (call-graph aware, far less
-# noise than Dependabot's Go alerts).
+# container base images (Containerfiles and compose.yaml) and the GitHub
+# Actions versions themselves. The Go module graph is handled by govulncheck
+# and the weekly dependency-freshness workflow instead.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
@@ -11,6 +11,10 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/"
-    # Watches the base images referenced by the Containerfiles.
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker-compose"
+    directory: "/"
     schedule:
       interval: "weekly"

@@ -6,7 +6,7 @@
 # a golang container so no host Go install is required.
 #
 # Usage:
-#   scripts/test.sh [unit|vet|vuln|build|all]   (default: all)
+#   scripts/test.sh [unit|vet|vuln|build|freshness|all]   (default: all)
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 . "$SCRIPT_DIR/lib.sh"
 
-GO_IMAGE="${GO_IMAGE:-docker.io/library/golang:1.27-bookworm}"
+GO_IMAGE="${GO_IMAGE:-docker.io/library/golang:1.27-trixie}"
 
 # run_go "<go shell snippet>" — execute a snippet with a Go toolchain, on host
 # if available else in a container mounting the repo.
@@ -45,9 +45,9 @@ cmd_unit() {
 }
 
 cmd_vet() {
-  log "running go vet…"
-  run_go "go mod tidy && go vet ./..."
-  ok "go vet clean"
+  log "checking gofmt and running go vet…"
+  run_go "test -z \"\$(gofmt -l .)\" || { gofmt -l . >&2; echo 'gofmt needed on the files above' >&2; exit 1; }; go mod tidy && go vet ./..."
+  ok "gofmt + go vet clean"
 }
 
 cmd_build() {

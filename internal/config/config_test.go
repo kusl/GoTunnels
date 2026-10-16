@@ -70,6 +70,9 @@ func TestValidate_CSPMode(t *testing.T) {
 		SessionTTL:  time.Hour,
 		RPOrigins:   []string{"http://localhost"},
 		CSPMode:     "nonsense",
+		DBMaxConns:  4,
+
+		MaintenanceInterval: time.Hour,
 	}
 	if err := c.Validate(); err == nil {
 		t.Fatal("expected invalid CSP mode to fail validation")
@@ -159,21 +162,75 @@ func TestResolveTelemetry_UptraceDSN(t *testing.T) {
 	}
 }
 
-func TestGetHelpers(t *testing.T) {
+func TestEnvReader(t *testing.T) {
 	t.Setenv("X_INT", "42")
-	if getint("X_INT", 0) != 42 {
-		t.Error("getint failed")
-	}
-	if getint("X_MISSING", 7) != 7 {
-		t.Error("getint default failed")
-	}
 	t.Setenv("X_BOOL", "true")
-	if !getbool("X_BOOL", false) {
-		t.Error("getbool failed")
-	}
 	t.Setenv("X_DUR", "250ms")
-	if getdur("X_DUR", 0) != 250*time.Millisecond {
-		t.Error("getdur failed")
+	t.Setenv("X_STR", "  padded  ")
+	t.Setenv("X_BLANK", "   ")
+	e := &env{}
+	if e.int("X_INT", 0) != 42 || e.int("X_MISSING", 7) != 7 {
+		t.Error("int parsing failed")
+	}
+	if !e.bool("X_BOOL", false) {
+		t.Error("bool parsing failed")
+	}
+	if e.dur("X_DUR", 0) != 250*time.Millisecond {
+		t.Error("duration parsing failed")
+	}
+	if e.str("X_STR", "") != "padded" {
+		t.Error("strings must be trimmed")
+	}
+	if e.str("X_BLANK", "default") != "" {
+		t.Error("a whitespace-only value must override the default with empty")
+	}
+	if err := e.err(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoad_RejectsUnparseableValues(t *testing.T) {
+	for key, bad := range map[string]string{
+		"GOTUNNELS_SESSION_TTL":  "7days",
+		"GOTUNNELS_DB_MAX_CONNS": "lots",
+		"GOTUNNELS_DEV":          "yes please",
+		"GOTUNNELS_DB_MIN_CONNS": "99999999999",
+	} {
+		t.Run(key, func(t *testing.T) {
+			t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+			t.Setenv("GOTUNNELS_IP_HASH_PEPPER", "p")
+			t.Setenv("GOTUNNELS_TOTP_ENCRYPTION_KEY", "k")
+			t.Setenv(key, bad)
+			_, err := Load()
+			if err == nil || !strings.Contains(err.Error(), key) {
+				t.Fatalf("Load with %s=%q: err = %v, want an error naming the variable", key, bad, err)
+			}
+		})
+	}
+}
+
+func TestLoad_AuthAndMaintenanceDefaults(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.AuthAttemptInterval != 6*time.Second || c.AuthAttemptBurst != 10 {
+		t.Errorf("auth limiter = (%v, %d)", c.AuthAttemptInterval, c.AuthAttemptBurst)
+	}
+	if c.MaintenanceInterval != time.Hour || c.HealthLogRetention != 168*time.Hour || c.CSPReportRetention != 720*time.Hour {
+		t.Errorf("maintenance = (%v, %v, %v)", c.MaintenanceInterval, c.HealthLogRetention, c.CSPReportRetention)
+	}
+}
+
+func TestValidate_DBConnBounds(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+	t.Setenv("GOTUNNELS_DEV", "1")
+	t.Setenv("GOTUNNELS_DB_MAX_CONNS", "2")
+	t.Setenv("GOTUNNELS_DB_MIN_CONNS", "5")
+	if _, err := Load(); err == nil {
+		t.Fatal("min conns above max conns must fail validation")
 	}
 }
 
@@ -296,10 +353,12 @@ func TestValidate_SessionTTL(t *testing.T) {
 	// sessions live until an explicit logout. It must pass validation.
 	base := func() *Config {
 		return &Config{
-			DatabaseURL: "x",
-			HTTPAddr:    ":8080",
-			RPOrigins:   []string{"http://localhost"},
-			CSPMode:     "report-only",
+			DatabaseURL:         "x",
+			HTTPAddr:            ":8080",
+			RPOrigins:           []string{"http://localhost"},
+			CSPMode:             "report-only",
+			DBMaxConns:          4,
+			MaintenanceInterval: time.Hour,
 		}
 	}
 

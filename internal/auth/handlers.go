@@ -10,7 +10,9 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -20,12 +22,18 @@ import (
 	"github.com/kusl/GoTunnels/internal/store"
 )
 
+const (
+	minPasswordLen     = 8
+	maxPasswordBytes   = 1024
+	maxDisplayNameRune = 64
+)
+
 // Settings are the auth-related knobs handlers need, sourced from config.
 type Settings struct {
 	SessionTTL   time.Duration
 	FlowTTL      time.Duration
 	TOTPKey      [32]byte
-	Issuer       string // TOTP issuer / RP display name
+	Issuer       string
 	CookieName   string
 	CookieSecure bool
 }
@@ -40,10 +48,9 @@ type Handlers struct {
 }
 
 // NewHandlers builds the auth handler set. The RPProvider (rather than a
-// single *webauthn.WebAuthn) is what lets passkey ceremonies bind to the
-// origin the browser actually presents instead of whatever origin happened to
-// be configured when the process booted — the root cause of the classic
-// "requested RPID did not match the origin" error behind a rotating tunnel.
+// single *webauthn.WebAuthn) lets passkey ceremonies bind to the origin the
+// browser actually presents instead of whatever origin was configured when
+// the process booted.
 func NewHandlers(s *store.Store, rp *RPProvider, rec *activity.Recorder, log *slog.Logger, set Settings) *Handlers {
 	if set.FlowTTL <= 0 {
 		set.FlowTTL = 10 * time.Minute
@@ -80,8 +87,10 @@ func CurrentSession(ctx context.Context) string {
 }
 
 // RequireAuth is middleware that loads the session referenced by the Bearer
-// token (preferred) or session cookie (fallback) and rejects with 401 when
-// absent or invalid.
+// token (preferred) or session cookie (fallback). A missing, revoked, or
+// expired session is a definitive 401. Any other failure (database down,
+// timeout) is a 503: the frontend treats 401 as "logged out" and clears the
+// token, so a transient fault must never masquerade as one.
 func (h *Handlers) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := h.extractToken(r)
@@ -92,19 +101,33 @@ func (h *Handlers) RequireAuth(next http.Handler) http.Handler {
 		id := HashSessionToken(token)
 		sess, err := h.store.GetSession(r.Context(), id)
 		if err != nil {
-			httpx.WriteError(w, http.StatusUnauthorized, "invalid or expired session")
+			h.authLookupFailed(w, r, "invalid or expired session", err)
 			return
 		}
 		user, err := h.store.GetUserByID(r.Context(), sess.UserID)
 		if err != nil {
-			httpx.WriteError(w, http.StatusUnauthorized, "session user not found")
+			h.authLookupFailed(w, r, "session user not found", err)
 			return
 		}
-		_ = h.store.TouchSession(r.Context(), id)
+		if err := h.store.TouchSession(r.Context(), id); err != nil {
+			h.log.WarnContext(r.Context(), "touch session", slog.String("error", err.Error()))
+		}
 		ctx := context.WithValue(r.Context(), userKey, user)
 		ctx = context.WithValue(ctx, sessionKey, id)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (h *Handlers) authLookupFailed(w http.ResponseWriter, r *http.Request, msg string, err error) {
+	if errors.Is(err, store.ErrNotFound) {
+		httpx.WriteError(w, http.StatusUnauthorized, msg)
+		return
+	}
+	h.log.ErrorContext(r.Context(), "auth: session lookup failed",
+		slog.String("error", err.Error()),
+		slog.String("request_id", httpx.RequestIDFromContext(r.Context())),
+	)
+	httpx.WriteError(w, http.StatusServiceUnavailable, "session check temporarily unavailable")
 }
 
 func (h *Handlers) extractToken(r *http.Request) string {
@@ -145,9 +168,7 @@ type userResponse struct {
 }
 
 type sessionResponse struct {
-	Token string `json:"token"`
-	// ExpiresAt is omitted entirely for a persistent (never-expiring) session,
-	// so clients can distinguish "no expiry" from a concrete time.
+	Token     string       `json:"token"`
 	ExpiresAt *time.Time   `json:"expires_at,omitempty"`
 	User      userResponse `json:"user"`
 }
@@ -156,25 +177,23 @@ type sessionResponse struct {
 // signup / login / logout / me / activity
 // ---------------------------------------------------------------------------
 
-// Signup creates an account with a password and immediately establishes a
-// session. (Password is one of two ways in — see PasskeySignupBegin/Finish
-// for the passwordless path.)
+// Signup creates a password account and immediately establishes a session.
 func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 	var req signupRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	req.Username = strings.TrimSpace(req.Username)
-	if !validUsername(req.Username) {
-		httpx.WriteError(w, http.StatusBadRequest, "username must be 3-32 chars: letters, digits, dot, dash, underscore")
+	username, displayName, problem := normalizeIdentity(req.Username, req.DisplayName)
+	if problem != "" {
+		httpx.WriteError(w, http.StatusBadRequest, problem)
 		return
 	}
-	if len(req.Password) < 8 {
-		httpx.WriteError(w, http.StatusBadRequest, "password must be at least 8 characters")
+	if problem := validatePassword(req.Password); problem != "" {
+		httpx.WriteError(w, http.StatusBadRequest, problem)
 		return
 	}
 
-	exists, err := h.store.UsernameExists(r.Context(), req.Username)
+	exists, err := h.store.UsernameExists(r.Context(), username)
 	if err != nil {
 		h.serverError(w, r, "signup: check username", err)
 		return
@@ -189,7 +208,7 @@ func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, "signup: hash password", err)
 		return
 	}
-	user, err := h.store.CreateUser(r.Context(), req.Username, req.DisplayName)
+	user, err := h.store.CreateUserWithPassword(r.Context(), username, displayName, hash)
 	if err != nil {
 		if store.IsUniqueViolation(err) {
 			httpx.WriteError(w, http.StatusConflict, "username already taken")
@@ -198,31 +217,42 @@ func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, "signup: create user", err)
 		return
 	}
-	if err := h.store.SetPassword(r.Context(), user.ID, hash); err != nil {
-		h.serverError(w, r, "signup: set password", err)
-		return
-	}
 
 	h.record(r, &user.ID, user.Username, "signup", "password", "success", nil)
 	h.issueSession(w, r, user, "password")
 }
 
 // Login authenticates with a password and, when enabled, a second factor.
+// Unknown users still pay for one argon2 derivation so response timing does
+// not reveal which usernames exist.
 func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}
+	if len(req.Password) > maxPasswordBytes {
+		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
+		return
+	}
 	user, err := h.store.GetUserByUsername(r.Context(), strings.TrimSpace(req.Username))
-	if err != nil {
-		// Do not distinguish unknown user from bad password.
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		h.serverError(w, r, "login: load user", err)
+		return
+	}
+	if errors.Is(err, store.ErrNotFound) {
+		burnPasswordCheck(req.Password)
 		h.record(r, nil, req.Username, "login", "password", "failure", map[string]any{"reason": "unknown_user"})
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 	hash, err := h.store.GetPasswordHash(r.Context(), user.ID)
-	if err != nil {
-		// Passkey-only accounts have no password row; same generic answer.
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		h.serverError(w, r, "login: load password", err)
+		return
+	}
+	if errors.Is(err, store.ErrNotFound) {
+		burnPasswordCheck(req.Password)
+		h.record(r, &user.ID, user.Username, "login", "password", "failure", map[string]any{"reason": "no_password"})
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -233,27 +263,37 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Second factor, if the user has a confirmed TOTP secret.
-	if enabled, _ := h.totpEnabled(r.Context(), user.ID); enabled {
-		if !h.verifySecondFactor(r.Context(), user.ID, req.TOTP) {
-			h.record(r, &user.ID, user.Username, "login", "password+totp", "failure", map[string]any{"reason": "totp"})
-			httpx.WriteError(w, http.StatusUnauthorized, "second factor required or invalid")
-			return
-		}
-		h.record(r, &user.ID, user.Username, "login", "password+totp", "success", nil)
-		h.issueSession(w, r, user, "password+totp")
+	enabled, err := h.totpEnabled(r.Context(), user.ID)
+	if err != nil {
+		h.serverError(w, r, "login: check totp", err)
 		return
 	}
-
-	h.record(r, &user.ID, user.Username, "login", "password", "success", nil)
-	h.issueSession(w, r, user, "password")
+	if !enabled {
+		h.record(r, &user.ID, user.Username, "login", "password", "success", nil)
+		h.issueSession(w, r, user, "password")
+		return
+	}
+	passed, err := h.verifySecondFactor(r.Context(), user.ID, req.TOTP)
+	if err != nil {
+		h.serverError(w, r, "login: verify second factor", err)
+		return
+	}
+	if !passed {
+		h.record(r, &user.ID, user.Username, "login", "password+totp", "failure", map[string]any{"reason": "totp"})
+		httpx.WriteError(w, http.StatusUnauthorized, "second factor required or invalid")
+		return
+	}
+	h.record(r, &user.ID, user.Username, "login", "password+totp", "success", nil)
+	h.issueSession(w, r, user, "password+totp")
 }
 
 // Logout revokes the current session.
 func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
-	id := CurrentSession(r.Context())
-	if id != "" {
-		_ = h.store.RevokeSession(r.Context(), id)
+	if id := CurrentSession(r.Context()); id != "" {
+		if err := h.store.RevokeSession(r.Context(), id); err != nil {
+			h.serverError(w, r, "logout: revoke session", err)
+			return
+		}
 	}
 	if user, ok := CurrentUser(r.Context()); ok {
 		h.record(r, &user.ID, user.Username, "logout", "", "success", nil)
@@ -262,14 +302,9 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "logged_out"})
 }
 
-// LogoutAll revokes every currently-active session for the current user across
-// all their devices and browsers — the "log out everywhere" action exposed on
-// the settings page. This is the ONLY logout GoTunnels performs beyond a
-// single explicit Logout, and it too is entirely user-initiated: the app never
-// ends a session on its own. The response reports how many sessions were
-// revoked. The current session is included in that set, so this also logs the
-// caller out here; the frontend drops its local token and the expired cookie
-// clears the secondary transport.
+// LogoutAll revokes every active session for the current user across all
+// devices — the user-initiated "log out everywhere" action. The current
+// session is part of that set.
 func (h *Handlers) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	user, ok := CurrentUser(r.Context())
 	if !ok {
@@ -296,7 +331,12 @@ func (h *Handlers) Me(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, h.userResponse(r.Context(), user))
+	resp, err := h.userResponse(r.Context(), user)
+	if err != nil {
+		h.serverError(w, r, "me: load profile", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 // Activity lists the current user's audit events.
@@ -310,6 +350,9 @@ func (h *Handlers) Activity(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.serverError(w, r, "activity: list", err)
 		return
+	}
+	if events == nil {
+		events = []store.Activity{}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"activity": events})
 }
@@ -337,12 +380,13 @@ func (h *Handlers) PasskeyRegisterBegin(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	creation, sessionData, err := wa.BeginRegistration(waUser,
-		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred))
+		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred),
+		webauthn.WithExclusions(webauthn.Credentials(waUser.Credentials).CredentialDescriptors()))
 	if err != nil {
 		h.serverError(w, r, "passkey: begin registration", err)
 		return
 	}
-	flowID, err := h.saveFlow(r.Context(), &user.ID, "register", origin, nil, sessionData)
+	flowID, err := h.saveFlow(r.Context(), &user.ID, flowRegister, origin, nil, sessionData)
 	if err != nil {
 		h.serverError(w, r, "passkey: save flow", err)
 		return
@@ -357,22 +401,12 @@ func (h *Handlers) PasskeyRegisterFinish(w http.ResponseWriter, r *http.Request)
 		httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
-	flowID := r.URL.Query().Get("flow")
-	env, err := h.loadFlow(r.Context(), flowID, "register", &user.ID)
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired registration flow")
+	flow, ok := h.consumeFlow(w, r, flowRegister)
+	if !ok {
 		return
 	}
-	sd, err := env.sessionData()
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "corrupt registration flow")
-		return
-	}
-	// Finish against the relying party pinned when the flow began, so begin
-	// and finish agree even if the Origin header were to change between them.
-	wa, err := h.rpForFlow(env)
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+	if flow.UserID != user.ID {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired flow")
 		return
 	}
 	waUser, err := h.buildWAUser(r.Context(), user)
@@ -380,17 +414,20 @@ func (h *Handlers) PasskeyRegisterFinish(w http.ResponseWriter, r *http.Request)
 		h.serverError(w, r, "passkey: load user", err)
 		return
 	}
-	cred, err := wa.FinishRegistration(waUser, *sd, r)
+	cred, err := flow.wa.FinishRegistration(waUser, *flow.session, r)
 	if err != nil {
 		h.record(r, &user.ID, user.Username, "passkey_register", "passkey", "failure", map[string]any{"error": err.Error()})
 		httpx.WriteError(w, http.StatusBadRequest, "passkey registration failed")
 		return
 	}
 	if err := h.store.AddWebAuthnCredential(r.Context(), user.ID, cred); err != nil {
+		if store.IsUniqueViolation(err) {
+			httpx.WriteError(w, http.StatusConflict, "this passkey is already registered")
+			return
+		}
 		h.serverError(w, r, "passkey: store credential", err)
 		return
 	}
-	_ = h.store.DeleteFlow(r.Context(), flowID)
 	h.record(r, &user.ID, user.Username, "passkey_register", "passkey", "success", nil)
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "registered"})
 }
@@ -416,13 +453,17 @@ func (h *Handlers) PasskeyLoginBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user, err := h.store.GetUserByUsername(r.Context(), strings.TrimSpace(req.Username))
-	if err != nil {
+	if errors.Is(err, store.ErrNotFound) {
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
+		return
+	}
+	if err != nil {
+		h.serverError(w, r, "passkey: load user", err)
 		return
 	}
 	waUser, err := h.buildWAUser(r.Context(), user)
 	if err != nil {
-		h.serverError(w, r, "passkey: load user", err)
+		h.serverError(w, r, "passkey: load credentials", err)
 		return
 	}
 	if len(waUser.Credentials) == 0 {
@@ -434,7 +475,7 @@ func (h *Handlers) PasskeyLoginBegin(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, "passkey: begin login", err)
 		return
 	}
-	flowID, err := h.saveFlow(r.Context(), &user.ID, "login", origin, nil, sessionData)
+	flowID, err := h.saveFlow(r.Context(), &user.ID, flowLogin, origin, nil, sessionData)
 	if err != nil {
 		h.serverError(w, r, "passkey: save flow", err)
 		return
@@ -444,34 +485,29 @@ func (h *Handlers) PasskeyLoginBegin(w http.ResponseWriter, r *http.Request) {
 
 // PasskeyLoginFinish completes a passkey assertion and starts a session.
 func (h *Handlers) PasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
-	flowID := r.URL.Query().Get("flow")
-	flow, err := h.loadFlowAny(r.Context(), flowID, "login")
-	if err != nil || flow.UserID == nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired login flow")
+	flow, ok := h.consumeFlow(w, r, flowLogin)
+	if !ok {
 		return
 	}
-	user, err := h.store.GetUserByID(r.Context(), *flow.UserID)
-	if err != nil {
+	if flow.UserID == "" {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired flow")
+		return
+	}
+	user, err := h.store.GetUserByID(r.Context(), flow.UserID)
+	if errors.Is(err, store.ErrNotFound) {
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
-	env := decodeFlowEnvelope(flow.SessionData)
-	sd, err := env.sessionData()
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "corrupt login flow")
-		return
-	}
-	wa, err := h.rpForFlow(env)
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
-		return
-	}
-	waUser, err := h.buildWAUser(r.Context(), user)
 	if err != nil {
 		h.serverError(w, r, "passkey: load user", err)
 		return
 	}
-	cred, err := wa.FinishLogin(waUser, *sd, r)
+	waUser, err := h.buildWAUser(r.Context(), user)
+	if err != nil {
+		h.serverError(w, r, "passkey: load credentials", err)
+		return
+	}
+	cred, err := flow.wa.FinishLogin(waUser, *flow.session, r)
 	if err != nil {
 		h.record(r, &user.ID, user.Username, "login", "passkey", "failure", map[string]any{"error": err.Error()})
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid credentials")
@@ -480,13 +516,12 @@ func (h *Handlers) PasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.UpdateWebAuthnCredential(r.Context(), user.ID, cred); err != nil {
 		h.log.WarnContext(r.Context(), "update credential sign count", slog.String("error", err.Error()))
 	}
-	_ = h.store.DeleteFlow(r.Context(), flowID)
 	h.record(r, &user.ID, user.Username, "login", "passkey", "success", nil)
 	h.issueSession(w, r, user, "passkey")
 }
 
 // ---------------------------------------------------------------------------
-// passkey-first signup (unauthenticated) — create an account with no password
+// passkey-first signup (unauthenticated)
 // ---------------------------------------------------------------------------
 
 type passkeySignupBeginRequest struct {
@@ -494,25 +529,21 @@ type passkeySignupBeginRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
-// PasskeySignupBegin starts creating a brand-new account whose only credential
-// will be a passkey. No user row is written yet: a candidate user id is
-// generated here and carried inside the flow envelope, and the account only
-// comes into existence in PasskeySignupFinish after the authenticator has
-// actually produced a credential. Abandoned ceremonies therefore leave nothing
-// behind but an expiring row in webauthn_flows.
+// PasskeySignupBegin starts creating an account whose only credential will be
+// a passkey. No user row is written yet: a candidate id travels inside the
+// flow envelope and the account is only created in PasskeySignupFinish, once
+// the authenticator has produced a credential.
 func (h *Handlers) PasskeySignupBegin(w http.ResponseWriter, r *http.Request) {
 	var req passkeySignupBeginRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	req.Username = strings.TrimSpace(req.Username)
-	if !validUsername(req.Username) {
-		httpx.WriteError(w, http.StatusBadRequest, "username must be 3-32 chars: letters, digits, dot, dash, underscore")
+	username, displayName, problem := normalizeIdentity(req.Username, req.DisplayName)
+	if problem != "" {
+		httpx.WriteError(w, http.StatusBadRequest, problem)
 		return
 	}
-	// Fast-fail on an obviously taken name. The authoritative check is the
-	// unique index at Finish time, which also closes the begin/finish race.
-	exists, err := h.store.UsernameExists(r.Context(), req.Username)
+	exists, err := h.store.UsernameExists(r.Context(), username)
 	if err != nil {
 		h.serverError(w, r, "passkey signup: check username", err)
 		return
@@ -524,7 +555,7 @@ func (h *Handlers) PasskeySignupBegin(w http.ResponseWriter, r *http.Request) {
 
 	wa, origin, err := h.rp.ForRequest(r)
 	if err != nil {
-		h.record(r, nil, req.Username, "signup", "passkey", "failure", map[string]any{"error": err.Error()})
+		h.record(r, nil, username, "signup", "passkey", "failure", map[string]any{"error": err.Error()})
 		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
 		return
 	}
@@ -534,23 +565,16 @@ func (h *Handlers) PasskeySignupBegin(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, "passkey signup: candidate id", err)
 		return
 	}
-	displayName := strings.TrimSpace(req.DisplayName)
-	if displayName == "" {
-		displayName = req.Username
-	}
-
-	// A transient user object: satisfies webauthn.User for the ceremony
-	// without existing in the database.
-	waUser := &WebAuthnUser{User: store.User{ID: candidateID, Username: req.Username, DisplayName: displayName}}
+	waUser := &WebAuthnUser{User: store.User{ID: candidateID, Username: username, DisplayName: displayName}}
 	creation, sessionData, err := wa.BeginRegistration(waUser,
 		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred))
 	if err != nil {
 		h.serverError(w, r, "passkey signup: begin registration", err)
 		return
 	}
-	flowID, err := h.saveFlow(r.Context(), nil, "signup", origin, &signupFlowData{
+	flowID, err := h.saveFlow(r.Context(), nil, flowSignup, origin, &signupFlowData{
 		UserID:      candidateID,
-		Username:    req.Username,
+		Username:    username,
 		DisplayName: displayName,
 	}, sessionData)
 	if err != nil {
@@ -561,58 +585,38 @@ func (h *Handlers) PasskeySignupBegin(w http.ResponseWriter, r *http.Request) {
 }
 
 // PasskeySignupFinish verifies the new credential and only then creates the
-// account (passwordless) and starts a session.
+// passwordless account (user, role, and credential atomically) and starts a
+// session.
 func (h *Handlers) PasskeySignupFinish(w http.ResponseWriter, r *http.Request) {
-	flowID := r.URL.Query().Get("flow")
-	flow, err := h.loadFlowAny(r.Context(), flowID, "signup")
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired signup flow")
+	flow, ok := h.consumeFlow(w, r, flowSignup)
+	if !ok {
 		return
 	}
-	env := decodeFlowEnvelope(flow.SessionData)
-	if env.Signup == nil {
-		httpx.WriteError(w, http.StatusBadRequest, "corrupt signup flow")
+	if flow.signup == nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired flow")
 		return
 	}
-	sd, err := env.sessionData()
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "corrupt signup flow")
-		return
-	}
-	wa, err := h.rpForFlow(env)
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
-		return
-	}
-
 	candidate := store.User{
-		ID:          env.Signup.UserID,
-		Username:    env.Signup.Username,
-		DisplayName: env.Signup.DisplayName,
+		ID:          flow.signup.UserID,
+		Username:    flow.signup.Username,
+		DisplayName: flow.signup.DisplayName,
 	}
-	waUser := &WebAuthnUser{User: candidate}
-	cred, err := wa.FinishRegistration(waUser, *sd, r)
+	cred, err := flow.wa.FinishRegistration(&WebAuthnUser{User: candidate}, *flow.session, r)
 	if err != nil {
 		h.record(r, nil, candidate.Username, "signup", "passkey", "failure", map[string]any{"error": err.Error()})
 		httpx.WriteError(w, http.StatusBadRequest, "passkey signup failed")
 		return
 	}
-
-	user, err := h.store.CreateUserWithID(r.Context(), candidate.ID, candidate.Username, candidate.DisplayName)
+	user, err := h.store.CreateUserWithPasskey(r.Context(), candidate.ID, candidate.Username, candidate.DisplayName, cred)
 	if err != nil {
 		if store.IsUniqueViolation(err) {
-			h.record(r, nil, candidate.Username, "signup", "passkey", "failure", map[string]any{"reason": "username_taken"})
+			h.record(r, nil, candidate.Username, "signup", "passkey", "failure", map[string]any{"reason": "conflict"})
 			httpx.WriteError(w, http.StatusConflict, "username already taken")
 			return
 		}
 		h.serverError(w, r, "passkey signup: create user", err)
 		return
 	}
-	if err := h.store.AddWebAuthnCredential(r.Context(), user.ID, cred); err != nil {
-		h.serverError(w, r, "passkey signup: store credential", err)
-		return
-	}
-	_ = h.store.DeleteFlow(r.Context(), flowID)
 	h.record(r, &user.ID, user.Username, "signup", "passkey", "success", nil)
 	h.issueSession(w, r, user, "passkey")
 }
@@ -621,12 +625,14 @@ func (h *Handlers) PasskeySignupFinish(w http.ResponseWriter, r *http.Request) {
 // TOTP (authenticated)
 // ---------------------------------------------------------------------------
 
-type totpConfirmRequest struct {
+type totpCodeRequest struct {
 	Code string `json:"code"`
 }
 
-// TOTPEnroll generates a new TOTP secret and recovery codes for the current
-// user. The secret is stored encrypted and unconfirmed until TOTPConfirm.
+// TOTPEnroll generates a new TOTP secret and recovery codes. The secret is
+// stored encrypted and unconfirmed until TOTPConfirm. An already-active
+// second factor is never replaced here: it must be disabled with a valid code
+// first, so a hijacked session cannot quietly swap or strip it.
 func (h *Handlers) TOTPEnroll(w http.ResponseWriter, r *http.Request) {
 	user, ok := CurrentUser(r.Context())
 	if !ok {
@@ -643,17 +649,18 @@ func (h *Handlers) TOTPEnroll(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, "totp: encrypt", err)
 		return
 	}
-	if err := h.store.UpsertTOTPSecret(r.Context(), user.ID, sealed); err != nil {
-		h.serverError(w, r, "totp: store secret", err)
-		return
-	}
 	codes, hashes, err := GenerateRecoveryCodes(10)
 	if err != nil {
 		h.serverError(w, r, "totp: recovery codes", err)
 		return
 	}
-	if err := h.store.AddRecoveryCodes(r.Context(), user.ID, hashes); err != nil {
-		h.serverError(w, r, "totp: store recovery codes", err)
+	started, err := h.store.StartTOTPEnrollment(r.Context(), user.ID, sealed, hashes)
+	if err != nil {
+		h.serverError(w, r, "totp: store enrollment", err)
+		return
+	}
+	if !started {
+		httpx.WriteError(w, http.StatusConflict, "two-factor authentication is already enabled; disable it first")
 		return
 	}
 	h.record(r, &user.ID, user.Username, "totp_enroll", "totp", "success", nil)
@@ -671,21 +678,40 @@ func (h *Handlers) TOTPConfirm(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
-	var req totpConfirmRequest
+	var req totpCodeRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	secret, err := h.decryptTOTPSecret(r.Context(), user.ID)
-	if err != nil {
+	sealed, confirmed, err := h.store.GetTOTPSecret(r.Context(), user.ID)
+	if errors.Is(err, store.ErrNotFound) {
 		httpx.WriteError(w, http.StatusBadRequest, "no pending TOTP enrollment")
 		return
 	}
-	if !ValidateTOTP(req.Code, secret) {
+	if err != nil {
+		h.serverError(w, r, "totp: load secret", err)
+		return
+	}
+	if confirmed {
+		httpx.WriteError(w, http.StatusConflict, "two-factor authentication is already enabled")
+		return
+	}
+	secret, err := DecryptSecret(h.set.TOTPKey, sealed)
+	if err != nil {
+		h.serverError(w, r, "totp: decrypt secret", err)
+		return
+	}
+	step, ok := MatchTOTPStep(req.Code, string(secret), time.Now())
+	if !ok {
 		httpx.WriteError(w, http.StatusBadRequest, "invalid code")
 		return
 	}
-	if err := h.store.ConfirmTOTP(r.Context(), user.ID); err != nil {
+	done, err := h.store.ConfirmTOTP(r.Context(), user.ID, step)
+	if err != nil {
 		h.serverError(w, r, "totp: confirm", err)
+		return
+	}
+	if !done {
+		httpx.WriteError(w, http.StatusConflict, "no pending TOTP enrollment")
 		return
 	}
 	h.record(r, &user.ID, user.Username, "totp_confirm", "totp", "success", nil)
@@ -699,11 +725,26 @@ func (h *Handlers) TOTPDisable(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
-	var req totpConfirmRequest
+	var req totpCodeRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if !h.verifySecondFactor(r.Context(), user.ID, req.Code) {
+	enabled, err := h.totpEnabled(r.Context(), user.ID)
+	if err != nil {
+		h.serverError(w, r, "totp: check enabled", err)
+		return
+	}
+	if !enabled {
+		httpx.WriteError(w, http.StatusBadRequest, "two-factor authentication is not enabled")
+		return
+	}
+	passed, err := h.verifySecondFactor(r.Context(), user.ID, req.Code)
+	if err != nil {
+		h.serverError(w, r, "totp: verify", err)
+		return
+	}
+	if !passed {
+		h.record(r, &user.ID, user.Username, "totp_disable", "totp", "failure", nil)
 		httpx.WriteError(w, http.StatusBadRequest, "invalid code")
 		return
 	}
@@ -716,57 +757,117 @@ func (h *Handlers) TOTPDisable(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------------------------------------------------------------------------
-// flow envelope — what actually goes into webauthn_flows.session_data
+// flows — what goes into webauthn_flows.session_data
 // ---------------------------------------------------------------------------
 
+const (
+	flowRegister = "register"
+	flowLogin    = "login"
+	flowSignup   = "signup"
+)
+
 // flowEnvelope wraps the go-webauthn ceremony state with the origin the flow
-// was created for (so begin and finish always agree on the relying party) and,
-// for passkey-first signup, the candidate account that will be created only if
-// the ceremony succeeds.
+// was created for (so begin and finish agree on the relying party) and, for
+// passkey-first signup, the candidate account created only on success.
 type flowEnvelope struct {
-	V       int             `json:"v"`
 	Origin  string          `json:"origin,omitempty"`
 	Signup  *signupFlowData `json:"signup,omitempty"`
 	Session json.RawMessage `json:"session"`
 }
 
-// signupFlowData is the not-yet-created account carried through a passkey
-// signup ceremony.
 type signupFlowData struct {
 	UserID      string `json:"user_id"`
 	Username    string `json:"username"`
 	DisplayName string `json:"display_name"`
 }
 
-// decodeFlowEnvelope reads a stored flow blob. Flows written before the
-// envelope existed stored the bare webauthn.SessionData; those are wrapped
-// on the fly (with no pinned origin, which resolves to the static relying
-// party) so in-flight ceremonies survive an upgrade.
-func decodeFlowEnvelope(blob []byte) flowEnvelope {
+// liveFlow is a consumed flow, decoded and bound to its relying party.
+type liveFlow struct {
+	UserID  string
+	signup  *signupFlowData
+	session *webauthn.SessionData
+	wa      *webauthn.WebAuthn
+}
+
+func decodeFlowEnvelope(blob []byte) (flowEnvelope, *webauthn.SessionData, error) {
 	var env flowEnvelope
-	if err := json.Unmarshal(blob, &env); err == nil && len(env.Session) > 0 {
-		return env
+	if err := json.Unmarshal(blob, &env); err != nil {
+		return flowEnvelope{}, nil, err
 	}
-	return flowEnvelope{V: 0, Session: json.RawMessage(blob)}
-}
-
-// sessionData unpacks the library's ceremony state.
-func (e flowEnvelope) sessionData() (*webauthn.SessionData, error) {
+	if len(env.Session) == 0 {
+		return flowEnvelope{}, nil, errors.New("auth: flow has no session data")
+	}
 	var sd webauthn.SessionData
-	if err := json.Unmarshal(e.Session, &sd); err != nil {
-		return nil, err
+	if err := json.Unmarshal(env.Session, &sd); err != nil {
+		return flowEnvelope{}, nil, err
 	}
-	return &sd, nil
+	return env, &sd, nil
 }
 
-// rpForFlow resolves the relying party a flow was pinned to when it began.
-func (h *Handlers) rpForFlow(env flowEnvelope) (*webauthn.WebAuthn, error) {
+func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind, origin string, signup *signupFlowData, sd *webauthn.SessionData) (string, error) {
+	sess, err := json.Marshal(sd)
+	if err != nil {
+		return "", err
+	}
+	blob, err := json.Marshal(flowEnvelope{Origin: origin, Signup: signup, Session: sess})
+	if err != nil {
+		return "", err
+	}
+	id, err := newFlowID()
+	if err != nil {
+		return "", err
+	}
+	err = h.store.SaveFlow(ctx, store.Flow{
+		ID:          id,
+		UserID:      userID,
+		Kind:        kind,
+		SessionData: blob,
+		ExpiresAt:   time.Now().Add(h.set.FlowTTL),
+	})
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+// consumeFlow atomically takes the flow named by ?flow= out of the store, so
+// each ceremony can be finished at most once, then decodes it and resolves
+// the relying party pinned when it began. On failure it has already written
+// the response.
+func (h *Handlers) consumeFlow(w http.ResponseWriter, r *http.Request, kind string) (liveFlow, bool) {
+	id := r.URL.Query().Get("flow")
+	if id == "" {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired flow")
+		return liveFlow{}, false
+	}
+	flow, err := h.store.ConsumeFlow(r.Context(), id, kind)
+	if errors.Is(err, store.ErrNotFound) {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired flow")
+		return liveFlow{}, false
+	}
+	if err != nil {
+		h.serverError(w, r, "flow: consume", err)
+		return liveFlow{}, false
+	}
+	env, sd, err := decodeFlowEnvelope(flow.SessionData)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired flow")
+		return liveFlow{}, false
+	}
 	wa, _, err := h.rp.ForOrigin(env.Origin)
-	return wa, err
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "this origin is not allowed to use passkeys")
+		return liveFlow{}, false
+	}
+	lf := liveFlow{signup: env.Signup, session: sd, wa: wa}
+	if flow.UserID != nil {
+		lf.UserID = *flow.UserID
+	}
+	return lf, true
 }
 
 // ---------------------------------------------------------------------------
-// internal helpers
+// sessions & cookies
 // ---------------------------------------------------------------------------
 
 func (h *Handlers) issueSession(w http.ResponseWriter, r *http.Request, user store.User, method string) {
@@ -780,28 +881,23 @@ func (h *Handlers) issueSession(w http.ResponseWriter, r *http.Request, user sto
 		h.serverError(w, r, "session: create", err)
 		return
 	}
+	profile, err := h.userResponse(r.Context(), user)
+	if err != nil {
+		h.log.WarnContext(r.Context(), "session: load profile", slog.String("error", err.Error()))
+		profile = userResponse{ID: user.ID, Username: user.Username, DisplayName: user.DisplayName, Roles: []string{}}
+	}
 	http.SetCookie(w, h.sessionCookie(token, cookieExpiry, cookieMaxAge))
-	httpx.WriteJSON(w, http.StatusOK, sessionResponse{
-		Token:     token,
-		ExpiresAt: dbExpiry, // nil (omitted) when the session never expires
-		User:      h.userResponse(r.Context(), user),
-	})
+	httpx.WriteJSON(w, http.StatusOK, sessionResponse{Token: token, ExpiresAt: dbExpiry, User: profile})
 }
 
-// persistentSessionCookieTTL is how far in the future the secondary session
-// cookie is dated when the session itself never expires. The server-side
-// session (the source of truth) has no expiry and the frontend's Bearer token
-// lives in localStorage indefinitely; this only affects the cookie, which
-// browsers additionally clamp to their own maximum (commonly ~400 days). It is
-// re-set on every login, so a returning user's cookie stays fresh.
+// persistentSessionCookieTTL dates the secondary session cookie when the
+// session itself never expires. Browsers clamp it further (~400 days); it is
+// re-set on every login.
 const persistentSessionCookieTTL = 365 * 24 * time.Hour
 
 // computeSessionExpiry maps the configured session TTL to the database expiry
-// (nil = never expires, stored as SQL NULL) and the cookie's Expires/Max-Age.
-// A TTL of zero or less means the session never expires on its own: no logout
-// for inactivity, no logout on browser close — only an explicit logout ends
-// it. A positive TTL opts into an absolute expiry. Pure and time-injected so
-// it is trivially unit-testable.
+// (nil = never expires) and the cookie's Expires/Max-Age. A TTL of zero or
+// less means only an explicit logout ends the session.
 func computeSessionExpiry(now time.Time, ttl time.Duration) (dbExpiry *time.Time, cookieExpiry time.Time, cookieMaxAge int) {
 	if ttl > 0 {
 		exp := now.Add(ttl)
@@ -816,10 +912,10 @@ func (h *Handlers) sessionCookie(token string, expires time.Time, maxAge int) *h
 		Value:    token,
 		Path:     "/",
 		Expires:  expires,
-		MaxAge:   maxAge, // Max-Age wins over Expires in modern browsers; both set for reach
+		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   h.set.CookieSecure,
-		SameSite: http.SameSiteNoneMode, // cross-site: frontend and API differ
+		SameSite: http.SameSiteNoneMode,
 	}
 }
 
@@ -836,10 +932,26 @@ func (h *Handlers) expiredCookie() *http.Cookie {
 	}
 }
 
-func (h *Handlers) userResponse(ctx context.Context, u store.User) userResponse {
-	roles, _ := h.store.UserRoles(ctx, u.ID)
-	totp, _ := h.totpEnabled(ctx, u.ID)
-	pk, _ := h.store.CountWebAuthnCredentials(ctx, u.ID)
+// ---------------------------------------------------------------------------
+// internal helpers
+// ---------------------------------------------------------------------------
+
+func (h *Handlers) userResponse(ctx context.Context, u store.User) (userResponse, error) {
+	roles, err := h.store.UserRoles(ctx, u.ID)
+	if err != nil {
+		return userResponse{}, err
+	}
+	if roles == nil {
+		roles = []string{}
+	}
+	totp, err := h.totpEnabled(ctx, u.ID)
+	if err != nil {
+		return userResponse{}, err
+	}
+	pk, err := h.store.CountWebAuthnCredentials(ctx, u.ID)
+	if err != nil {
+		return userResponse{}, err
+	}
 	return userResponse{
 		ID:          u.ID,
 		Username:    u.Username,
@@ -847,7 +959,7 @@ func (h *Handlers) userResponse(ctx context.Context, u store.User) userResponse 
 		Roles:       roles,
 		TOTPEnabled: totp,
 		Passkeys:    pk,
-	}
+	}, nil
 }
 
 func (h *Handlers) buildWAUser(ctx context.Context, u store.User) (*WebAuthnUser, error) {
@@ -869,90 +981,30 @@ func (h *Handlers) totpEnabled(ctx context.Context, userID string) (bool, error)
 	return confirmed, nil
 }
 
-func (h *Handlers) decryptTOTPSecret(ctx context.Context, userID string) (string, error) {
-	sealed, _, err := h.store.GetTOTPSecret(ctx, userID)
-	if err != nil {
-		return "", err
-	}
-	plain, err := DecryptSecret(h.set.TOTPKey, sealed)
-	if err != nil {
-		return "", err
-	}
-	return string(plain), nil
-}
-
-// verifySecondFactor accepts either a valid TOTP code or an unused recovery
-// code. It returns true on success and consumes a recovery code when used.
-func (h *Handlers) verifySecondFactor(ctx context.Context, userID, code string) bool {
+// verifySecondFactor accepts a TOTP code whose time step is newer than the
+// last one accepted (so every code is single-use) or an unused recovery code
+// (consumed on success). Storage failures are returned as errors, never as a
+// silent pass or fail.
+func (h *Handlers) verifySecondFactor(ctx context.Context, userID, code string) (bool, error) {
 	code = strings.TrimSpace(code)
 	if code == "" {
-		return false
+		return false, nil
 	}
-	if secret, err := h.decryptTOTPSecret(ctx, userID); err == nil {
-		if ValidateTOTP(code, secret) {
-			return true
-		}
+	sealed, confirmed, err := h.store.GetTOTPSecret(ctx, userID)
+	if errors.Is(err, store.ErrNotFound) || (err == nil && !confirmed) {
+		return false, nil
 	}
-	// Fall back to a one-time recovery code.
-	used, err := h.store.UseRecoveryCode(ctx, userID, HashRecoveryCode(code))
 	if err != nil {
-		h.log.WarnContext(ctx, "recovery code check", slog.String("error", err.Error()))
-		return false
+		return false, err
 	}
-	return used
-}
-
-func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind, origin string, signup *signupFlowData, sd *webauthn.SessionData) (string, error) {
-	sess, err := json.Marshal(sd)
+	secret, err := DecryptSecret(h.set.TOTPKey, sealed)
 	if err != nil {
-		return "", err
+		return false, err
 	}
-	blob, err := json.Marshal(flowEnvelope{V: 1, Origin: origin, Signup: signup, Session: sess})
-	if err != nil {
-		return "", err
+	if step, ok := MatchTOTPStep(code, string(secret), time.Now()); ok {
+		return h.store.MarkTOTPStepUsed(ctx, userID, step)
 	}
-	id, err := newFlowID()
-	if err != nil {
-		return "", err
-	}
-	err = h.store.SaveFlow(ctx, store.Flow{
-		ID:          id,
-		UserID:      userID,
-		Kind:        kind,
-		SessionData: blob,
-		ExpiresAt:   time.Now().Add(h.set.FlowTTL),
-	})
-	if err != nil {
-		return "", err
-	}
-	return id, nil
-}
-
-func (h *Handlers) loadFlow(ctx context.Context, id, kind string, expectUser *string) (flowEnvelope, error) {
-	flow, err := h.loadFlowAny(ctx, id, kind)
-	if err != nil {
-		return flowEnvelope{}, err
-	}
-	if expectUser != nil {
-		if flow.UserID == nil || *flow.UserID != *expectUser {
-			return flowEnvelope{}, errors.New("auth: flow does not belong to user")
-		}
-	}
-	return decodeFlowEnvelope(flow.SessionData), nil
-}
-
-func (h *Handlers) loadFlowAny(ctx context.Context, id, kind string) (store.Flow, error) {
-	if id == "" {
-		return store.Flow{}, errors.New("auth: missing flow id")
-	}
-	flow, err := h.store.GetFlow(ctx, id)
-	if err != nil {
-		return store.Flow{}, err
-	}
-	if flow.Kind != kind {
-		return store.Flow{}, errors.New("auth: flow kind mismatch")
-	}
-	return flow, nil
+	return h.store.UseRecoveryCode(ctx, userID, HashRecoveryCode(code))
 }
 
 func (h *Handlers) record(r *http.Request, userID *string, username, eventType, method, outcome string, detail map[string]any) {
@@ -970,11 +1022,7 @@ func (h *Handlers) record(r *http.Request, userID *string, username, eventType, 
 }
 
 func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg string, err error) {
-	h.log.ErrorContext(r.Context(), msg,
-		slog.String("error", err.Error()),
-		slog.String("request_id", httpx.RequestIDFromContext(r.Context())),
-	)
-	httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
+	httpx.ServerError(w, r, h.log, msg, err)
 }
 
 func (h *Handlers) issuer() string {
@@ -988,6 +1036,23 @@ func (h *Handlers) issuer() string {
 // free helpers
 // ---------------------------------------------------------------------------
 
+var (
+	dummyHashOnce sync.Once
+	dummyHash     string
+)
+
+// burnPasswordCheck performs one argon2 verification against a throwaway hash
+// so failed logins for unknown or passwordless accounts take as long as a
+// wrong password for a real one.
+func burnPasswordCheck(password string) {
+	dummyHashOnce.Do(func() {
+		dummyHash, _ = HashPassword("gotunnels-timing-equaliser")
+	})
+	if dummyHash != "" {
+		_, _ = VerifyPassword(dummyHash, password)
+	}
+}
+
 func newFlowID() (string, error) {
 	b := make([]byte, 24)
 	if _, err := rand.Read(b); err != nil {
@@ -996,30 +1061,53 @@ func newFlowID() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// newUUIDv4 generates an RFC 4122 version 4 UUID string. Kept local (like the
-// store's id::text convention) to avoid pulling in a UUID dependency for the
-// one place the application, rather than Postgres, must mint an id: the
-// passkey-signup candidate user, which has to exist as a WebAuthn user handle
-// before any row exists in the database.
+// newUUIDv4 generates an RFC 9562 version 4 UUID string for the passkey
+// signup candidate, which must exist as a WebAuthn user handle before any row
+// exists in the database.
 func newUUIDv4() (string, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", err
 	}
-	b[6] = (b[6] & 0x0f) | 0x40 // version 4
-	b[8] = (b[8] & 0x3f) | 0x80 // RFC 4122 variant
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
 }
 
-// decodeJSON reads a size-limited JSON body into dst, writing a 400 on failure.
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MiB
-	dec := json.NewDecoder(r.Body)
-	if err := dec.Decode(dst); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid JSON body")
-		return false
+	return httpx.DecodeJSON(w, r, dst, 64<<10)
+}
+
+// normalizeIdentity trims and validates a username and display name, falling
+// back to the username when the display name is blank.
+func normalizeIdentity(username, displayName string) (string, string, string) {
+	username = strings.TrimSpace(username)
+	if !validUsername(username) {
+		return "", "", "username must be 3-32 chars: letters, digits, dot, dash, underscore"
 	}
-	return true
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		displayName = username
+	}
+	if !utf8.ValidString(displayName) || utf8.RuneCountInString(displayName) > maxDisplayNameRune {
+		return "", "", fmt.Sprintf("display name must be at most %d characters", maxDisplayNameRune)
+	}
+	for _, r := range displayName {
+		if r < 0x20 || (r >= 0x7f && r < 0xa0) {
+			return "", "", "display name must not contain control characters"
+		}
+	}
+	return username, displayName, ""
+}
+
+func validatePassword(p string) string {
+	switch {
+	case len(p) < minPasswordLen:
+		return fmt.Sprintf("password must be at least %d characters", minPasswordLen)
+	case len(p) > maxPasswordBytes:
+		return fmt.Sprintf("password must be at most %d bytes", maxPasswordBytes)
+	}
+	return ""
 }
 
 // validUsername enforces a conservative username policy.

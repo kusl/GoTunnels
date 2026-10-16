@@ -110,7 +110,27 @@ user can:
 Login accepts password (plus a TOTP or recovery code if TOTP is enabled) or a
 passkey assertion. WebAuthn ceremony state lives server-side in `webauthn_flows`
 keyed by a random flow id echoed back on the finish request, so the ceremony
-never depends on a cross-site cookie.
+never depends on a cross-site cookie. Finishing a ceremony atomically deletes
+its flow (`DELETE … RETURNING`), so each one can complete at most once.
+
+Hardening details:
+
+- **TOTP codes are single-use** (RFC 6238 §5.2): the time step of every
+  accepted code is stored (`totp_secrets.last_used_step`, migration `0009`)
+  and a code is only accepted when its step is newer.
+- **An active second factor cannot be replaced** by enrolling again; it must
+  first be disabled with a valid code, so a hijacked session cannot strip it.
+- **Failures fail closed.** A database error while checking whether TOTP is
+  enabled is a 500, never a skipped second factor. A database error while
+  validating a session is a 503, never a 401, because the frontend treats 401
+  as "logged out".
+- **Account creation is atomic.** The user, role, and first credential
+  (password hash or passkey) are written in one transaction.
+- **Sign-in attempts are rate limited** (see `GOTUNNELS_AUTH_ATTEMPT_*`), and
+  unknown usernames still pay for one argon2 derivation so timing does not
+  reveal which accounts exist.
+- Every API response carries `X-Content-Type-Options: nosniff`,
+  `Cache-Control: no-store`, and `Referrer-Policy: no-referrer`.
 
 Authorization is a simple role model (`user` / `admin`) seeded by the first
 migration.
@@ -183,8 +203,22 @@ raw SQL.
 
 `internal/database` embeds the `*.sql` files and applies pending `*.up.sql`
 migrations on startup, each in its own transaction, recording applied versions
-in `schema_migrations`. It is a deliberately tiny, dependency-free runner rather
-than a third-party migration tool.
+in `schema_migrations`. The run holds a PostgreSQL advisory lock, so several
+API instances booting against one database cannot race each other. It is a
+deliberately tiny, dependency-free runner rather than a third-party migration
+tool.
+
+Deployments are disposable (`scripts/up.sh` recreates the database volume
+every run), so migrations only ever run against an empty database and no
+migration needs to transform existing rows.
+
+## Housekeeping
+
+`internal/maintenance` runs a janitor goroutine: at startup and then every
+`GOTUNNELS_MAINTENANCE_INTERVAL` it deletes expired `webauthn_flows` rows and
+prunes `health_check_log` and `csp_reports` past their retention, so no table
+grows without bound. In-memory rate limiters likewise drop idle keys once a
+minute.
 
 ## User preferences
 

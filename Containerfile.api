@@ -1,19 +1,19 @@
 # Containerfile.api — multi-stage build for the GoTunnels API.
 #
-# The builder runs `go mod tidy` because go.sum is intentionally not committed
-# on first import (the authoring environment could not reach the module proxy).
-# On any machine with network access this resolves and locks the dependency
-# graph, then produces a static binary. The final image is distroless: no
-# shell, no package manager, minimal attack surface, runs as nonroot.
+# go.sum is not committed, so the builder resolves the module graph with
+# `go mod download` (cached as its own layer, keyed on go.mod only) and then
+# `go mod tidy`. The final image is distroless: no shell, no package manager,
+# runs as nonroot.
 
-FROM golang:1.27-bookworm AS build
+FROM docker.io/library/golang:1.27-trixie AS build
 WORKDIR /src
 
-# Keep the bundled toolchain (no surprise network toolchain downloads) and
-# build a static, CGO-free binary (all dependencies are pure Go).
 ENV CGO_ENABLED=0 \
     GOFLAGS=-mod=mod \
     GOTOOLCHAIN=local
+
+COPY go.mod ./
+RUN go mod download
 
 COPY . .
 
@@ -21,7 +21,7 @@ ARG VERSION=dev
 RUN go mod tidy \
  && go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/api ./cmd/api
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian13:nonroot
 WORKDIR /
 COPY --from=build /out/api /api
 USER nonroot:nonroot

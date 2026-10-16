@@ -5,7 +5,7 @@
 // browser reports natively to the same-origin /csp-report path, which Caddy
 // proxies to the API (see frontend/Caddyfile).
 
-import { Api, getToken, TOKEN_KEY } from "./api.js";
+import { Api, clearToken, getToken, TOKEN_KEY } from "./api.js";
 
 export function qs(sel, root = document) {
   return root.querySelector(sel);

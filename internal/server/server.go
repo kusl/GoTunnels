@@ -39,7 +39,10 @@ type Deps struct {
 	// authenticator ceremony never burns a scarce signup token.
 	SignupIPLimiter     *httpx.RateLimiter
 	SignupGlobalLimiter *httpx.RateLimiter
-	Pepper              []byte
+	// AuthLimiter throttles credential checks (password login, passkey
+	// login, TOTP confirm/disable). Nil disables it.
+	AuthLimiter *httpx.RateLimiter
+	Pepper      []byte
 }
 
 // New builds the configured *http.Server.
@@ -53,9 +56,9 @@ func New(d Deps) *http.Server {
 
 	// --- unauthenticated: auth entry points ---
 	mux.Handle("POST /api/signup", d.signupGuard(http.HandlerFunc(d.Auth.Signup)))
-	mux.HandleFunc("POST /api/login", d.Auth.Login)
-	mux.HandleFunc("POST /api/passkey/login/begin", d.Auth.PasskeyLoginBegin)
-	mux.HandleFunc("POST /api/passkey/login/finish", d.Auth.PasskeyLoginFinish)
+	mux.Handle("POST /api/login", d.authGuard(http.HandlerFunc(d.Auth.Login), hashedIPKey(d.Pepper)))
+	mux.Handle("POST /api/passkey/login/begin", d.authGuard(http.HandlerFunc(d.Auth.PasskeyLoginBegin), hashedIPKey(d.Pepper)))
+	mux.Handle("POST /api/passkey/login/finish", d.authGuard(http.HandlerFunc(d.Auth.PasskeyLoginFinish), hashedIPKey(d.Pepper)))
 	mux.HandleFunc("POST /api/passkey/signup/begin", d.Auth.PasskeySignupBegin)
 	mux.Handle("POST /api/passkey/signup/finish", d.signupGuard(http.HandlerFunc(d.Auth.PasskeySignupFinish)))
 
@@ -81,8 +84,8 @@ func New(d Deps) *http.Server {
 	mux.Handle("POST /api/passkey/register/begin", authed(http.HandlerFunc(d.Auth.PasskeyRegisterBegin)))
 	mux.Handle("POST /api/passkey/register/finish", authed(http.HandlerFunc(d.Auth.PasskeyRegisterFinish)))
 	mux.Handle("POST /api/totp/enroll", authed(http.HandlerFunc(d.Auth.TOTPEnroll)))
-	mux.Handle("POST /api/totp/confirm", authed(http.HandlerFunc(d.Auth.TOTPConfirm)))
-	mux.Handle("POST /api/totp/disable", authed(http.HandlerFunc(d.Auth.TOTPDisable)))
+	mux.Handle("POST /api/totp/confirm", authed(d.authGuard(http.HandlerFunc(d.Auth.TOTPConfirm), userRateKey())))
+	mux.Handle("POST /api/totp/disable", authed(d.authGuard(http.HandlerFunc(d.Auth.TOTPDisable), userRateKey())))
 
 	// --- authenticated: CAPTCHA stats & leaderboard ---
 	mux.Handle("GET /api/captcha/stats", authed(http.HandlerFunc(d.Captcha.Stats)))
@@ -102,7 +105,7 @@ func New(d Deps) *http.Server {
 	mux.Handle("GET /api/notes/authors", authed(http.HandlerFunc(d.Notes.Authors)))
 	mux.Handle("POST /api/notes", authed(httpx.Chain(
 		http.HandlerFunc(d.Notes.Create),
-		d.NotesRateLimiter.LimitByIP(noteRateKey()),
+		d.NotesRateLimiter.LimitByIP(userRateKey()),
 	)))
 	mux.Handle("DELETE /api/notes/{id}", authed(http.HandlerFunc(d.Notes.Delete)))
 
@@ -112,6 +115,7 @@ func New(d Deps) *http.Server {
 	handler := httpx.Chain(mux,
 		httpx.RequestID(),
 		httpx.Recoverer(d.Log),
+		httpx.SecurityHeaders(),
 		httpx.CORS(d.Config.CORSAllowedOrigins, d.Config.CORSAllowsAny()),
 	)
 	handler = httpx.Instrument(handler, "gotunnels-api")
@@ -144,6 +148,15 @@ func (d Deps) signupGuard(h http.Handler) http.Handler {
 	return httpx.Chain(h, mws...)
 }
 
+// authGuard applies the credential-check limiter, keyed by keyFn.
+func (d Deps) authGuard(h http.Handler, keyFn func(*http.Request) string) http.Handler {
+	if d.AuthLimiter == nil {
+		return h
+	}
+	return httpx.Chain(h, d.AuthLimiter.LimitWith(keyFn,
+		"too many sign-in attempts — please wait a moment and try again"))
+}
+
 // hashedIPKey derives a rate-limit key from the hashed client IP, so limits
 // track clients without ever storing a raw IP.
 func hashedIPKey(pepper []byte) func(*http.Request) string {
@@ -152,10 +165,10 @@ func hashedIPKey(pepper []byte) func(*http.Request) string {
 	}
 }
 
-// noteRateKey keys the note-creation rate limiter by the authenticated user
-// ID. The limiter runs inside RequireAuth, so the user is always present; the
-// "anon" fallback only guards against future wiring mistakes.
-func noteRateKey() func(*http.Request) string {
+// userRateKey keys a limiter by the authenticated user ID. It is only used
+// inside RequireAuth, so the user is always present; the "anon" fallback
+// guards against future wiring mistakes.
+func userRateKey() func(*http.Request) string {
 	return func(r *http.Request) string {
 		if u, ok := auth.CurrentUser(r.Context()); ok {
 			return "user:" + u.ID

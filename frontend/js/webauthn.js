@@ -77,6 +77,11 @@ function encodeAssertion(cred) {
   };
 }
 
+function requireCredential(cred) {
+  if (!cred) throw new Error("No passkey was provided. Please try again.");
+  return cred;
+}
+
 export function supported() {
   return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
 }
@@ -85,7 +90,7 @@ export function supported() {
 export async function registerPasskey() {
   const begin = await Api.passkeyRegisterBegin();
   const publicKey = prepCreation(begin.options.publicKey);
-  const cred = await navigator.credentials.create({ publicKey });
+  const cred = requireCredential(await navigator.credentials.create({ publicKey }));
   return Api.passkeyRegisterFinish(begin.flow_id, encodeAttestation(cred));
 }
 
@@ -94,7 +99,7 @@ export async function registerPasskey() {
 export async function loginPasskey(username) {
   const begin = await Api.passkeyLoginBegin({ username });
   const publicKey = prepRequest(begin.options.publicKey);
-  const cred = await navigator.credentials.get({ publicKey });
+  const cred = requireCredential(await navigator.credentials.get({ publicKey }));
   return Api.passkeyLoginFinish(begin.flow_id, encodeAssertion(cred));
 }
 
@@ -105,6 +110,6 @@ export async function loginPasskey(username) {
 export async function signupPasskey(username, displayName) {
   const begin = await Api.passkeySignupBegin({ username, display_name: displayName });
   const publicKey = prepCreation(begin.options.publicKey);
-  const cred = await navigator.credentials.create({ publicKey });
+  const cred = requireCredential(await navigator.credentials.create({ publicKey }));
   return Api.passkeySignupFinish(begin.flow_id, encodeAttestation(cred));
 }

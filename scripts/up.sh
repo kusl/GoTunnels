@@ -5,6 +5,13 @@
 # frontend's runtime URL). Safe to run for multiple instances concurrently by
 # passing a distinct project name.
 #
+# Every run starts FROM SCRATCH: the instance's containers AND volumes are
+# removed first. Quick Tunnel hostnames change on every run and passkeys are
+# bound to the hostname they were created on, so nothing in an old database
+# would work anyway; a clean slate also means schema changes never need a
+# data migration. Base images are re-pulled so each deployment runs on the
+# latest stable releases.
+#
 # Usage:
 #   scripts/up.sh [project-name]
 #
@@ -43,11 +50,27 @@ export GOTUNNELS_HOST_NAME
 set_env_var GOTUNNELS_HOST_NAME "$GOTUNNELS_HOST_NAME"
 log "telemetry host.name: $GOTUNNELS_HOST_NAME"
 
-# 1) Build images (API multi-stage build runs go mod tidy + go build).
-log "building images…"
-dc -p "$PROJECT" build
+# 0) Fresh start: remove this instance's containers, networks, and volumes.
+log "removing any previous deployment of $PROJECT (containers + volumes)…"
+dc -p "$PROJECT" down -v --remove-orphans >/dev/null 2>&1 || true
+for _svc in db api frontend cloudflared-frontend cloudflared-api; do
+  _cid="$(cid_of "$PROJECT" "$_svc")"
+  if [ -n "$_cid" ]; then
+    "$CR" rm -f --depend "$_cid" >/dev/null 2>&1 || "$CR" rm -f "$_cid" >/dev/null 2>&1 || true
+  fi
+done
+"$CR" volume rm -f "${PROJECT}_pgdata" >/dev/null 2>&1 || true
+if [ -n "$(cid_of "$PROJECT" api)" ] || [ -n "$(cid_of "$PROJECT" db)" ]; then
+  die "could not remove the previous deployment of $PROJECT; see 'Starting over' in README.md"
+fi
+ok "clean slate"
 
-# 2) Database first, wait until it actually accepts connections.
+# 1) Pull the latest base images and build (API build runs go mod tidy).
+log "pulling images and building…"
+dc -p "$PROJECT" pull db cloudflared-frontend cloudflared-api || warn "image pull failed; using local copies"
+dc -p "$PROJECT" build --pull
+
+# 2) Database first (fresh volume), wait until it actually accepts connections.
 #    We pass an explicit `pg_isready` probe so readiness does NOT hinge on
 #    podman's health *timer* firing (it often doesn't in a rootless shell) — see
 #    the long note on wait_healthy in lib.sh. 60s is plenty for a fresh volume.
@@ -55,33 +78,6 @@ log "starting database…"
 dc -p "$PROJECT" up -d db
 wait_healthy "$PROJECT" db 60 \
   pg_isready -U "${POSTGRES_USER:-gotunnels}" -d "${POSTGRES_DB:-gotunnels}" -q
-
-# 2b) Clear any stale api container from a previous run of THIS project,
-#     BEFORE the frontend and tunnels come up. Doing it this early matters:
-#     right now nothing has been discovered yet, so if removing the api drags
-#     dependent containers with it (instances created before the compose fix
-#     carry podman --requires links from frontend/cloudflared-api onto the
-#     api container), those dependents are simply recreated fresh by the
-#     steps below. Waiting until after tunnel discovery to do this — as an
-#     earlier version of this script did — is what produced the virginia
-#     failure: `podman rm -f api` failed with "has dependent containers",
-#     the `|| true` swallowed it, `up -d api` then hit "name already in use",
-#     and the API silently kept its bootstrap env (RP_ID=localhost, CORS=*):
-#     everything worked except passkeys.
-_stale_api_cid="$(cid_of "$PROJECT" api)"
-if [ -n "$_stale_api_cid" ]; then
-  warn "found an api container from a previous run; removing it (and any podman-level dependents) so it can be recreated with this run's environment"
-  "$CR" rm -f "$_stale_api_cid" >/dev/null 2>&1 || true
-  if [ -n "$(cid_of "$PROJECT" api)" ]; then
-    # Old-format instances: dependents hold --requires on the api container.
-    # podman's --depend removes them too; they are recreated fresh below.
-    "$CR" rm -f --depend "$_stale_api_cid" >/dev/null 2>&1 || true
-  fi
-  if [ -n "$(cid_of "$PROJECT" api)" ]; then
-    die "could not remove the stale api container ($_stale_api_cid). Tear the instance down first: scripts/down.sh $PROJECT"
-  fi
-  ok "stale api container removed"
-fi
 
 # 3) Frontend + its tunnel, WITHOUT pulling in the api dependency yet.
 log "starting frontend and its tunnel…"
@@ -104,8 +100,8 @@ export GOTUNNELS_CORS_ALLOWED_ORIGINS="$FRONTEND_URL"
 
 # 6) Now start the API (with correct RP/CORS) and its tunnel.
 #
-#    compose.yaml deliberately has no depends_on -> api edges anymore, and
-#    step 2b removed any leftover api container, so nothing can have
+#    compose.yaml deliberately has no depends_on -> api edges, and step 0
+#    removed every container of this instance, so nothing can have
 #    pre-created the api with stale env by this point. Verify that instead of
 #    assuming it: if an api container somehow exists here, recreating it is
 #    NOT safe to skip — a container created before the exports above would
@@ -181,4 +177,3 @@ for _pair in "cloudflared-frontend|Web app" "cloudflared-api|API"; do
   fi
   echo >&2
 done
-

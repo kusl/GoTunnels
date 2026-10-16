@@ -84,8 +84,9 @@ That one command:
 
 1. regenerates the LLM context dump (`export.sh`),
 2. runs the full test suite (build + vet + unit tests), and
-3. builds the images and brings the stack up, printing the two Quick Tunnel
-   URLs when ready.
+3. removes any previous deployment of the instance (containers **and**
+   volumes), pulls the latest base images, rebuilds, and brings the stack up,
+   printing the two Quick Tunnel URLs when ready.
 
 Open the **Web app** URL it prints, create an account, then add a passkey or
 enable TOTP from Settings. Tear it down with:
@@ -93,6 +94,28 @@ enable TOTP from Settings. Tear it down with:
 ```bash
 ./scripts/down.sh
 ```
+
+### Every deployment starts from scratch
+
+Quick Tunnel hostnames change on every run and passkeys only work on the
+hostname they were created for, so there is nothing worth keeping between
+deployments. `scripts/up.sh` therefore always begins with the equivalent of
+`down -v`: the instance's containers, network, and database volume are
+deleted and recreated. Accounts, notes, and stats from a previous run are
+gone; sign up again. Schema changes never need a data migration.
+
+### Starting over by hand
+
+If a run is interrupted and leaves something behind, remove it explicitly
+(`gotunnels` is the default project name; use yours if you passed one):
+
+```bash
+./scripts/down.sh gotunnels
+podman ps -a --filter label=com.docker.compose.project=gotunnels -q | xargs -r podman rm -f --depend
+podman volume ls -q --filter label=com.docker.compose.project=gotunnels | xargs -r podman volume rm -f
+```
+
+Replace `podman` with `docker` (and drop `--depend`) on Docker.
 
 ### Prerequisites
 
@@ -167,11 +190,13 @@ If you have Go installed it uses it directly; otherwise it runs the suite in a
 `golang` container. The GitHub Actions workflows are intentionally thin — they
 call these script functions rather than embedding logic:
 
-- `ci.yaml` — build, vet, unit tests on every push/PR.
+- `ci.yaml` — gofmt, build, vet, unit tests on every push/PR, plus a job that
+  builds both images and smoke-tests the real stack against PostgreSQL.
 - `govulncheck.yaml` — vulnerability scan on push/PR and weekly.
 - `dependency-freshness.yaml` — weekly update-and-retest drift check.
 
-Dependabot watches container base images and Actions versions; the Go module
+Dependabot watches container base images (Containerfiles and `compose.yaml`)
+and Actions versions; the Go module
 graph is covered by `govulncheck` (call-graph aware, far less noise than
 Dependabot's Go alerts).
 
@@ -192,7 +217,9 @@ Dependabot's Go alerts).
 │   ├── prefs/                   per-user key/value preferences
 │   ├── health/                  liveness / readiness / info
 │   ├── csp/                     CSP report ingestion (3 wire formats)
-│   ├── httpx/                   CORS, request-id, recovery, rate limit, JSON
+│   ├── httpx/                   CORS, request-id, recovery, security headers,
+│   │                            rate limit, JSON
+│   ├── maintenance/             janitor: expired flows, log retention
 │   └── server/                  route wiring + middleware chain
 ├── migrations/                  *.up.sql / *.down.sql (embedded)
 ├── frontend/                    plain HTML/CSS/JS + Caddyfile
@@ -228,6 +255,7 @@ This is a **demonstration**, deliberately simple in places:
   the ingress could later be swapped for a named tunnel or a real domain
   without touching the app.
 - Argon2 parameters are modest to keep the demo snappy in a container.
+- Data is disposable: every deployment starts with an empty database.
 - LLM-generated code should be **reviewed before you rely on it**.
 
 ## License

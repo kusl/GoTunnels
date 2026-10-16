@@ -6,11 +6,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/base32"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
@@ -30,7 +30,7 @@ func GenerateTOTP(issuer, account string) (TOTPSecret, error) {
 		AccountName: account,
 		Algorithm:   otp.AlgorithmSHA1, // widest authenticator-app compatibility
 		Digits:      otp.DigitsSix,
-		Period:      30,
+		Period:      totpPeriod,
 	})
 	if err != nil {
 		return TOTPSecret{}, fmt.Errorf("auth: generate totp: %w", err)
@@ -38,9 +38,36 @@ func GenerateTOTP(issuer, account string) (TOTPSecret, error) {
 	return TOTPSecret{Secret: key.Secret(), URL: key.URL()}, nil
 }
 
+const totpPeriod = 30
+
 // ValidateTOTP reports whether code is currently valid for secret.
 func ValidateTOTP(code, secret string) bool {
-	return totp.Validate(strings.TrimSpace(code), secret)
+	_, ok := MatchTOTPStep(code, secret, time.Now())
+	return ok
+}
+
+// MatchTOTPStep checks code against the time steps around now (one step of
+// clock skew either way) and returns the matching step number. Callers
+// persist the step and reject any code whose step is not newer, which is what
+// makes each code single-use.
+func MatchTOTPStep(code, secret string, now time.Time) (int64, bool) {
+	code = strings.TrimSpace(code)
+	if len(code) != 6 {
+		return 0, false
+	}
+	opts := totp.ValidateOpts{Period: totpPeriod, Digits: otp.DigitsSix, Algorithm: otp.AlgorithmSHA1}
+	base := now.Unix() / totpPeriod
+	for _, d := range []int64{0, -1, 1} {
+		step := base + d
+		want, err := totp.GenerateCodeCustom(secret, time.Unix(step*totpPeriod, 0).UTC(), opts)
+		if err != nil {
+			return 0, false
+		}
+		if subtle.ConstantTimeCompare([]byte(want), []byte(code)) == 1 {
+			return step, true
+		}
+	}
+	return 0, false
 }
 
 // ---------------------------------------------------------------------------
@@ -154,6 +181,3 @@ func randomRecoveryCode() (string, error) {
 	}
 	return b.String(), nil
 }
-
-// base32NoPad is exposed for callers that need to sanity-check a secret.
-var base32NoPad = base32.StdEncoding.WithPadding(base32.NoPadding)

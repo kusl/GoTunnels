@@ -48,6 +48,12 @@ func TestValidateBodyRejects(t *testing.T) {
 		{"null byte", "a\x00b"},
 		{"delete char", "a\x7fb"},
 		{"invalid utf8", string([]byte{0xff, 0xfe, 0x41})},
+		{"c1 csi escape", "sneaky \u009b31m red"},
+		{"next line control", "a\u0085b"},
+		{"bidi override", "abc\u202Edef"},
+		{"bidi isolate", "abc\u2066def"},
+		{"zero width space", "a\u200Bb"},
+		{"byte order mark", "a\uFEFFb"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -55,6 +61,13 @@ func TestValidateBodyRejects(t *testing.T) {
 				t.Fatalf("ValidateBody(%q) accepted as %q, want rejection", tc.in, got)
 			}
 		})
+	}
+}
+
+func TestValidateBodyKeepsEmojiJoiners(t *testing.T) {
+	family := "family \U0001F468\u200D\U0001F469\u200D\U0001F467"
+	if got, problem := ValidateBody(family); problem != "" || got != family {
+		t.Fatalf("ZWJ emoji sequence rejected: %q", problem)
 	}
 }
 

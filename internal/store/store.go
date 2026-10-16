@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -162,71 +163,58 @@ type Note struct {
 // Users & roles
 // ---------------------------------------------------------------------------
 
-// CreateUser inserts a user and grants the default "user" role atomically.
-func (s *Store) CreateUser(ctx context.Context, username, displayName string) (User, error) {
-	lower := normalizeUsername(username)
-	if displayName == "" {
-		displayName = username
-	}
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return User{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
+// CreateUserWithPassword creates a password account in one transaction: the
+// user row, the default "user" role, and the password hash. Either all three
+// exist afterwards or none do, so a failure can never strand a username.
+func (s *Store) CreateUserWithPassword(ctx context.Context, username, displayName, passwordHash string) (User, error) {
 	var u User
-	err = tx.QueryRow(ctx, `
-		INSERT INTO users (username, username_lower, display_name)
-		VALUES ($1, $2, $3)
-		RETURNING id::text, username, display_name, created_at`,
-		username, lower, displayName,
-	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.CreatedAt)
-	if err != nil {
-		return User{}, err
-	}
-	if _, err = tx.Exec(ctx,
-		`INSERT INTO user_roles (user_id, role) VALUES ($1::uuid, 'user')`, u.ID); err != nil {
-		return User{}, err
-	}
-	if err = tx.Commit(ctx); err != nil {
-		return User{}, err
-	}
-	return u, nil
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
+		var err error
+		if u, err = insertUser(ctx, tx, nil, username, displayName); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `
+			INSERT INTO password_credentials (user_id, password_hash, updated_at)
+			VALUES ($1::uuid, $2, now())`, u.ID, passwordHash)
+		return err
+	})
+	return u, err
 }
 
-// CreateUserWithID inserts a user under a caller-supplied uuid and grants the
-// default "user" role atomically. The passkey-first signup flow needs this:
-// it must mint the id before any row exists so the id can serve as the
-// WebAuthn user handle during the ceremony, and only writes the row once the
-// authenticator has produced a credential. A duplicate username surfaces as a
-// unique violation here (see IsUniqueViolation) — the authoritative check
-// that closes the begin/finish race.
-func (s *Store) CreateUserWithID(ctx context.Context, id, username, displayName string) (User, error) {
-	lower := normalizeUsername(username)
+// CreateUserWithPasskey creates a passwordless account under a caller-minted
+// uuid together with its first WebAuthn credential, atomically. The passkey
+// signup flow must mint the id before any row exists so it can serve as the
+// WebAuthn user handle. A duplicate username surfaces as a unique violation
+// (see IsUniqueViolation), the authoritative check that closes the
+// begin/finish race.
+func (s *Store) CreateUserWithPasskey(ctx context.Context, id, username, displayName string, cred *webauthn.Credential) (User, error) {
+	var u User
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
+		var err error
+		if u, err = insertUser(ctx, tx, &id, username, displayName); err != nil {
+			return err
+		}
+		return insertWebAuthnCredential(ctx, tx, u.ID, cred)
+	})
+	return u, err
+}
+
+func insertUser(ctx context.Context, tx pgx.Tx, id *string, username, displayName string) (User, error) {
 	if displayName == "" {
 		displayName = username
 	}
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return User{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
 	var u User
-	err = tx.QueryRow(ctx, `
+	err := tx.QueryRow(ctx, `
 		INSERT INTO users (id, username, username_lower, display_name)
-		VALUES ($1::uuid, $2, $3, $4)
+		VALUES (COALESCE($1::uuid, gen_random_uuid()), $2, $3, $4)
 		RETURNING id::text, username, display_name, created_at`,
-		id, username, lower, displayName,
+		id, username, normalizeUsername(username), displayName,
 	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.CreatedAt)
 	if err != nil {
 		return User{}, err
 	}
 	if _, err = tx.Exec(ctx,
 		`INSERT INTO user_roles (user_id, role) VALUES ($1::uuid, 'user')`, u.ID); err != nil {
-		return User{}, err
-	}
-	if err = tx.Commit(ctx); err != nil {
 		return User{}, err
 	}
 	return u, nil
@@ -286,17 +274,6 @@ func (s *Store) UserRoles(ctx context.Context, userID string) ([]string, error) 
 // Password credentials
 // ---------------------------------------------------------------------------
 
-// SetPassword upserts the password hash for a user.
-func (s *Store) SetPassword(ctx context.Context, userID, hash string) error {
-	_, err := s.pool.Exec(ctx, `
-		INSERT INTO password_credentials (user_id, password_hash, updated_at)
-		VALUES ($1::uuid, $2, now())
-		ON CONFLICT (user_id)
-		DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now()`,
-		userID, hash)
-	return err
-}
-
 // GetPasswordHash returns the stored PHC hash, or ErrNotFound.
 func (s *Store) GetPasswordHash(ctx context.Context, userID string) (string, error) {
 	var hash string
@@ -310,10 +287,20 @@ func (s *Store) GetPasswordHash(ctx context.Context, userID string) (string, err
 // WebAuthn credentials
 // ---------------------------------------------------------------------------
 
-// AddWebAuthnCredential stores a freshly registered credential. The full
-// webauthn.Credential is persisted as JSON (the source of truth for later
-// reconstruction) alongside broken-out columns used for indexing/uniqueness.
+// AddWebAuthnCredential stores a freshly registered credential for an
+// existing user.
 func (s *Store) AddWebAuthnCredential(ctx context.Context, userID string, cred *webauthn.Credential) error {
+	return insertWebAuthnCredential(ctx, s.pool, userID, cred)
+}
+
+type execer interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
+
+// insertWebAuthnCredential persists the full webauthn.Credential as JSON (the
+// source of truth for later reconstruction) alongside broken-out columns used
+// for indexing and uniqueness.
+func insertWebAuthnCredential(ctx context.Context, db execer, userID string, cred *webauthn.Credential) error {
 	blob, err := json.Marshal(cred)
 	if err != nil {
 		return err
@@ -322,7 +309,7 @@ func (s *Store) AddWebAuthnCredential(ctx context.Context, userID string, cred *
 	for _, t := range cred.Transport {
 		transports = append(transports, string(t))
 	}
-	_, err = s.pool.Exec(ctx, `
+	_, err = db.Exec(ctx, `
 		INSERT INTO webauthn_credentials
 			(user_id, credential_id, public_key, attestation_type, aaguid,
 			 sign_count, transports, clone_warning, credential)
@@ -407,49 +394,102 @@ func (s *Store) SaveFlow(ctx context.Context, f Flow) error {
 	return err
 }
 
-// GetFlow fetches ceremony state, or ErrNotFound if missing/expired.
-func (s *Store) GetFlow(ctx context.Context, id string) (Flow, error) {
+// ConsumeFlow atomically removes and returns live ceremony state of the given
+// kind. A flow can therefore be finished at most once: a replayed or
+// concurrent finish finds nothing and gets ErrNotFound.
+func (s *Store) ConsumeFlow(ctx context.Context, id, kind string) (Flow, error) {
 	var f Flow
-	var uid *string
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, user_id::text, kind, session_data, expires_at
-		FROM webauthn_flows WHERE id = $1 AND expires_at > now()`, id,
-	).Scan(&f.ID, &uid, &f.Kind, &f.SessionData, &f.ExpiresAt)
+		DELETE FROM webauthn_flows
+		WHERE id = $1 AND kind = $2 AND expires_at > now()
+		RETURNING id, user_id::text, kind, session_data, expires_at`, id, kind,
+	).Scan(&f.ID, &f.UserID, &f.Kind, &f.SessionData, &f.ExpiresAt)
 	if err != nil {
 		return Flow{}, mapErr(err)
 	}
-	f.UserID = uid
 	return f, nil
 }
 
-// DeleteFlow removes ceremony state (called once consumed).
-func (s *Store) DeleteFlow(ctx context.Context, id string) error {
-	_, err := s.pool.Exec(ctx, `DELETE FROM webauthn_flows WHERE id = $1`, id)
-	return err
+// DeleteExpiredFlows removes abandoned ceremonies whose expiry has passed.
+func (s *Store) DeleteExpiredFlows(ctx context.Context) (int64, error) {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM webauthn_flows WHERE expires_at <= now()`)
+	if err != nil {
+		return 0, err
+	}
+	return ct.RowsAffected(), nil
 }
 
 // ---------------------------------------------------------------------------
 // TOTP
 // ---------------------------------------------------------------------------
 
-// UpsertTOTPSecret stores an unconfirmed encrypted TOTP secret.
-func (s *Store) UpsertTOTPSecret(ctx context.Context, userID string, encrypted []byte) error {
-	_, err := s.pool.Exec(ctx, `
-		INSERT INTO totp_secrets (user_id, secret_encrypted, confirmed, created_at)
-		VALUES ($1::uuid, $2, false, now())
-		ON CONFLICT (user_id)
-		DO UPDATE SET secret_encrypted = EXCLUDED.secret_encrypted,
-		              confirmed = false, created_at = now(), confirmed_at = NULL`,
-		userID, encrypted)
-	return err
+// StartTOTPEnrollment stores a new unconfirmed encrypted TOTP secret and
+// replaces the user's recovery codes, in one transaction. It refuses (false,
+// nil) when TOTP is already confirmed: an active second factor must be
+// disabled with a valid code before it can be re-enrolled, so a hijacked
+// session cannot silently swap it out.
+func (s *Store) StartTOTPEnrollment(ctx context.Context, userID string, encrypted []byte, recoveryHashes []string) (bool, error) {
+	started := false
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx, `
+			INSERT INTO totp_secrets (user_id, secret_encrypted, confirmed, created_at)
+			VALUES ($1::uuid, $2, false, now())
+			ON CONFLICT (user_id)
+			DO UPDATE SET secret_encrypted = EXCLUDED.secret_encrypted,
+			              confirmed = false, created_at = now(), confirmed_at = NULL,
+			              last_used_step = NULL
+			WHERE totp_secrets.confirmed = false`,
+			userID, encrypted)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return nil
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM totp_recovery_codes WHERE user_id = $1::uuid`, userID); err != nil {
+			return err
+		}
+		for _, h := range recoveryHashes {
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO totp_recovery_codes (user_id, code_hash) VALUES ($1::uuid, $2)`,
+				userID, h); err != nil {
+				return err
+			}
+		}
+		started = true
+		return nil
+	})
+	return started, err
 }
 
-// ConfirmTOTP marks a user's TOTP secret confirmed.
-func (s *Store) ConfirmTOTP(ctx context.Context, userID string) error {
-	_, err := s.pool.Exec(ctx,
-		`UPDATE totp_secrets SET confirmed = true, confirmed_at = now() WHERE user_id = $1::uuid`,
-		userID)
-	return err
+// ConfirmTOTP marks a pending TOTP secret confirmed and records the time step
+// of the code that proved possession. It reports false when there was no
+// pending (unconfirmed) secret.
+func (s *Store) ConfirmTOTP(ctx context.Context, userID string, step int64) (bool, error) {
+	ct, err := s.pool.Exec(ctx, `
+		UPDATE totp_secrets
+		SET confirmed = true, confirmed_at = now(), last_used_step = $2::bigint
+		WHERE user_id = $1::uuid AND confirmed = false`,
+		userID, step)
+	if err != nil {
+		return false, err
+	}
+	return ct.RowsAffected() > 0, nil
+}
+
+// MarkTOTPStepUsed records a confirmed secret's code as spent. It reports false
+// when the step is not newer than the last accepted one, which is how a
+// replayed code is rejected.
+func (s *Store) MarkTOTPStepUsed(ctx context.Context, userID string, step int64) (bool, error) {
+	ct, err := s.pool.Exec(ctx, `
+		UPDATE totp_secrets SET last_used_step = $2::bigint
+		WHERE user_id = $1::uuid AND confirmed = true
+		  AND (last_used_step IS NULL OR last_used_step < $2::bigint)`,
+		userID, step)
+	if err != nil {
+		return false, err
+	}
+	return ct.RowsAffected() > 0, nil
 }
 
 // GetTOTPSecret returns the encrypted secret and confirmation state.
@@ -462,38 +502,13 @@ func (s *Store) GetTOTPSecret(ctx context.Context, userID string) (encrypted []b
 
 // DeleteTOTP disables TOTP for a user (secret + recovery codes).
 func (s *Store) DeleteTOTP(ctx context.Context, userID string) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := tx.Exec(ctx, `DELETE FROM totp_recovery_codes WHERE user_id = $1::uuid`, userID); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM totp_secrets WHERE user_id = $1::uuid`, userID); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
-}
-
-// AddRecoveryCodes stores hashed one-time recovery codes.
-func (s *Store) AddRecoveryCodes(ctx context.Context, userID string, hashes []string) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := tx.Exec(ctx, `DELETE FROM totp_recovery_codes WHERE user_id = $1::uuid`, userID); err != nil {
-		return err
-	}
-	for _, h := range hashes {
-		if _, err := tx.Exec(ctx,
-			`INSERT INTO totp_recovery_codes (user_id, code_hash) VALUES ($1::uuid, $2)`,
-			userID, h); err != nil {
+	return s.inTx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `DELETE FROM totp_recovery_codes WHERE user_id = $1::uuid`, userID); err != nil {
 			return err
 		}
-	}
-	return tx.Commit(ctx)
+		_, err := tx.Exec(ctx, `DELETE FROM totp_secrets WHERE user_id = $1::uuid`, userID)
+		return err
+	})
 }
 
 // UseRecoveryCode marks a matching unused recovery code as used. It reports
@@ -540,10 +555,12 @@ func (s *Store) GetSession(ctx context.Context, id string) (Session, error) {
 	return sess, mapErr(err)
 }
 
-// TouchSession updates last_seen_at.
+// TouchSession updates last_seen_at, at most once a minute per session so
+// every authenticated request does not turn into a write.
 func (s *Store) TouchSession(ctx context.Context, id string) error {
 	_, err := s.pool.Exec(ctx,
-		`UPDATE sessions SET last_seen_at = now() WHERE id = $1`, id)
+		`UPDATE sessions SET last_seen_at = now()
+		 WHERE id = $1 AND last_seen_at < now() - interval '1 minute'`, id)
 	return err
 }
 
@@ -610,7 +627,7 @@ func (s *Store) ListActivityForUser(ctx context.Context, userID string, limit in
 		       ip_hash, user_agent, detail, created_at
 		FROM activity_log
 		WHERE user_id = $1::uuid
-		ORDER BY created_at DESC
+		ORDER BY created_at DESC, id DESC
 		LIMIT $2`, userID, limit)
 	if err != nil {
 		return nil, err
@@ -641,6 +658,15 @@ func (s *Store) InsertHealthCheck(ctx context.Context, checkName, status string,
 	return err
 }
 
+// PruneHealthChecks deletes probe history older than before.
+func (s *Store) PruneHealthChecks(ctx context.Context, before time.Time) (int64, error) {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM health_check_log WHERE created_at < $1`, before)
+	if err != nil {
+		return 0, err
+	}
+	return ct.RowsAffected(), nil
+}
+
 // ---------------------------------------------------------------------------
 // CSP reports
 // ---------------------------------------------------------------------------
@@ -661,6 +687,15 @@ func (s *Store) InsertCSPReport(ctx context.Context, in CSPReportInput) error {
 		in.OriginalPolicy, in.Disposition, in.SourceFile, in.LineNumber, in.ColumnNumber,
 		in.StatusCode, in.ScriptSample, in.IPHash, in.UserAgent, []byte(raw))
 	return err
+}
+
+// PruneCSPReports deletes violation reports older than before.
+func (s *Store) PruneCSPReports(ctx context.Context, before time.Time) (int64, error) {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM csp_reports WHERE created_at < $1`, before)
+	if err != nil {
+		return 0, err
+	}
+	return ct.RowsAffected(), nil
 }
 
 // CSPReportRow is one sanitised violation for the public transparency feed:
@@ -966,26 +1001,17 @@ func IsUniqueViolation(err error) bool {
 // normalizeUsername lowercases and trims a username for case-insensitive
 // comparison. Kept here so store lookups and inserts agree on the rule.
 func normalizeUsername(u string) string {
-	return toLowerTrim(u)
+	return strings.ToLower(strings.TrimSpace(u))
 }
 
-func toLowerTrim(s string) string {
-	out := make([]rune, 0, len(s))
-	for _, r := range s {
-		if r >= 'A' && r <= 'Z' {
-			r += 'a' - 'A'
-		}
-		out = append(out, r)
+func (s *Store) inTx(ctx context.Context, fn func(pgx.Tx) error) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
 	}
-	// trim spaces
-	start, end := 0, len(out)
-	for start < end && isSpace(out[start]) {
-		start++
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := fn(tx); err != nil {
+		return err
 	}
-	for end > start && isSpace(out[end-1]) {
-		end--
-	}
-	return string(out[start:end])
+	return tx.Commit(ctx)
 }
-
-func isSpace(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' }

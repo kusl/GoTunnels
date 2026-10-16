@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"go.opentelemetry.io/otel"
@@ -208,7 +209,7 @@ func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 // Normalisation: CRLF and lone CR become LF, then surrounding whitespace is
 // trimmed. Validation: valid UTF-8, 1..MaxBodyChars characters, and no control
 // characters other than newline and tab (keeps posts as honest, copyable plain
-// text — no zero-width or terminal-escape mischief).
+// text — no zero-width, bidi-override, or terminal-escape mischief).
 func ValidateBody(raw string) (string, string) {
 	if !utf8.ValidString(raw) {
 		return "", "note body must be valid UTF-8"
@@ -223,14 +224,30 @@ func ValidateBody(raw string) (string, string) {
 		return "", fmt.Sprintf("note body must be at most %d characters (got %d)", MaxBodyChars, n)
 	}
 	for _, r := range body {
-		if r < 0x20 && r != '\n' && r != '\t' {
-			return "", "note body must not contain control characters"
-		}
-		if r == 0x7f {
-			return "", "note body must not contain control characters"
+		if forbiddenRune(r) {
+			return "", "note body must not contain control or invisible formatting characters"
 		}
 	}
 	return body, ""
+}
+
+// forbiddenRune rejects C0 and C1 control characters (except newline and
+// tab; C1 includes the single-byte CSI terminal escape U+009B), bidirectional
+// overrides and isolates (which can visually reorder text), and invisible
+// zero-width characters other than ZWNJ/ZWJ, which real scripts and emoji
+// sequences need.
+func forbiddenRune(r rune) bool {
+	switch {
+	case r == '\n' || r == '\t':
+		return false
+	case unicode.IsControl(r):
+		return true
+	case r >= 0x202A && r <= 0x202E, r >= 0x2066 && r <= 0x2069:
+		return true
+	case r == 0x200B, r == 0x200E, r == 0x200F, r == 0x2060, r == 0xFEFF:
+		return true
+	}
+	return false
 }
 
 // maxAuthorFilter caps how many author ids one request may filter by.
@@ -286,9 +303,5 @@ func isUUIDString(s string) bool {
 }
 
 func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg string, err error) {
-	h.log.ErrorContext(r.Context(), msg,
-		slog.String("error", err.Error()),
-		slog.String("request_id", httpx.RequestIDFromContext(r.Context())),
-	)
-	httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
+	httpx.ServerError(w, r, h.log, msg, err)
 }

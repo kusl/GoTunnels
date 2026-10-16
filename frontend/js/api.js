@@ -20,23 +20,6 @@ import { loadConfig } from "./config.js";
 
 export const TOKEN_KEY = "gotunnels_token";
 
-// One-time migration: earlier builds stored the token in sessionStorage. If a
-// tab still has one there and localStorage does not, carry it over so the
-// storage switch does not sign anyone out on their next visit.
-(function migrateLegacyToken() {
-  try {
-    if (!localStorage.getItem(TOKEN_KEY)) {
-      const legacy = sessionStorage.getItem(TOKEN_KEY);
-      if (legacy) {
-        localStorage.setItem(TOKEN_KEY, legacy);
-        sessionStorage.removeItem(TOKEN_KEY);
-      }
-    }
-  } catch {
-    // Storage can be unavailable (private mode); callers degrade gracefully.
-  }
-})();
-
 export function getToken() {
   try {
     return localStorage.getItem(TOKEN_KEY) || "";
@@ -56,11 +39,6 @@ export function setToken(t) {
 export function clearToken() {
   try {
     localStorage.removeItem(TOKEN_KEY);
-  } catch {
-    /* storage unavailable */
-  }
-  try {
-    sessionStorage.removeItem(TOKEN_KEY); // clean up any legacy copy too
   } catch {
     /* storage unavailable */
   }

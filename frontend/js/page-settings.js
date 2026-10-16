@@ -119,9 +119,14 @@ async function main() {
         const res = await Api.logoutAll();
         const n = (res && res.sessions_revoked) || 0;
         showMsg(msg, `Signed out of ${n} session${n === 1 ? "" : "s"} everywhere. Redirecting…`, "ok");
-      } catch {
-        // Even if the call fails, drop the local token so this browser is
-        // signed out; the redirect below sends the user to log in again.
+      } catch (err) {
+        if (!err || err.status !== 401) {
+          showMsg(msg, "Could not reach the server, so other devices are still signed in. Please try again.", "error");
+          logoutAllBtn.disabled = false;
+          return;
+        }
+        // 401: this session was already revoked, so signing out locally is
+        // exactly right.
       }
       clearToken();
       setTimeout(() => (location.href = "/login"), 600);

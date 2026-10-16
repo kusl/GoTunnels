@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/kusl/GoTunnels/internal/store"
 )
@@ -70,19 +71,35 @@ type Event struct {
 	Detail     map[string]any
 }
 
+const (
+	maxUsernameRunes  = 64
+	maxUserAgentRunes = 512
+)
+
 // Record hashes the request's client IP, captures the user agent, and persists
-// the event. Recording failures are returned but are typically logged and
+// the event, truncating the free-text fields. Recording failures are returned but are typically logged and
 // swallowed by callers so audit problems never block an auth flow.
 func (rec *Recorder) Record(ctx context.Context, r *http.Request, e Event) error {
 	ipHash := HashIP(rec.pepper, ClientIP(r))
 	return rec.store.InsertActivity(ctx, store.ActivityInput{
 		UserID:     e.UserID,
-		Username:   e.Username,
+		Username:   truncate(e.Username, maxUsernameRunes),
 		EventType:  e.EventType,
 		AuthMethod: e.AuthMethod,
 		Outcome:    e.Outcome,
 		IPHash:     ipHash,
-		UserAgent:  r.UserAgent(),
+		UserAgent:  truncate(r.UserAgent(), maxUserAgentRunes),
 		Detail:     e.Detail,
 	})
+}
+
+// truncate caps attacker-influenced strings (a failed login's username, the
+// user agent) before they reach the audit log, cutting on a rune boundary and
+// dropping invalid UTF-8.
+func truncate(s string, n int) string {
+	s = strings.ToValidUTF8(s, "")
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	return string([]rune(s)[:n])
 }

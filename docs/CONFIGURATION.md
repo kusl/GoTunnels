@@ -1,5 +1,10 @@
 # Configuration
 
+Every variable is parsed strictly: a value that is set but malformed (for
+example `GOTUNNELS_SESSION_TTL=7days`) stops startup with an error naming the
+variable instead of silently falling back to the default. Durations use Go
+syntax (`90s`, `15m`, `168h`).
+
 All runtime configuration is centralized. On the Go side every variable is read
 in exactly one place — [`internal/config/config.go`](../internal/config/config.go)
 — and nowhere else. This file is the reference for what each variable does.
@@ -88,6 +93,31 @@ that guard.
 | `GOTUNNELS_SIGNUP_GLOBAL_INTERVAL` | `1m` | Sustained rate: one signup per interval across the whole instance. |
 | `GOTUNNELS_SIGNUP_GLOBAL_BURST` | `1` | Burst across the whole instance. |
 
+## Sign-in attempt rate limit
+
+Password login, passkey login (begin and finish), and TOTP confirm/disable
+share one limiter: per hashed client IP for unauthenticated calls, per user
+for the TOTP calls. It makes brute-forcing a password or a six-digit code
+impractical. An interval of `0` disables it.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `GOTUNNELS_AUTH_ATTEMPT_INTERVAL` | `6s` | Sustained rate: one attempt per interval per client. |
+| `GOTUNNELS_AUTH_ATTEMPT_BURST` | `10` | Attempts allowed back to back before the rate applies. |
+
+## Maintenance
+
+A background janitor runs at startup and then every interval: it deletes
+expired WebAuthn ceremonies and prunes the readiness-probe history and CSP
+reports older than their retention. A retention of `0` keeps that table
+forever.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `GOTUNNELS_MAINTENANCE_INTERVAL` | `1h` | How often the janitor runs (must be positive). |
+| `GOTUNNELS_HEALTH_LOG_RETENTION` | `168h` | Age after which `health_check_log` rows are deleted. |
+| `GOTUNNELS_CSP_REPORT_RETENTION` | `720h` | Age after which `csp_reports` rows are deleted. |
+
 ## Content Security Policy (central)
 
 | Variable | Default | Meaning |
@@ -148,5 +178,5 @@ naming and the test toolchain:
 | Variable | Meaning |
 | --- | --- |
 | `GOTUNNELS_PROJECT` | Explicit Compose project name (else derived from the instance id or generated). |
-| `GO_IMAGE` | Go image used by `scripts/test.sh` when no host Go toolchain is present (default `golang:1.27-bookworm`). |
+| `GO_IMAGE` | Go image used by `scripts/test.sh` when no host Go toolchain is present (default `golang:1.27-trixie`). |
 | `CR` / `COMPOSE` | Override the detected container runtime / compose command. |

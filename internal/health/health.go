@@ -5,6 +5,7 @@
 package health
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -45,10 +46,16 @@ func (h *Handler) Live(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// probeTimeout bounds both the readiness ping and its history write, so a
+// wedged database produces a prompt 503 rather than a hung probe.
+const probeTimeout = 2 * time.Second
+
 // Ready reports readiness by probing the database and logging the result.
 func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), probeTimeout)
+	defer cancel()
 	start := time.Now()
-	err := h.store.Ping(r.Context())
+	err := h.store.Ping(ctx)
 	latencyMs := float64(time.Since(start).Microseconds()) / 1000.0
 
 	status := "ok"
@@ -61,7 +68,7 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Best-effort history write; never let logging failure change the verdict.
-	if logErr := h.store.InsertHealthCheck(r.Context(), "database", status, latencyMs, detail); logErr != nil {
+	if logErr := h.store.InsertHealthCheck(ctx, "database", status, latencyMs, detail); logErr != nil {
 		h.log.WarnContext(r.Context(), "record health check", slog.String("error", logErr.Error()))
 	}
 

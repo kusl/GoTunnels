@@ -126,11 +126,11 @@ func CORS(allowed []string, allowAny bool) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
+			w.Header().Add("Vary", "Origin")
 			if echo, ok := OriginAllowed(allowed, allowAny, origin); ok {
 				h := w.Header()
 				h.Set("Access-Control-Allow-Origin", echo)
 				h.Set("Access-Control-Allow-Credentials", "true")
-				h.Add("Vary", "Origin")
 				h.Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 				h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 				h.Set("Access-Control-Max-Age", "600")
@@ -148,13 +148,18 @@ func CORS(allowed []string, allowAny bool) Middleware {
 // Request ID
 // ---------------------------------------------------------------------------
 
-// RequestID attaches a request identifier (reusing an inbound X-Request-Id when
-// present) to the context and response headers.
+// maxRequestIDLen bounds an inbound X-Request-Id we are willing to adopt.
+const maxRequestIDLen = 128
+
+// RequestID attaches a request identifier to the context and response
+// headers. A well-formed inbound X-Request-Id is reused so traces correlate
+// across hops; anything oversized or containing characters outside
+// [A-Za-z0-9._:-] is replaced, so client input cannot inject into logs.
 func RequestID() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			id := r.Header.Get("X-Request-Id")
-			if id == "" {
+			if !validRequestID(id) {
 				id = newID()
 			}
 			w.Header().Set("X-Request-Id", id)
@@ -172,6 +177,22 @@ func RequestIDFromContext(ctx context.Context) string {
 	return ""
 }
 
+func validRequestID(id string) bool {
+	if id == "" || len(id) > maxRequestIDLen {
+		return false
+	}
+	for i := 0; i < len(id); i++ {
+		c := id[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		case c == '.' || c == '_' || c == ':' || c == '-':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 func newID() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
@@ -185,11 +206,16 @@ func newID() string {
 // ---------------------------------------------------------------------------
 
 // Recoverer converts panics into a 500 response and logs them.
+// http.ErrAbortHandler is re-panicked: it is the standard library's signal to
+// abort the response silently and must reach net/http untouched.
 func Recoverer(log *slog.Logger) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if rec := recover(); rec != nil {
+					if rec == http.ErrAbortHandler {
+						panic(rec)
+					}
 					log.ErrorContext(r.Context(), "panic recovered",
 						slog.Any("panic", rec),
 						slog.String("path", r.URL.Path),
@@ -198,6 +224,26 @@ func Recoverer(log *slog.Logger) Middleware {
 					WriteError(w, http.StatusInternalServerError, "internal server error")
 				}
 			}()
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Security headers
+// ---------------------------------------------------------------------------
+
+// SecurityHeaders marks every API response as non-sniffable, non-cacheable
+// JSON with no referrer leakage. Responses carry session tokens and personal
+// data, so no intermediary or browser cache may keep them.
+func SecurityHeaders() Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := w.Header()
+			h.Set("X-Content-Type-Options", "nosniff")
+			h.Set("Referrer-Policy", "no-referrer")
+			h.Set("Cache-Control", "no-store")
+			h.Set("Cross-Origin-Resource-Policy", "cross-origin")
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -218,13 +264,20 @@ func Instrument(h http.Handler, operation string) http.Handler {
 // Rate limiting (token bucket per key)
 // ---------------------------------------------------------------------------
 
+// sweepInterval is how often the limiter drops buckets that have refilled to
+// capacity. A full bucket is indistinguishable from a missing one, so
+// dropping it changes no decision while keeping memory bounded by the number
+// of recently active keys.
+const sweepInterval = time.Minute
+
 // RateLimiter is a simple per-key token-bucket limiter safe for concurrent use.
 type RateLimiter struct {
-	mu       sync.Mutex
-	buckets  map[string]*bucket
-	rate     float64 // tokens per second
-	capacity float64
-	now      func() time.Time // injectable clock for tests
+	mu        sync.Mutex
+	buckets   map[string]*bucket
+	rate      float64
+	capacity  float64
+	now       func() time.Time
+	lastSweep time.Time
 }
 
 type bucket struct {
@@ -250,22 +303,46 @@ func (rl *RateLimiter) Allow(key string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 	now := rl.now()
+	rl.sweep(now)
 	b, ok := rl.buckets[key]
 	if !ok {
 		rl.buckets[key] = &bucket{tokens: rl.capacity - 1, last: now}
 		return true
 	}
-	elapsed := now.Sub(b.last).Seconds()
-	b.tokens += elapsed * rl.rate
-	if b.tokens > rl.capacity {
-		b.tokens = rl.capacity
-	}
+	b.tokens = rl.refill(b, now)
 	b.last = now
 	if b.tokens >= 1 {
 		b.tokens--
 		return true
 	}
 	return false
+}
+
+// Len reports how many keys are currently tracked.
+func (rl *RateLimiter) Len() int {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	return len(rl.buckets)
+}
+
+func (rl *RateLimiter) refill(b *bucket, now time.Time) float64 {
+	t := b.tokens + now.Sub(b.last).Seconds()*rl.rate
+	if t > rl.capacity {
+		t = rl.capacity
+	}
+	return t
+}
+
+func (rl *RateLimiter) sweep(now time.Time) {
+	if now.Sub(rl.lastSweep) < sweepInterval {
+		return
+	}
+	rl.lastSweep = now
+	for k, b := range rl.buckets {
+		if rl.refill(b, now) >= rl.capacity {
+			delete(rl.buckets, k)
+		}
+	}
 }
 
 // LimitByIP returns middleware that rate-limits using a key derived from the
@@ -309,6 +386,16 @@ func WriteError(w http.ResponseWriter, status int, msg string) {
 	WriteJSON(w, status, map[string]string{"error": msg})
 }
 
+// ServerError logs err with the request id and writes a generic 500, so
+// internal details never reach the client.
+func ServerError(w http.ResponseWriter, r *http.Request, log *slog.Logger, msg string, err error) {
+	log.ErrorContext(r.Context(), msg,
+		slog.String("error", err.Error()),
+		slog.String("request_id", RequestIDFromContext(r.Context())),
+	)
+	WriteError(w, http.StatusInternalServerError, "internal server error")
+}
+
 // DecodeJSON reads a size-limited JSON body into dst, writing a 400 and
 // returning false on failure. maxBytes <= 0 defaults to 1 MiB.
 func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64) bool {
@@ -316,7 +403,12 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64)
 		maxBytes = 1 << 20
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
-	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(dst); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid JSON body")
+		return false
+	}
+	if dec.More() {
 		WriteError(w, http.StatusBadRequest, "invalid JSON body")
 		return false
 	}

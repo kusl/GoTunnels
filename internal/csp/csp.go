@@ -241,6 +241,11 @@ func NewHandler(s *store.Store, log *slog.Logger, pepper []byte) *Handler {
 	return &Handler{store: s, log: log, pepper: pepper}
 }
 
+const (
+	maxReportsPerRequest = 20
+	maxUserAgentLen      = 512
+)
+
 // ServeHTTP accepts a report POST. It always responds 204 once the body is
 // read (a report endpoint should never give an attacker signal), but still
 // logs and stores what it can.
@@ -259,8 +264,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(reports) > maxReportsPerRequest {
+		reports = reports[:maxReportsPerRequest]
+	}
 	ipHash := activity.HashIP(h.pepper, activity.ClientIP(r))
-	ua := r.UserAgent()
+	ua := truncateRunes(r.UserAgent(), maxUserAgentLen)
 	for i := range reports {
 		reports[i].IPHash = ipHash
 		reports[i].UserAgent = ua
@@ -317,8 +325,7 @@ func (h *Handler) Recent(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := h.store.ListRecentCSPReports(r.Context(), limit)
 	if err != nil {
-		h.log.ErrorContext(r.Context(), "csp: list recent", slog.String("error", err.Error()))
-		httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
+		httpx.ServerError(w, r, h.log, "csp: list recent", err)
 		return
 	}
 	if rows == nil {

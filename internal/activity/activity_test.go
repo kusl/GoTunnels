@@ -60,3 +60,15 @@ func TestClientIPFallsBackToRemoteAddr(t *testing.T) {
 		t.Fatalf("ClientIP = %q, want host from RemoteAddr", got)
 	}
 }
+
+func TestTruncate(t *testing.T) {
+	if got := truncate("héllo", 3); got != "hél" {
+		t.Fatalf("truncate = %q", got)
+	}
+	if got := truncate("ok", 10); got != "ok" {
+		t.Fatalf("truncate = %q", got)
+	}
+	if got := truncate("a\xffb", 10); got != "ab" {
+		t.Fatalf("invalid UTF-8 must be dropped, got %q", got)
+	}
+}

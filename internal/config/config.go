@@ -9,8 +9,8 @@ package config
 import (
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -80,6 +80,22 @@ type Config struct {
 	SignupGlobalInterval time.Duration
 	SignupGlobalBurst    int
 
+	// Authentication attempt rate limit ----------------------------------
+	// Password login, passkey login, and TOTP confirm/disable are limited to
+	// one attempt per AuthAttemptInterval per client (hashed IP, or user for
+	// authenticated TOTP calls), with AuthAttemptBurst of headroom. Brute
+	// forcing a password or a 6-digit code becomes impractical. Zero disables.
+	AuthAttemptInterval time.Duration
+	AuthAttemptBurst    int
+
+	// Maintenance ---------------------------------------------------------
+	// A background janitor deletes expired WebAuthn ceremonies and prunes
+	// health_check_log and csp_reports older than their retention. A zero
+	// retention keeps that table forever.
+	MaintenanceInterval time.Duration
+	HealthLogRetention  time.Duration
+	CSPReportRetention  time.Duration
+
 	// Telemetry host identity ---------------------------------------------
 	// HostName becomes the OTel resource attribute host.name. Inside a
 	// container os.Hostname() is the container ID, so scripts/up.sh passes
@@ -121,33 +137,44 @@ type TelemetryConfig struct {
 	MetricsHistogram string
 }
 
-// Load reads and validates configuration from the environment.
+// Load reads and validates configuration from the environment. A variable
+// that is set but cannot be parsed is an error, never a silent fallback to the
+// default: "GOTUNNELS_SESSION_TTL=7days" must not quietly mean "never".
 func Load() (*Config, error) {
+	e := &env{}
 	c := &Config{
-		InstanceID:           getenv("GOTUNNELS_INSTANCE_ID", defaultInstanceID()),
-		ServiceName:          getenv("OTEL_SERVICE_NAME", getenv("GOTUNNELS_SERVICE_NAME", "gotunnels-api")),
-		Version:              getenv("GOTUNNELS_VERSION", "dev"),
-		HTTPAddr:             getenv("GOTUNNELS_HTTP_ADDR", ":8080"),
-		ShutdownTimeout:      getdur("GOTUNNELS_SHUTDOWN_TIMEOUT", 15*time.Second),
-		DatabaseURL:          getenv("DATABASE_URL", ""),
-		DBMaxConns:           int32(getint("GOTUNNELS_DB_MAX_CONNS", 20)),
-		DBMinConns:           int32(getint("GOTUNNELS_DB_MIN_CONNS", 2)),
-		DBConnectTimeout:     getdur("GOTUNNELS_DB_CONNECT_TIMEOUT", 30*time.Second),
-		SessionCookieName:    getenv("GOTUNNELS_SESSION_COOKIE_NAME", "gotunnels_session"),
-		SessionTTL:           getdur("GOTUNNELS_SESSION_TTL", 0), // 0 = never expires (see field doc)
-		CORSAllowedOrigins:   splitList(getenv("GOTUNNELS_CORS_ALLOWED_ORIGINS", "*")),
-		RPID:                 getenv("GOTUNNELS_RP_ID", "localhost"),
-		RPDisplayName:        getenv("GOTUNNELS_RP_DISPLAY_NAME", "GoTunnels"),
-		RPOrigins:            splitList(getenv("GOTUNNELS_RP_ORIGINS", "http://localhost:8080")),
-		RPOriginPatterns:     splitList(getenv("GOTUNNELS_RP_ORIGIN_PATTERNS", "https://*.trycloudflare.com")),
-		SignupIPInterval:     getdur("GOTUNNELS_SIGNUP_IP_INTERVAL", 5*time.Minute),
-		SignupIPBurst:        getint("GOTUNNELS_SIGNUP_IP_BURST", 1),
-		SignupGlobalInterval: getdur("GOTUNNELS_SIGNUP_GLOBAL_INTERVAL", time.Minute),
-		SignupGlobalBurst:    getint("GOTUNNELS_SIGNUP_GLOBAL_BURST", 1),
-		HostName:             getenv("GOTUNNELS_HOST_NAME", ""),
-		CSPMode:              getenv("GOTUNNELS_CSP_MODE", "report-only"),
-		CSPPolicy:            getenv("GOTUNNELS_CSP_POLICY", DefaultCSPPolicy),
-		Dev:                  getbool("GOTUNNELS_DEV", false),
+		InstanceID:           e.str("GOTUNNELS_INSTANCE_ID", defaultInstanceID()),
+		ServiceName:          e.str("OTEL_SERVICE_NAME", e.str("GOTUNNELS_SERVICE_NAME", "gotunnels-api")),
+		Version:              e.str("GOTUNNELS_VERSION", "dev"),
+		HTTPAddr:             e.str("GOTUNNELS_HTTP_ADDR", ":8080"),
+		ShutdownTimeout:      e.dur("GOTUNNELS_SHUTDOWN_TIMEOUT", 15*time.Second),
+		DatabaseURL:          e.str("DATABASE_URL", ""),
+		DBMaxConns:           e.int32("GOTUNNELS_DB_MAX_CONNS", 20),
+		DBMinConns:           e.int32("GOTUNNELS_DB_MIN_CONNS", 2),
+		DBConnectTimeout:     e.dur("GOTUNNELS_DB_CONNECT_TIMEOUT", 30*time.Second),
+		SessionCookieName:    e.str("GOTUNNELS_SESSION_COOKIE_NAME", "gotunnels_session"),
+		SessionTTL:           e.dur("GOTUNNELS_SESSION_TTL", 0),
+		CORSAllowedOrigins:   splitList(e.str("GOTUNNELS_CORS_ALLOWED_ORIGINS", "*")),
+		RPID:                 e.str("GOTUNNELS_RP_ID", "localhost"),
+		RPDisplayName:        e.str("GOTUNNELS_RP_DISPLAY_NAME", "GoTunnels"),
+		RPOrigins:            splitList(e.str("GOTUNNELS_RP_ORIGINS", "http://localhost:8080")),
+		RPOriginPatterns:     splitList(e.str("GOTUNNELS_RP_ORIGIN_PATTERNS", "https://*.trycloudflare.com")),
+		SignupIPInterval:     e.dur("GOTUNNELS_SIGNUP_IP_INTERVAL", 5*time.Minute),
+		SignupIPBurst:        e.int("GOTUNNELS_SIGNUP_IP_BURST", 1),
+		SignupGlobalInterval: e.dur("GOTUNNELS_SIGNUP_GLOBAL_INTERVAL", time.Minute),
+		SignupGlobalBurst:    e.int("GOTUNNELS_SIGNUP_GLOBAL_BURST", 1),
+		AuthAttemptInterval:  e.dur("GOTUNNELS_AUTH_ATTEMPT_INTERVAL", 6*time.Second),
+		AuthAttemptBurst:     e.int("GOTUNNELS_AUTH_ATTEMPT_BURST", 10),
+		MaintenanceInterval:  e.dur("GOTUNNELS_MAINTENANCE_INTERVAL", time.Hour),
+		HealthLogRetention:   e.dur("GOTUNNELS_HEALTH_LOG_RETENTION", 7*24*time.Hour),
+		CSPReportRetention:   e.dur("GOTUNNELS_CSP_REPORT_RETENTION", 30*24*time.Hour),
+		HostName:             e.str("GOTUNNELS_HOST_NAME", ""),
+		CSPMode:              e.str("GOTUNNELS_CSP_MODE", "report-only"),
+		CSPPolicy:            e.str("GOTUNNELS_CSP_POLICY", DefaultCSPPolicy),
+		Dev:                  e.bool("GOTUNNELS_DEV", false),
+	}
+	if err := e.err(); err != nil {
+		return nil, err
 	}
 
 	if err := c.resolveSecrets(); err != nil {
@@ -213,10 +240,10 @@ func (c *Config) resolveTelemetry() {
 	// comparisons elsewhere are simple and either casing works.
 	tc := TelemetryConfig{
 		Headers:     map[string]string{},
-		Compression: strings.ToLower(getenv("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip")),
-		MetricsTemporality: strings.ToLower(getenv(
+		Compression: strings.ToLower(envStr("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip")),
+		MetricsTemporality: strings.ToLower(envStr(
 			"OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", "delta")),
-		MetricsHistogram: strings.ToLower(getenv(
+		MetricsHistogram: strings.ToLower(envStr(
 			"OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION",
 			"base2_exponential_bucket_histogram")),
 	}
@@ -266,6 +293,24 @@ func (c *Config) Validate() error {
 	if c.SignupGlobalInterval > 0 && c.SignupGlobalBurst < 1 {
 		return fmt.Errorf("config: GOTUNNELS_SIGNUP_GLOBAL_BURST must be >= 1 when the global limiter is enabled")
 	}
+	if c.AuthAttemptInterval < 0 {
+		return fmt.Errorf("config: GOTUNNELS_AUTH_ATTEMPT_INTERVAL must not be negative")
+	}
+	if c.AuthAttemptInterval > 0 && c.AuthAttemptBurst < 1 {
+		return fmt.Errorf("config: GOTUNNELS_AUTH_ATTEMPT_BURST must be >= 1 when the auth limiter is enabled")
+	}
+	if c.DBMaxConns < 1 {
+		return fmt.Errorf("config: GOTUNNELS_DB_MAX_CONNS must be >= 1")
+	}
+	if c.DBMinConns < 0 || c.DBMinConns > c.DBMaxConns {
+		return fmt.Errorf("config: GOTUNNELS_DB_MIN_CONNS must be between 0 and GOTUNNELS_DB_MAX_CONNS")
+	}
+	if c.MaintenanceInterval <= 0 {
+		return fmt.Errorf("config: GOTUNNELS_MAINTENANCE_INTERVAL must be positive")
+	}
+	if c.HealthLogRetention < 0 || c.CSPReportRetention < 0 {
+		return fmt.Errorf("config: retention periods must not be negative (0 keeps rows forever)")
+	}
 	return nil
 }
 
@@ -299,38 +344,79 @@ func (c *Config) CORSAllowsAny() bool {
 // small env helpers
 // ---------------------------------------------------------------------------
 
-func getenv(key, def string) string {
-	if v, ok := os.LookupEnv(key); ok && v != "" {
+// env reads typed values and collects every parse failure so Load can report
+// all misconfigurations at once.
+type env struct {
+	errs []error
+}
+
+func (e *env) err() error { return errors.Join(e.errs...) }
+
+// raw returns the trimmed value and whether the variable is set to anything
+// at all. A whitespace-only value counts as set, so it can deliberately clear
+// a list setting such as GOTUNNELS_RP_ORIGIN_PATTERNS.
+func (e *env) raw(key string) (string, bool) {
+	v, ok := os.LookupEnv(key)
+	return strings.TrimSpace(v), ok && v != ""
+}
+
+func (e *env) str(key, def string) string {
+	if v, ok := e.raw(key); ok {
 		return v
 	}
 	return def
 }
 
-func getint(key string, def int) int {
-	if v, ok := os.LookupEnv(key); ok && v != "" {
-		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
-			return n
-		}
+func (e *env) int(key string, def int) int {
+	v, ok := e.raw(key)
+	if !ok {
+		return def
 	}
-	return def
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		e.errs = append(e.errs, fmt.Errorf("config: %s=%q is not an integer", key, v))
+		return def
+	}
+	return n
 }
 
-func getbool(key string, def bool) bool {
-	if v, ok := os.LookupEnv(key); ok && v != "" {
-		if b, err := strconv.ParseBool(strings.TrimSpace(v)); err == nil {
-			return b
-		}
+func (e *env) int32(key string, def int32) int32 {
+	v, ok := e.raw(key)
+	if !ok {
+		return def
 	}
-	return def
+	n, err := strconv.ParseInt(v, 10, 32)
+	if err != nil {
+		e.errs = append(e.errs, fmt.Errorf("config: %s=%q is not a 32-bit integer", key, v))
+		return def
+	}
+	return int32(n)
 }
 
-func getdur(key string, def time.Duration) time.Duration {
-	if v, ok := os.LookupEnv(key); ok && v != "" {
-		if d, err := time.ParseDuration(strings.TrimSpace(v)); err == nil {
-			return d
-		}
+func (e *env) bool(key string, def bool) bool {
+	v, ok := e.raw(key)
+	if !ok {
+		return def
 	}
-	return def
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		e.errs = append(e.errs, fmt.Errorf("config: %s=%q is not a boolean", key, v))
+		return def
+	}
+	return b
+}
+
+func (e *env) dur(key string, def time.Duration) time.Duration {
+	v, ok := e.raw(key)
+	if !ok {
+		return def
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		e.errs = append(e.errs, fmt.Errorf("config: %s=%q is not a duration (use Go syntax such as 90s, 15m, 168h)", key, v))
+		return def
+	}
+	return d
 }
 
 // splitList parses a comma-or-space separated list, trimming empties.
@@ -401,19 +487,6 @@ func mustRandom(n int) []byte {
 	return b
 }
 
-// DecodeKeyMaterial is a helper exposed for tests and tooling: it accepts hex,
-// base64 (std or url), or raw bytes and returns them. Unused by Load directly
-// but kept for completeness where callers want exact-length keys.
-func DecodeKeyMaterial(s string) ([]byte, error) {
-	s = strings.TrimSpace(s)
-	if b, err := hex.DecodeString(s); err == nil && len(s)%2 == 0 {
-		return b, nil
-	}
-	if b, err := base64.StdEncoding.DecodeString(s); err == nil {
-		return b, nil
-	}
-	if b, err := base64.RawURLEncoding.DecodeString(s); err == nil {
-		return b, nil
-	}
-	return []byte(s), nil
+func envStr(key, def string) string {
+	return (&env{}).str(key, def)
 }
