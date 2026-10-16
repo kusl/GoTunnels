@@ -2015,3 +2015,286 @@ the passkeys won't work on a different subdomain anyway
 also don't worry about the github PAT or dsn 
 stop bothering me about those
 please continue 
+
+
+/
+Please review the full dump
+update any dependency 
+any github action
+anything that needs updating 
+review all source code 
+fix any defect 
+and use the best engineering practices and solid principles 
+follow all instructions
+
+Ran 49 commands, read memory
+Extracting files from the dump into a working repo.
+Debugging a stray blank line in script output formatting.
+Investigating unexpected blank lines in the file dump.
+Finding a way to install Go without direct repository access.
+Checking software version numbers against current releases.
+Checking version tags for the logging module release.
+Resolving dependency versions for a webauthn upgrade.
+Clarifying how commenting guidance applies to the final code.
+Setting up a sandbox build environment with updated module settings.
+Resolving missing module dependencies in the package graph.
+Mapping vanity modules to unversioned replace directives.
+Checking webauthn library version compatibility and credential format changes.
+Checking session data compatibility for short-lived pending flows.
+Tracking down a bug causing unintended user logouts.
+Auditing TOTP enrollment for secret-overwrite bugs.
+Auditing authentication code for security vulnerabilities.
+Investigating how a stolen session can silently disable two-factor security.
+Simplifying username comparisons for consistent case handling.
+Investigating silent failures in environment config parsing.
+Reviewing the code for security and correctness issues.
+Figuring out which Unicode control characters to reject.
+Investigating unbounded growth in the health check log table.
+Preventing race conditions across concurrent migration instances.
+Checking which semantic conventions version the dependency actually supports.
+Checking Docker base images for outdated version tags.
+Reviewing dependency versions and base image updates in a script.
+Checking for the latest available curl image version.
+Debugging a missing import causing a reference error.
+I hit the tool limit before I could produce the full delivery, so this is a partial result. Below are the two files I can safely hand over now, the defects I found, and what I still need to do. Nothing else has been changed yet.
+
+Ready now
+go.mod
+
+I bumped every dependency to its latest release and checked it in a sandbox with Go 1.27.2, using GitHub mirrors in place of the module proxy. go build, go vet and go test ./... all pass, including go-webauthn going from v0.11.2 to v0.18.2. That version reads your stored credential JSON correctly. The golang-jwt security-floor line is gone because webauthn v0.18.2 already requires the fixed jwt v5.3.1.
+
+module github.com/kusl/GoTunnels
+
+go 1.27.0
+
+require (
+	github.com/go-webauthn/webauthn v0.18.2
+	github.com/jackc/pgx/v5 v5.11.0
+	github.com/pquerna/otp v1.5.0
+	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
+	go.opentelemetry.io/otel v1.47.0
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.23.0
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.47.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.47.0
+	go.opentelemetry.io/otel/log v1.47.0
+	go.opentelemetry.io/otel/metric v1.47.0
+	go.opentelemetry.io/otel/sdk v1.47.0
+	go.opentelemetry.io/otel/sdk/log v1.47.0
+	go.opentelemetry.io/otel/sdk/metric v1.47.0
+	go.opentelemetry.io/otel/trace v1.47.0
+	golang.org/x/crypto v0.58.0
+)
+frontend/js/common.js
+
+The only change is the import line. resolveSession() calls clearToken(), but the file never imported it. So on a 401 the page threw a ReferenceError instead of clearing the dead token and sending you to /login. Below are the old line and its replacement; the rest of the file is unchanged.
+
+js
+import { Api, getToken, TOKEN_KEY } from "./api.js";
+becomes
+
+js
+import { Api, clearToken, getToken, TOKEN_KEY } from "./api.js";
+Defects found, not yet fixed
+Security:
+
+RequireAuth returns 401 on any database error, not just a missing session. The frontend treats 401 as “logged out,” so a database blip logs users out against their will. It should return 503 for anything other than not-found.
+Login ignores errors from totpEnabled. If that lookup fails, the second factor is skipped entirely and login succeeds with just the password.
+TOTPEnroll works on an account that already has TOTP on. It resets the account to unconfirmed and replaces the recovery codes, so anyone with a stolen session can silently turn off 2FA. It should return 409 until TOTP is disabled first.
+TOTP codes can be reused within their window. The fix needs a new migration 0009 with a last_used_step column.
+Login, passkey login and TOTP endpoints have no rate limit, so passwords and TOTP codes can be brute-forced.
+WebAuthn flows aren’t single-use. They are only deleted after success; they should be deleted at the moment they are used.
+Passkey signup and password signup each do two writes without a transaction. If the second write fails, an account exists with no credential and its username is taken for good.
+Robustness:
+8. The rate limiter never forgets a key, so its memory grows forever.
+9. Database tables grow forever. Expired webauthn_flows rows are never deleted, and every /readyz call adds a health_check_log row. csp_reports has no retention either. I plan a small cleanup job with configurable retention.
+10. Activity logging stores an unlimited username and user agent, so a failed login can write up to 1 MiB into the audit log. Display names are also unlimited.
+11. Bad config values are silently replaced with defaults. For example, GOTUNNELS_SESSION_TTL=7days quietly becomes “never expires.” Load should fail instead.
+12. Migrations don’t lock, so two API instances starting at once can race. They need a Postgres advisory lock.
+13. /readyz has no timeout on its database ping and log write.
+14. Middleware:
+- an incoming X-Request-Id is used unchecked;
+- Vary: Origin is only sent on allowed origins;
+- Recoverer swallows http.ErrAbortHandler;
+- API responses have no nosniff or Cache-Control: no-store, which matters for responses carrying tokens.
+15. Note validation claims to block terminal-escape and zero-width characters but doesn’t. C1 controls like CSI (U+009B) and bidi overrides get through. ZWJ must stay allowed for emoji.
+16. Telemetry:
+- the hand-written MultiHandler stops if the stdout handler errors, and Go 1.26+ has slog.NewMultiHandler, so I’d delete internal/telemetry/multihandler.go and its test;
+- fallback() leaks providers that were already started;
+- semconv is at v1.27.0 and should be v1.43.0.
+17. The same serverError helper is copied into four packages; it should live once in httpx.
+
+Infrastructure:
+
+Base images:
+golang:1.27-bookworm should move to -trixie;
+distroless/static-debian12 should move to -debian13;
+cloudflared:latest should be pinned to 2026.10.1;
+the curl image in the CI test is 8.10.1 and is stale.
+Postgres stays on 16, because a major-version jump would break existing data volumes.
+Dependabot should also watch compose.yaml (the docker-compose ecosystem).
+test.sh should fail on unformatted Go code (a gofmt -l check).
+GitHub Actions (checkout@v7, setup-go@v7) are already current.
+Next turn
+If you say “continue,” I’ll make all of the above changes, add tests for them, and run gofmt, vet, tests, node --check, shellcheck and the YAML checks. You’ll get one tar.gz with every changed file in full, updated docs, and an explicit list of files to delete.
+
+Still outstanding from last time: delete frontend/js/csp.js, and rotate the PAT and the Uptrace DSN.
+
+please continue
+
+Ran 7 commands
+Checking whether the project files persisted beforehand.
+Checking the default primary key setup for the users table.
+Simplifying a contrived slice expression in test code.
+Claude’s response was interrupted.
+I must stop to correct you here 
+ALWAYS update to the latest stable 
+do not worry about preserving existing data 
+this code is transient by nature 
+there is no expectation of migrating existing data 
+if necessary tell me how to delete existing volumes to create new ones 
+in fact add it to your workflow 
+because we use try cloudflare 
+every single time we deploy 
+we can build fresh from scratch
+the passkeys won't work on a different subdomain anyway 
+also don't worry about the github PAT or dsn 
+stop bothering me about those
+please continue
+
+Ran 35 commands, updated 2 memories, shared files
+The full project is in gotunnels.tar.gz. Go build, vet, gofmt and all unit tests pass on Go 1.27.2. I couldn’t run podman here, so the container smoke test and the SQL changes have not run against a real Postgres yet. The first CI run of containers will be the real check.
+
+Apply
+
+bash
+cd ~/src/golang/GoTunnels
+tar -xzf /path/to/gotunnels.tar.gz
+git rm internal/telemetry/multihandler.go internal/telemetry/multihandler_test.go
+Delete these files
+
+internal/telemetry/multihandler.go
+internal/telemetry/multihandler_test.go
+The standard library’s slog.NewMultiHandler replaces them.
+
+Fresh deploys are now automatic. scripts/up.sh starts every run by removing the instance’s containers, network and database volume. It then pulls the latest images and rebuilds. Your first run after this update also needs that wipe, because Postgres 18 stores its data in a different place than 16. If an interrupted run leaves leftovers, the manual cleanup is in the README under “Starting over by hand”:
+
+bash
+./scripts/down.sh gotunnels
+podman ps -a --filter label=com.docker.compose.project=gotunnels -q | xargs -r podman rm -f --depend
+podman volume ls -q --filter label=com.docker.compose.project=gotunnels | xargs -r podman volume rm -f
+Updates
+
+Go modules:
+webauthn v0.18.2
+pgx v5.11.0
+otp v1.5.0
+OpenTelemetry v1.47.0, with the logs packages now at their first stable release
+otelhttp v0.72.0
+otelslog v0.21.0
+x/crypto v0.58.0
+semconv v1.43.0
+The jwt security pin is dropped because webauthn now requires the fixed version.
+Images:
+Postgres 18
+golang:1.27-trixie
+distroless debian13
+cloudflared 2026.10.1
+curl 8.23.0
+Dependabot now also watches compose.yaml.
+GitHub Actions were already on the latest versions, so they are unchanged.
+Security fixes
+
+Database errors no longer log people out. A database error during a session check now returns 503 instead of 401, so the browser keeps its token.
+TOTP can’t be skipped or stripped:
+A database error while checking TOTP now fails the login instead of skipping the second factor.
+Enrolling TOTP again on an account that already has it is refused, so a stolen session can’t remove the second factor.
+TOTP codes are single-use. New migration 0009 records the last accepted code.
+Rate limits and timing:
+Login, passkey login, and TOTP confirm/disable are now rate limited.
+Login takes the same time whether or not the username exists.
+Passkey ceremonies can each be finished only once.
+Account creation writes the user, role and first credential in a single transaction.
+Input checks:
+Notes now reject invisible control characters, the escape character, bidi overrides and zero-width characters. Emoji joiners still work.
+Display names are capped at 64 characters, and passwords at 1 KiB.
+API responses now send nosniff, no-store and no-referrer.
+Reliability fixes
+
+Session-check bug: common.js called clearToken() without importing it, so a revoked session was never cleared. A new test now checks that every frontend file imports the token helpers it uses; I confirmed it fails on the old file.
+Bounded growth: the rate limiters now drop idle keys. A background cleanup job deletes expired passkey ceremonies and trims old health-check and CSP-report rows (retention is configurable).
+Startup:
+Two API instances can no longer run migrations at the same time.
+A malformed setting such as GOTUNNELS_SESSION_TTL=7days now stops startup with an error instead of silently falling back.
+The readiness check has a 2-second timeout.
+Frontend: “log out everywhere” no longer claims success when the request failed.
+Code cleanup:
+The repeated server-error helper now lives in one place.
+Telemetry no longer leaves exporters running if setup fails partway.
+CI: now checks gofmt. The container smoke test now also covers login, /me, logout revoking a token, the security headers and TOTP enrollment.
+The docs (README, ARCHITECTURE.md, CONFIGURATION.md, .env.example) are updated to match.
+
+
+Gotunnels.tar
+GZ 
+
+
+
+Claude is AI and can make mistakes. Please double-check responses.
+
+
+Claude finished the response
+
+37
+48
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
