@@ -122,14 +122,14 @@ services:
     restart: unless-stopped
 
   cloudflared-frontend:
-    image: docker.io/cloudflare/cloudflared:2026.10.1
+    image: docker.io/cloudflare/cloudflared:2026.10.3
     depends_on:
       - frontend
     command: ["tunnel", "--no-autoupdate", "--url", "http://frontend:8080"]
     restart: unless-stopped
 
   cloudflared-api:
-    image: docker.io/cloudflare/cloudflared:2026.10.1
+    image: docker.io/cloudflare/cloudflared:2026.10.3
     # No depends_on for the same reason as the frontend service above:
     # cloudflared retries its upstream connection, so start order does not
     # matter, and a --requires link here would again block recreating the api
