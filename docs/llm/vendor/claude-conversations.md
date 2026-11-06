@@ -3198,3 +3198,403 @@ fetch("https://seeds-accepted-donate-lion.trycloudflare.com/favicon.ico", {
 
 
 
+Claude
+/
+I added the code but now I get a CORS error when trying to sign up 
+password or passkey doesn't matter 
+both fail 
+desktop or iPhone doesn't matter 
+both fail 
+curl --url 'https://walls-nodes-mothers-declare.trycloudflare.com/api/signup' \
+  -H 'sec-ch-ua-platform: "Linux"' \
+  -H 'Referer;' \
+  -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36' \
+  -H 'Accept: application/json' \
+  -H 'sec-ch-ua: "Not-A.Brand";v="99", "Google Chrome";v="157", "Chromium";v="157"' \
+  -H 'Content-Type: application/json' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  --data-raw '{"username":"kus","display_name":"","password":"avocadotoast"}'
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/signup", {
+  "headers": {
+    "upgrade-insecure-requests": "1"
+  },
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/passkeys", {
+  "headers": {
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "accept-language": "en-US,en;q=0.9",
+    "priority": "u=0, i",
+    "upgrade-insecure-requests": "1"
+  },
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/signup", {
+  "headers": {
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "accept-language": "en-US,en;q=0.9",
+    "priority": "u=0, i",
+    "upgrade-insecure-requests": "1"
+  },
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/css/style.css", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/theme-boot.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/page-signup.js", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.9",
+    "priority": "u=1"
+  },
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/common.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/api.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/webauthn.js", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.9",
+    "priority": "u=1"
+  },
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/config.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/favicon.ico", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/config.json", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.9",
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "priority": "u=1, i"
+  },
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://walls-nodes-mothers-declare.trycloudflare.com/api/signup", {
+  "headers": {
+    "accept": "application/json",
+    "content-type": "application/json"
+  },
+  "referrer": "",
+  "body": "{\"username\":\"kus\",\"display_name\":\"\",\"password\":\"avocadotoast\"}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://walls-nodes-mothers-declare.trycloudflare.com/api/signup", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.9",
+    "priority": "u=1, i"
+  },
+  "body": null,
+  "method": "OPTIONS",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/css/style.css", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/theme-boot.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/page-passkeys.js", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.9",
+    "priority": "u=1"
+  },
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/common.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/api.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/webauthn.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/config.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/config.json", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.9",
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "priority": "u=1, i"
+  },
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/favicon.ico", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://walls-nodes-mothers-declare.trycloudflare.com/api/csp-reports/recent?limit=50", {
+  "headers": {
+    "accept": "application/json",
+    "accept-language": "en-US,en;q=0.9",
+    "priority": "u=1, i"
+  },
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/css/style.css", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/theme-boot.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/page-signup.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/common.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/api.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/webauthn.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/js/config.js", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+}); ;
+fetch("https://seeds-accepted-donate-lion.trycloudflare.com/favicon.ico", {
+  "referrer": "",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "omit"
+});
+
+Ran 49 commands, read memory
+Checking uploads and memory files for the CORS problem.
+Checking whether the API service keeps restarting.
+Trying module proxy and download options.
+Tracing the earlier failing run and its prompt.
+Checking the WebAuthn library's new configuration requirements.
+Tracing the crash to a dependency upgrade.
+Setting up the build and dependencies.
+Checking how a Go submodule resolves within the repo.
+Checking the module path and repository layout.
+Checking whether the old server process is still running.
+Checking which module tags hold the packages.
+Checking whether stale state caused the build error.
+Checking a dependency's checksum history.
+I haven’t found the fix yet, so there are no files to change this round. I’m fairly sure the CORS error is a side effect, though, and one log will tell us what the real problem is.
+
+The API container is crashing on startup. When nothing is running behind the API tunnel, Cloudflare returns its own error page. That page has no Access-Control-Allow-Origin header, so the browser reports it as a CORS failure. That fits both signup paths, desktop and iPhone all failing the same way.
+
+The clues are in docs/llm/vendor/virginia.txt from the gotunnels-7wggkw run:
+
+up.sh printed did not observe API listening log yet, so the API never logged http server listening within 60 seconds.
+podman ps -a shows gotunnels-7wggkw_api_1 created 2 minutes earlier but “Up Less than a second”. That means it keeps exiting and being restarted.
+The Oct 16 run (gotunnels-7yivoa) did the same thing and shows Exited (1). The last run that worked was ogz9jw.
+Between the working run and the first crash, three things changed: go-webauthn went from v0.11.2 to v0.18.2, Postgres went from 16 to 18, and Go went to 1.27. The newest commit also switched to encoding/json/v2, but the crash started before that, so it isn’t the original cause.
+
+I tried to build and run the API here to see the actual error, but my sandbox couldn’t put together the full Go module graph.
+
+Please run these on virginia and paste the output:
+
+bash
+podman logs gotunnels-7wggkw_api_1 2>&1 | tail -60
+podman inspect gotunnels-7wggkw_api_1 --format '{{.State.ExitCode}} {{.RestartCount}}'
+curl -sS -i https://walls-nodes-mothers-declare.trycloudflare.com/healthz | head -20
+The first command will show the fatal line that main.go logs before exiting, which names the failing step. The last one confirms whether the tunnel is serving a Cloudflare error page instead of the API.
+
+Once I have that error line, I’ll send the full files for the fix plus the matching doc updates. If you redeploy before then, run scripts/down.sh gotunnels-7wggkw first, since the containers from that run are still around.
+
+This response ended early.
+
+
+
+
+Claude is AI and can make mistakes. Please double-check responses.
+Claude finished the response
+
+49
+42
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
