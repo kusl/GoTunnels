@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-11-06T07:28:20-05:00
+  Generated at   : 2026-11-06T10:16:57-05:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,12 +17,12 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : cb4bce9ab9a8693ee1d3358d96acee5fbcf6d8d5
-  Commit (short) : cb4bce9
-  Commit date    : 2026-11-06 07:27:47 -0500
+  Commit (full)  : b17147909f7b252bc3ecd43d12200748ec752fe5
+  Commit (short) : b171479
+  Commit date    : 2026-11-06 10:16:47 -0500
   Commit message : add claude response
   Remote origin  : git@github.com:kusl/GoTunnels.git
-  Files included : 105
+  Files included : 107
   Excluded path  : docs/llm/
   Excluded files : yarn.lock
 
@@ -38,7 +38,7 @@ GIT WORKING TREE STATUS (first 20 lines)
   File name:             export.sh
   Relative path:         export.sh
   Size:                  16.6 KiB (17022 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   SHA-256:               542323f8128dfce4873eee0c14719b64363244b398ee99c4ad780a82ab240739
   MIME type:             text/x-shellscript
@@ -424,7 +424,7 @@ FOOTER
 mv -f "$TMP_FILE" "$OUTPUT_FILE"
 
 ################################################################################
-# FILE TREE  (all 105 included files)
+# FILE TREE  (all 107 included files)
 ################################################################################
 .
 .
@@ -496,6 +496,7 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 │   │   ├── config.go
 │   │   ├── config_test.go
 │   │   ├── csp_deployment_test.go
+│   │   ├── placeholder_test.go
 │   │   └── session_persistence_test.go
 │   ├── csp
 │   │   ├── csp.go
@@ -556,6 +557,7 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
     ├── lib.sh
     ├── run.sh
     ├── tests
+    │   ├── compose-defaults-test.sh
     │   └── lib-detect-test.sh
     ├── test.sh
     └── up.sh
@@ -570,10 +572,10 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   Relative path:         cmd/api/main.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/cmd/api/main.go
   Size:                  5.9 KiB (6049 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919049
+  Inode:                 69677878
   Hard links:            1
   MIME type:             text/x-c
   SHA-256:               39205f0ac37b1704907275c834c073415480b4934e1d4dece969cd07f1948eb9
@@ -796,10 +798,10 @@ func intervalLimiter(interval time.Duration, burst int) *httpx.RateLimiter {
   Relative path:         compose.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/compose.yaml
   Size:                  7.7 KiB (7963 bytes)
-  Last modified:         2026-10-16 10:59:43.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919050
+  Inode:                 69677879
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               7af4d0e05646e5d6b08ca7add33aec46af2efeba14396d8de1895cce9c965ee7
@@ -958,10 +960,10 @@ volumes:
   Relative path:         Containerfile.api
   Absolute path:         /home/kushal/src/golang/GoTunnels/Containerfile.api
   Size:                  758 B (758 bytes)
-  Last modified:         2026-10-16 10:59:43.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919043
+  Inode:                 69677872
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               5da27fb5633730a9e165510aa8c04e9c59ab0747058a08ff7b29e45c765cf615
@@ -1008,10 +1010,10 @@ ENTRYPOINT ["/api"]
   Relative path:         Containerfile.frontend
   Absolute path:         /home/kushal/src/golang/GoTunnels/Containerfile.frontend
   Size:                  1.5 KiB (1585 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919044
+  Inode:                 69677873
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               0bd885b147f3311d245faa17c1ca26e6b89d3309bf9656e729cb1d20a2ca1816
@@ -1058,10 +1060,10 @@ EXPOSE 8080
   Relative path:         .containerignore
   Absolute path:         /home/kushal/src/golang/GoTunnels/.containerignore
   Size:                  226 B (226 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919034
+  Inode:                 69677863
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               a2721997bdc613df9ee3e5a36de686a6c0fccb0d73d766512119a8dde5c49fa0
@@ -1096,10 +1098,10 @@ README.md
   Relative path:         docs/ARCHITECTURE.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/docs/ARCHITECTURE.md
   Size:                  21.5 KiB (22091 bytes)
-  Last modified:         2026-11-06 07:20:06.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650508
+  Inode:                 69677881
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               fecfbc45fd8adf17ab7cf5311bbd42a3f6bcc2112ad27cec138a150d64099356
@@ -1509,15 +1511,15 @@ also annotate their active span (batch sizes, note ids) so traces answer
   File name:             CONFIGURATION.md
   Relative path:         docs/CONFIGURATION.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/docs/CONFIGURATION.md
-  Size:                  10.0 KiB (10300 bytes)
-  Last modified:         2026-10-16 11:00:50.000000000 -0400
+  Size:                  10.7 KiB (11037 bytes)
+  Last modified:         2026-11-06 10:05:50.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919053
+  Inode:                 69677882
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               f42765d11ae80905f0a3f49ac96679ec389681e20eba6ca9561094fe413befab
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               aa4bdb25d40dc18522b14e39cb1cbda81e7757b8518f89b2f36c24e9b690ae2e
+  Last git commit:       b171479 2026-11-06 10:16:47 -0500 add claude response
 
 --- CONTENT ---
 # Configuration
@@ -1534,6 +1536,17 @@ in exactly one place — [`internal/config/config.go`](../internal/config/config
 Most values are generated for you by `scripts/up.sh` on first run and written to
 a gitignored `.env`. You only ever set variables by hand if you are bypassing
 the scripts. See also [`.env.example`](../.env.example).
+
+Defaults for everything the API and frontend read live in
+[`compose.yaml`](../compose.yaml) as `${NAME:-default}`. Before every compose
+command the scripts export each of those defaults whose variable is unset
+(`seed_compose_defaults` in `scripts/lib.sh`), so compose only ever substitutes
+variables that are set. This works around podman-compose before 1.6 (Debian
+trixie ships 1.3), which passes `"${NAME:-default}"` through literally when an
+environment entry references an unset variable of its own name. If you run
+compose directly instead of through the scripts, either use podman-compose 1.6+
+/ docker compose or set the variables yourself. The API refuses to start on any
+value that still contains `${`, and names the variable.
 
 ## Identity
 
@@ -1713,10 +1726,10 @@ naming and the test toolchain:
   Relative path:         .env.example
   Absolute path:         /home/kushal/src/golang/GoTunnels/.env.example
   Size:                  5.3 KiB (5433 bytes)
-  Last modified:         2026-10-16 11:00:55.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919035
+  Inode:                 69677864
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               09f2d82234d2b8c002fd2a66db148ad6f4a1c7c9da0b17c10f538f61d80019c2
@@ -1838,10 +1851,10 @@ GOTUNNELS_DEV=false
   Relative path:         export.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/export.sh
   Size:                  16.6 KiB (17022 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919054
+  Inode:                 69677900
   Hard links:            1
   MIME type:             text/x-shellscript
   SHA-256:               542323f8128dfce4873eee0c14719b64363244b398ee99c4ad780a82ab240739
@@ -2237,10 +2250,10 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   Relative path:         frontend/activity.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/activity.html
   Size:                  1.7 KiB (1802 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919057
+  Inode:                 69677903
   Hard links:            1
   MIME type:             text/html
   SHA-256:               6fdc169985f8d7c70ce635e9a217734f9adb0c7647fe27b2763424fb095a0007
@@ -2316,10 +2329,10 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   Relative path:         frontend/Caddyfile
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/Caddyfile
   Size:                  3.6 KiB (3741 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919056
+  Inode:                 69677902
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               73791fe7ccf87ad73d5869e76c2d3018488d3ace3a30e64c08c1547dce89cf6a
@@ -2420,10 +2433,10 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   Relative path:         frontend/captcha.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/captcha.html
   Size:                  4.4 KiB (4555 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919058
+  Inode:                 69677904
   Hard links:            1
   MIME type:             text/html
   SHA-256:               f969ef0403452ae4d9a3d9ede6316a9ece2ed9840eb5e18f1724d118894b64e3
@@ -2551,10 +2564,10 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
   Relative path:         frontend/css/style.css
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/css/style.css
   Size:                  21.7 KiB (22239 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919060
+  Inode:                 69677906
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               d24ff34625eceed69bfda6ae051fb0669cdb86edd1badfd7d86e380ac18b91ef
@@ -3398,10 +3411,10 @@ hr.author-sep { border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
   Relative path:         frontend/index.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/index.html
   Size:                  3.3 KiB (3426 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919061
+  Inode:                 69677907
   Hard links:            1
   MIME type:             text/html
   SHA-256:               97c40c87dc77ff060ca2172db1d1eb5d45168f10e5c94f16ea2113e9b5e0381e
@@ -3500,10 +3513,10 @@ hr.author-sep { border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
   Relative path:         frontend/js/api.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/api.js
   Size:                  5.5 KiB (5663 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919063
+  Inode:                 69677909
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               d1f788b91512090800429d07ed801b5d079e08b5b5557b67779668eeb8d1d4d0
@@ -3667,10 +3680,10 @@ export const Api = {
   Relative path:         frontend/js/common.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/common.js
   Size:                  6.8 KiB (7054 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919064
+  Inode:                 69677910
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               0c392a07c9c68e840f97b8558f72779d4d8c24f1de0ecf1cab6d9fc5da53111d
@@ -3879,10 +3892,10 @@ void initThemePicker();
   Relative path:         frontend/js/config.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/config.js
   Size:                  674 B (674 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919065
+  Inode:                 69677911
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               9afff186d9996c47bd52fb98c8abd40d7494ffeae0a910fe16bd014ac68b7e04
@@ -3917,10 +3930,10 @@ export function loadConfig() {
   Relative path:         frontend/js/page-activity.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-activity.js
   Size:                  1.4 KiB (1453 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919066
+  Inode:                 69677912
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               6e8cdaa1f85df65b51f3979db1a7cb47fe6fb070474e43198eeeb7394477b085
@@ -3994,10 +4007,10 @@ main();
   Relative path:         frontend/js/page-captcha.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-captcha.js
   Size:                  22.9 KiB (23481 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919067
+  Inode:                 69677913
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               49ac42cd50512345c9c94e8243e6d5208e0a3666e6a752bc2ffcb569afa778f4
@@ -4745,10 +4758,10 @@ void boot();
   Relative path:         frontend/js/page-index.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-index.js
   Size:                  821 B (821 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919068
+  Inode:                 69677914
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               41a1af01efdd7a3e19517ef2445fae7d754739d304f485a4fe2ff5ab63759dde
@@ -4797,10 +4810,10 @@ main();
   Relative path:         frontend/js/page-login.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-login.js
   Size:                  1.7 KiB (1812 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919069
+  Inode:                 69677915
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               c7c310547bd3ac8a3c0b41be4a869917daf335a1706a3ce64bd43d83f6c4e76a
@@ -4879,10 +4892,10 @@ main();
   Relative path:         frontend/js/page-notes.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-notes.js
   Size:                  19.6 KiB (20168 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919070
+  Inode:                 69677916
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               4ab9064807a2ac42d555146c8277a7a953d485cf018f4f0033608bc6a5449092
@@ -5509,10 +5522,10 @@ void boot();
   Relative path:         frontend/js/page-passkeys.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-passkeys.js
   Size:                  2.5 KiB (2585 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919071
+  Inode:                 69677917
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               8dafbd0f9047d5765742578c402ff0159aa00a362d4714f051f2a0a3b3bbc762
@@ -5611,10 +5624,10 @@ void main();
   Relative path:         frontend/js/page-settings.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-settings.js
   Size:                  4.1 KiB (4276 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919072
+  Inode:                 69677918
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               715df3fbf17b70a88819b601c8ce91becfda8793a7bc841022a0cc3e7cd8a9a4
@@ -5769,10 +5782,10 @@ main();
   Relative path:         frontend/js/page-signup.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/page-signup.js
   Size:                  2.3 KiB (2360 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919073
+  Inode:                 69677919
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               607e6328a2f2c463d8ded1477413e8ec9955a7b4a558be1ef59e5946ca7d6b85
@@ -5863,10 +5876,10 @@ main();
   Relative path:         frontend/js/theme-boot.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/theme-boot.js
   Size:                  1006 B (1006 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919074
+  Inode:                 69677920
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               f15e6dabb778b1204fe5b99ea07e0cdb08c5cd6ed2ef0c4c4b1687c169ec5fbd
@@ -5912,10 +5925,10 @@ main();
   Relative path:         frontend/js/webauthn.js
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/js/webauthn.js
   Size:                  4.0 KiB (4115 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919075
+  Inode:                 69677921
   Hard links:            1
   MIME type:             application/javascript
   SHA-256:               b393417d37410387d340b935481a88fb266c2f168b9e7dc80b21b1b709ea3973
@@ -6048,10 +6061,10 @@ export async function signupPasskey(username, displayName) {
   Relative path:         frontend/login.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/login.html
   Size:                  2.1 KiB (2229 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919076
+  Inode:                 69677922
   Hard links:            1
   MIME type:             text/html
   SHA-256:               f3e9332b50932943b36b946d7a4aa6968fed35af782f1304d30f4e7c71a38040
@@ -6132,10 +6145,10 @@ export async function signupPasskey(username, displayName) {
   Relative path:         frontend/notes.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/notes.html
   Size:                  3.2 KiB (3366 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919077
+  Inode:                 69677923
   Hard links:            1
   MIME type:             text/html
   SHA-256:               7259d2d054d1c691a5b8a17877b79797150be739e53b8c1b0459a3d055dea49b
@@ -6244,10 +6257,10 @@ export async function signupPasskey(username, displayName) {
   Relative path:         frontend/passkeys.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/passkeys.html
   Size:                  9.5 KiB (9794 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919078
+  Inode:                 69677924
   Hard links:            1
   MIME type:             text/html
   SHA-256:               28d24c607813da21df81f2c6fa7de1977e9e595bc6dfa5f3517ca923c5319b3d
@@ -6487,10 +6500,10 @@ export async function signupPasskey(username, displayName) {
   Relative path:         frontend/settings.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/settings.html
   Size:                  4.3 KiB (4454 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919079
+  Inode:                 69677925
   Hard links:            1
   MIME type:             text/html
   SHA-256:               d6a59ef291d0da5dd4b6d28fb399d047d70a87e6e092af674fbe272fe74ef519
@@ -6623,10 +6636,10 @@ export async function signupPasskey(username, displayName) {
   Relative path:         frontend/signup.html
   Absolute path:         /home/kushal/src/golang/GoTunnels/frontend/signup.html
   Size:                  2.8 KiB (2929 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919080
+  Inode:                 69677926
   Hard links:            1
   MIME type:             text/html
   SHA-256:               90decbd7ff83c15ae4ddc412111a5d3c8c4fba93c51c2d8d2d847612126a1cb3
@@ -6715,10 +6728,10 @@ export async function signupPasskey(username, displayName) {
   Relative path:         .github/dependabot.yml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/dependabot.yml
   Size:                  591 B (591 bytes)
-  Last modified:         2026-10-16 10:59:43.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919037
+  Inode:                 69677866
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               30767eb9378c60d49e77079f5e83a594a396db227580f7d0307aa6133d6f5391
@@ -6755,15 +6768,15 @@ updates:
   File name:             ci.yaml
   Relative path:         .github/workflows/ci.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/workflows/ci.yaml
-  Size:                  2.2 KiB (2339 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Size:                  2.3 KiB (2406 bytes)
+  Last modified:         2026-11-06 10:05:50.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919039
+  Inode:                 69677868
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               a8cf3f52fc612429a13d87f838e93a773b9ec4e41c04998002a636f98fb3b9e3
-  Last git commit:       bd2c9cf 2026-08-20 08:50:11 -0400 Bump actions/setup-go from 6 to 7
+  SHA-256:               25824e42acfef97af532bf75cbf4fa489ec735aeb9ed306696a985e30d698b7d
+  Last git commit:       b171479 2026-11-06 10:16:47 -0500 add claude response
 
 --- CONTENT ---
 # Build and test. Deliberately thin: all logic lives in scripts/test.sh so the
@@ -6791,12 +6804,14 @@ jobs:
 
       # Fast, host-only checks on the bash layer: syntax, shellcheck (ships on
       # ubuntu runners), and the hermetic detect_runtime/ensure_podman_socket
-      # unit tests (stubbed binaries — no containers, no sockets, no network).
+      # and seed_compose_defaults unit tests (no containers, no sockets, no
+      # network).
       - name: Shell script checks
         run: |
           for f in scripts/*.sh scripts/tests/*.sh; do bash -n "$f"; done
           shellcheck -x -P SCRIPTDIR scripts/*.sh scripts/tests/*.sh
           bash scripts/tests/lib-detect-test.sh
+          bash scripts/tests/compose-defaults-test.sh
 
       - uses: actions/setup-go@v7
         with:
@@ -6845,10 +6860,10 @@ jobs:
   Relative path:         .github/workflows/dependency-freshness.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/workflows/dependency-freshness.yaml
   Size:                  642 B (642 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919040
+  Inode:                 69677869
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               c46a6ed2808b017e9ac408715b4eb6fef042d7ec7be25757c9f3b35d87657210
@@ -6892,10 +6907,10 @@ jobs:
   Relative path:         .github/workflows/govulncheck.yaml
   Absolute path:         /home/kushal/src/golang/GoTunnels/.github/workflows/govulncheck.yaml
   Size:                  673 B (673 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919041
+  Inode:                 69677870
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               7d0fc6d705f3cbbf7d342c5ca54ed44d1dc0b26c96903a874e8a9211e72b9f2c
@@ -6942,10 +6957,10 @@ jobs:
   Relative path:         .gitignore
   Absolute path:         /home/kushal/src/golang/GoTunnels/.gitignore
   Size:                  407 B (407 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919042
+  Inode:                 69677871
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               d714e060df98ed447e039a0365f193d8e6325a807898f48660f95058e93a6f20
@@ -6991,10 +7006,10 @@ docs/llm/dump.txt
   Relative path:         go.mod
   Absolute path:         /home/kushal/src/golang/GoTunnels/go.mod
   Size:                  811 B (811 bytes)
-  Last modified:         2026-11-06 07:20:21.000000000 -0500
+  Last modified:         2026-11-06 10:05:35.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650509
+  Inode:                 69677927
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               4706749cbc63b83be4711d93f5ffd045be985f6a70b63dc2523eb48ad26d0748
@@ -7034,10 +7049,10 @@ require (
   Relative path:         internal/activity/activity.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/activity/activity.go
   Size:                  3.0 KiB (3099 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919084
+  Inode:                 69677929
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               880ace4aa90b31aeabc40ab14b21687a056c8f7667abf32c572d627042f6abb4
@@ -7160,10 +7175,10 @@ func truncate(s string, n int) string {
   Relative path:         internal/activity/activity_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/activity/activity_test.go
   Size:                  1.9 KiB (2017 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919085
+  Inode:                 69677930
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               ce6b697543974525372c6a9a80305fe283b86e000a21f81430c1714589fb4586
@@ -7255,10 +7270,10 @@ func TestTruncate(t *testing.T) {
   Relative path:         internal/auth/handlers.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/handlers.go
   Size:                  35.8 KiB (36751 bytes)
-  Last modified:         2026-11-06 07:19:27.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650512
+  Inode:                 69677932
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               a74ebe4bfb6bde93f5eb99c91fd85102e77e222257983c83a56b8d3dc91e684c
@@ -8397,10 +8412,10 @@ func validUsername(u string) bool {
   Relative path:         internal/auth/handlers_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/handlers_test.go
   Size:                  10.4 KiB (10694 bytes)
-  Last modified:         2026-11-06 07:17:41.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650513
+  Inode:                 69677933
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               46e56571da7db2359693ac72dbc92de807f753fbd35906c9d19bbe4f683e61b3
@@ -8747,10 +8762,10 @@ func TestAuthLookupFailedDistinguishesMissingFromOutage(t *testing.T) {
   Relative path:         internal/auth/passkey.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/passkey.go
   Size:                  6.5 KiB (6707 bytes)
-  Last modified:         2026-11-06 07:15:57.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650514
+  Inode:                 69677934
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               2dc21ac4eaed56d55a5167528244afa02a13cfd8638f0550a1d3a1eb52a96821
@@ -8962,10 +8977,10 @@ func (u *WebAuthnUser) WebAuthnCredentials() []webauthn.Credential { return u.Cr
   Relative path:         internal/auth/passkey_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/passkey_test.go
   Size:                  5.0 KiB (5202 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919090
+  Inode:                 69677935
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               2c2f7591af55521fbab7393eed8ae3c63a209da84d93963782be7c76d555e00a
@@ -9157,10 +9172,10 @@ func TestHostOfOrigin(t *testing.T) {
   Relative path:         internal/auth/password.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/password.go
   Size:                  3.2 KiB (3298 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919091
+  Inode:                 69677936
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               4ef2251d3c2a8dfbca361858dcdc7152800bc838ffa39e034b02820114478718
@@ -9282,10 +9297,10 @@ func decodePHC(encoded string) (argonParams, []byte, []byte, error) {
   Relative path:         internal/auth/password_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/password_test.go
   Size:                  2.0 KiB (2085 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919092
+  Inode:                 69677937
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               f5e72020865617f753c798a139e02a055e9f2d7e0647c230a6d2c1e6b84d04c5
@@ -9390,10 +9405,10 @@ func TestDecodePHCFields(t *testing.T) {
   Relative path:         internal/auth/session.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/session.go
   Size:                  917 B (917 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919093
+  Inode:                 69677938
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               0121dc460745ad41f7611f20060b2945e894be196f2b42398729d7680aef83d9
@@ -9441,10 +9456,10 @@ func HashSessionToken(token string) string {
   Relative path:         internal/auth/session_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/session_test.go
   Size:                  1.0 KiB (1080 bytes)
-  Last modified:         2026-11-06 07:11:38.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650515
+  Inode:                 69677939
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               62edec748dd89ff5deede779fb85637f9eac0088f2da0c5c7a497edfd2d2d288
@@ -9507,10 +9522,10 @@ func TestHashSessionTokenDeterministic(t *testing.T) {
   Relative path:         internal/auth/totp.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/totp.go
   Size:                  5.2 KiB (5373 bytes)
-  Last modified:         2026-11-06 07:11:38.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650516
+  Inode:                 69677940
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               5cfd1f6434681a314801db831638660d34a953d51eb492a4b7bd2f70b7ab03bc
@@ -9711,10 +9726,10 @@ func randomRecoveryCode() (string, error) {
   Relative path:         internal/auth/totp_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/totp_test.go
   Size:                  4.6 KiB (4763 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919096
+  Inode:                 69677941
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               3df9bb0cdc9e00fcc0cd91e1f0e20a0faed7d522099decc4791b41d2a10307c7
@@ -9902,10 +9917,10 @@ func TestMatchTOTPStepWindowAndStep(t *testing.T) {
   Relative path:         internal/captcha/captcha.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/captcha/captcha.go
   Size:                  7.8 KiB (7995 bytes)
-  Last modified:         2026-11-06 07:17:00.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650518
+  Inode:                 69677943
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               4e6b3846bf9d1b6626a0187621f838cdde13a2323d0b674b29533ce409c7348d
@@ -10141,10 +10156,10 @@ func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg strin
   Relative path:         internal/captcha/captcha_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/captcha/captcha_test.go
   Size:                  1.6 KiB (1701 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919099
+  Inode:                 69677944
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               7f24b356bceed9b93ffdca89fd6048adc59b209f890ea51dbcd804c0742f4504
@@ -10221,15 +10236,15 @@ func TestClamp(t *testing.T) {
   File name:             config.go
   Relative path:         internal/config/config.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/config.go
-  Size:                  18.3 KiB (18762 bytes)
-  Last modified:         2026-11-06 07:15:57.000000000 -0500
+  Size:                  19.0 KiB (19523 bytes)
+  Last modified:         2026-11-06 10:05:36.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650520
+  Inode:                 69677945
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               e0890334a4492b5644ed19f2946c37bbee94cf254910babb395dbba69f0cc662
-  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
+  SHA-256:               044d119959367f38912d4261506a6a8db3885daf3ff728bdb94bbadc793dad1f
+  Last git commit:       b171479 2026-11-06 10:16:47 -0500 add claude response
 
 --- CONTENT ---
 // Package config is the single source of truth for every runtime setting.
@@ -10584,8 +10599,20 @@ func (e *env) err() error { return errors.Join(e.errs...) }
 // raw returns the trimmed value and whether the variable is set to anything
 // at all. A whitespace-only value counts as set, so it can deliberately clear
 // a list setting such as GOTUNNELS_RP_ORIGIN_PATTERNS.
+//
+// A value still containing a "${" placeholder is an error: it means the
+// compose tool passed compose.yaml's "${NAME:-default}" through literally
+// instead of substituting it (podman-compose before 1.6 does this for
+// variables unset on the host). Failing here names the real cause instead of
+// a confusing parse error — or, for plain strings such as
+// GOTUNNELS_RP_ORIGIN_PATTERNS, instead of silently running with garbage.
 func (e *env) raw(key string) (string, bool) {
 	v, ok := os.LookupEnv(key)
+	if strings.Contains(v, "${") {
+		e.errs = append(e.errs, fmt.Errorf(
+			"config: %s=%q is an unexpanded compose placeholder; the compose tool did not substitute it (podman-compose < 1.6 does this for unset variables) — start the stack with scripts/up.sh, which seeds every compose default", key, v))
+		return "", false
+	}
 	return strings.TrimSpace(v), ok && v != ""
 }
 
@@ -10730,10 +10757,10 @@ func envStr(key, def string) string {
   Relative path:         internal/config/config_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/config_test.go
   Size:                  11.5 KiB (11864 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919102
+  Inode:                 69677946
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               27b6e6d04db74be27bd85af0c366f90c6adaf3184920211b69ab1eafe0d61de8
@@ -11159,10 +11186,10 @@ func TestLoad_SessionTTLOverride(t *testing.T) {
   Relative path:         internal/config/csp_deployment_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/csp_deployment_test.go
   Size:                  5.2 KiB (5332 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919103
+  Inode:                 69677947
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               3977c4a20d511dc89a5b318bfd0f396c2b7e5564b0a6b2026561f10fe64af960
@@ -11311,6 +11338,81 @@ func TestConfigurationDocsShowCanonicalPolicy(t *testing.T) {
 
 
 ################################################################################
+# FILE: internal/config/placeholder_test.go
+################################################################################
+
+--- METADATA ---
+  File name:             placeholder_test.go
+  Relative path:         internal/config/placeholder_test.go
+  Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/placeholder_test.go
+  Size:                  1.6 KiB (1666 bytes)
+  Last modified:         2026-11-06 10:04:52.000000000 -0500
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 69677859
+  Hard links:            1
+  MIME type:             text/plain
+  SHA-256:               fae3fac9339ae0faeeade328d8873d5c80daa05cd67a828747395666efb31801
+  Last git commit:       b171479 2026-11-06 10:16:47 -0500 add claude response
+
+--- CONTENT ---
+package config
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestLoad_RejectsUnexpandedComposePlaceholders(t *testing.T) {
+	cases := map[string]string{
+		"GOTUNNELS_SIGNUP_IP_INTERVAL": "${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m}",
+		"GOTUNNELS_AUTH_ATTEMPT_BURST": "${GOTUNNELS_AUTH_ATTEMPT_BURST:-10}",
+		"GOTUNNELS_RP_ORIGIN_PATTERNS": "${GOTUNNELS_RP_ORIGIN_PATTERNS:-https://*.trycloudflare.com}",
+		"GOTUNNELS_CSP_MODE":           "${GOTUNNELS_CSP_MODE:-report-only}",
+		"GOTUNNELS_DEV":                "${GOTUNNELS_DEV:-false}",
+	}
+	for key, val := range cases {
+		t.Run(key, func(t *testing.T) {
+			t.Setenv("DATABASE_URL", "postgres://localhost/gotunnels")
+			t.Setenv("GOTUNNELS_IP_HASH_PEPPER", "p")
+			t.Setenv("GOTUNNELS_TOTP_ENCRYPTION_KEY", "k")
+			t.Setenv(key, val)
+			_, err := Load()
+			if err == nil {
+				t.Fatalf("Load accepted %s=%q", key, val)
+			}
+			msg := err.Error()
+			if !strings.Contains(msg, key) || !strings.Contains(msg, "unexpanded compose placeholder") {
+				t.Fatalf("error does not name the placeholder problem for %s: %v", key, err)
+			}
+		})
+	}
+}
+
+func TestEnvReader_PlaceholderFallsBackAndRecordsError(t *testing.T) {
+	t.Setenv("X_PLACEHOLDER", "${X_PLACEHOLDER:-1h}")
+	e := &env{}
+	if got := e.str("X_PLACEHOLDER", "def"); got != "def" {
+		t.Fatalf("str = %q, want default", got)
+	}
+	if e.err() == nil {
+		t.Fatal("placeholder must be recorded as an error")
+	}
+}
+
+func TestEnvReader_DollarWithoutBraceIsAllowed(t *testing.T) {
+	t.Setenv("X_DOLLAR", "pa$$word")
+	e := &env{}
+	if got := e.str("X_DOLLAR", ""); got != "pa$$word" {
+		t.Fatalf("str = %q", got)
+	}
+	if err := e.err(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+
+################################################################################
 # FILE: internal/config/session_persistence_test.go
 ################################################################################
 
@@ -11319,10 +11421,10 @@ func TestConfigurationDocsShowCanonicalPolicy(t *testing.T) {
   Relative path:         internal/config/session_persistence_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/session_persistence_test.go
   Size:                  7.8 KiB (8021 bytes)
-  Last modified:         2026-11-06 07:11:38.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650521
+  Inode:                 69677948
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               cb5b811432899aa965022500308ff835ca9b61ddd7f21a53c3560ab924f2ef8c
@@ -11536,10 +11638,10 @@ func TestFrontendImportsWhatItCalls(t *testing.T) {
   Relative path:         internal/csp/csp.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/csp/csp.go
   Size:                  12.1 KiB (12430 bytes)
-  Last modified:         2026-11-06 07:19:25.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650523
+  Inode:                 69677950
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               a6d257204244e0709d2a4d917efc6bd1b0782b16c6080ac32b676166b70272dc
@@ -11910,10 +12012,10 @@ func truncateRunes(s string, n int) string {
   Relative path:         internal/csp/csp_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/csp/csp_test.go
   Size:                  8.1 KiB (8374 bytes)
-  Last modified:         2026-11-06 07:18:03.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650524
+  Inode:                 69677951
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               53de0590497751cf11365fb123ebf57a8e2e7bbeb1ecba8dc2561b5a7e26b4c1
@@ -12178,10 +12280,10 @@ func TestRecentRejectsBadLimit(t *testing.T) {
   Relative path:         internal/database/database.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/database/database.go
   Size:                  5.9 KiB (6044 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919109
+  Inode:                 69677953
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               b0a4a795a018ff97a51669a7ed1011b2098b10a77dc07a0dd98b4ddbe19e2372
@@ -12394,10 +12496,10 @@ func parseVersion(filename string) (int64, error) {
   Relative path:         internal/database/database_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/database/database_test.go
   Size:                  1.8 KiB (1923 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919110
+  Inode:                 69677954
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               08ab008405217710578f9266bcda9503ad0a0329076f5fbaf4105e38fa6c7fb8
@@ -12485,10 +12587,10 @@ func TestEmbeddedMigrationsParse(t *testing.T) {
   Relative path:         internal/health/health.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/health/health.go
   Size:                  2.7 KiB (2795 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919112
+  Inode:                 69677956
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               0013d077af1505e87eb6aa0d276d6bce4ee90d3c6fc38a278fd2a773f64d9e33
@@ -12599,10 +12701,10 @@ func (h *Handler) InfoHandler(w http.ResponseWriter, r *http.Request) {
   Relative path:         internal/health/health_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/health/health_test.go
   Size:                  1.4 KiB (1460 bytes)
-  Last modified:         2026-11-06 07:17:32.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650526
+  Inode:                 69677957
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               c116d1315c244b5744a3e5154e2581232d77f70f1538233a8561c1bd7b8f402d
@@ -12678,10 +12780,10 @@ func TestInfoHandler(t *testing.T) {
   Relative path:         internal/httpx/middleware.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/httpx/middleware.go
   Size:                  15.9 KiB (16321 bytes)
-  Last modified:         2026-11-06 07:19:28.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650528
+  Inode:                 69677959
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               2e2088b6341bc8978c015610863750192af13893bd76c0ae4a890ccc72bea2e8
@@ -13185,10 +13287,10 @@ func decodeProblem(err error) (int, string) {
   Relative path:         internal/httpx/middleware_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/httpx/middleware_test.go
   Size:                  14.9 KiB (15351 bytes)
-  Last modified:         2026-11-06 07:17:32.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650529
+  Inode:                 69677960
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               bbe44f7adb3c6fc2a85bfc33241822d8b4301037307e76acae3cc65666397ba5
@@ -13665,10 +13767,10 @@ func TestMaxBodyCapsReads(t *testing.T) {
   Relative path:         internal/maintenance/maintenance.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/maintenance/maintenance.go
   Size:                  2.6 KiB (2707 bytes)
-  Last modified:         2026-10-16 10:57:24.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919118
+  Inode:                 69677962
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               6f63940c8cac6e3afd77c4b35ad879af53aa5dd09320de99936d53e08fb789d2
@@ -13774,10 +13876,10 @@ func (j *Janitor) Run(ctx context.Context) {
   Relative path:         internal/maintenance/maintenance_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/maintenance/maintenance_test.go
   Size:                  2.4 KiB (2532 bytes)
-  Last modified:         2026-10-16 10:57:24.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919119
+  Inode:                 69677963
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               729c3acebc6a151876b3f99431f0829024498d258bb91ae56f637f5466d44d20
@@ -13888,10 +13990,10 @@ func TestRunStopsOnCancel(t *testing.T) {
   Relative path:         internal/notes/notes.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/notes/notes.go
   Size:                  9.1 KiB (9353 bytes)
-  Last modified:         2026-11-06 07:19:25.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650531
+  Inode:                 69677965
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               ecb288f19f3f31fe8b468ef71ac077cff063439cec8f743e1d6c8d1b05c9375c
@@ -14196,10 +14298,10 @@ func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg strin
   Relative path:         internal/notes/notes_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/notes/notes_test.go
   Size:                  4.7 KiB (4865 bytes)
-  Last modified:         2026-11-06 07:18:03.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650532
+  Inode:                 69677966
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               9b4bb2164e0aaf12bf87b2b9ddb3aedda5a305e5bc6b4a28aa371b67b5b66a77
@@ -14364,10 +14466,10 @@ func TestParseAuthorsCapCountsDistinctIDs(t *testing.T) {
   Relative path:         internal/prefs/prefs.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/prefs/prefs.go
   Size:                  3.6 KiB (3703 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919124
+  Inode:                 69677968
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               0df4e734aaf348c0c0878a7110ca435c421dd4d888c84d2bfb7eb8dc9839bdbb
@@ -14507,10 +14609,10 @@ func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg strin
   Relative path:         internal/prefs/prefs_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/prefs/prefs_test.go
   Size:                  1002 B (1002 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919125
+  Inode:                 69677969
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               3d6813d62afcaa7ac229d2f38e275a553b2411afac6a262dd277826c49993541
@@ -14564,10 +14666,10 @@ func TestValidKey(t *testing.T) {
   Relative path:         internal/server/server.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/server/server.go
   Size:                  7.6 KiB (7854 bytes)
-  Last modified:         2026-11-06 07:15:57.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650534
+  Inode:                 69677971
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               1bc828ae43d1b3c6fab7c856e9e0ba76c65a0eaa32d448348f676291f8d927c8
@@ -14764,10 +14866,10 @@ func userRateKey() func(*http.Request) string {
   Relative path:         internal/store/store.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/store/store.go
   Size:                  37.4 KiB (38366 bytes)
-  Last modified:         2026-11-06 07:19:24.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650536
+  Inode:                 69677973
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               0db310da602178dc3d9f23161168f611a296af8ef316c7461d2d830c6e2bc7de
@@ -15825,10 +15927,10 @@ func (s *Store) inTx(ctx context.Context, fn func(pgx.Tx) error) error {
   Relative path:         internal/store/store_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/store/store_test.go
   Size:                  2.6 KiB (2706 bytes)
-  Last modified:         2026-11-06 07:19:02.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650537
+  Inode:                 69677974
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               093a53773de5f55735f15d1e65d37dc714a0a0535d199727ec47b6d99ba6adbf
@@ -15925,10 +16027,10 @@ func TestActivityJSONShape(t *testing.T) {
   Relative path:         internal/telemetry/multihandler.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/telemetry/multihandler.go
   Size:                  1.6 KiB (1647 bytes)
-  Last modified:         2026-07-01 08:51:15.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17806000
+  Inode:                 69677976
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               706810afa44fe7347faee9661ed36164abd2974d527c0858bc8eda86058c3713
@@ -16004,10 +16106,10 @@ func (m *MultiHandler) WithGroup(name string) slog.Handler {
   Relative path:         internal/telemetry/multihandler_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/telemetry/multihandler_test.go
   Size:                  1.5 KiB (1554 bytes)
-  Last modified:         2026-07-01 08:51:24.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 17806001
+  Inode:                 69677977
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               6b80dcb2f7ef36702949347bc017862af2a5d9100e907fe50a6985b2f2b4b058
@@ -16079,10 +16181,10 @@ func TestMultiHandler_Enabled(t *testing.T) {
   Relative path:         internal/telemetry/telemetry.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/telemetry/telemetry.go
   Size:                  10.6 KiB (10920 bytes)
-  Last modified:         2026-11-06 07:15:57.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650539
+  Inode:                 69677978
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               f0ed42b8629490191627e226f919d24762fb3a302ceb460e14210422c5294d47
@@ -16390,10 +16492,10 @@ func logHTTPOpts(cfg *config.Config) []otlploghttp.Option {
   Relative path:         internal/telemetry/telemetry_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/telemetry/telemetry_test.go
   Size:                  1.9 KiB (2000 bytes)
-  Last modified:         2026-10-16 10:56:36.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919132
+  Inode:                 69677979
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               50a412f3aee3d477d9a6e0f6a18e0c800fa71cd5278c6137f080d67068c5f86f
@@ -16468,10 +16570,10 @@ func TestSetupDisabledLogsToStdoutOnly(t *testing.T) {
   Relative path:         LICENSE
   Absolute path:         /home/kushal/src/golang/GoTunnels/LICENSE
   Size:                  33.2 KiB (34020 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919045
+  Inode:                 69677874
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               d8a6cc31abc16b6748c7a21f21611f5a1ec33f67d22ca23d7da1c19b95496bee
@@ -16724,10 +16826,10 @@ You should also get your employer (if you work as a programmer) or school, if an
   Relative path:         migrations/0001_init.down.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0001_init.down.sql
   Size:                  111 B (111 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919134
+  Inode:                 69677981
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               d3b5809815a09dc10ce07724d7a94a05739edf08e5cb54a8483f11791c29e922
@@ -16749,10 +16851,10 @@ DROP TABLE IF EXISTS users;
   Relative path:         migrations/0001_init.up.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0001_init.up.sql
   Size:                  1.0 KiB (1105 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919135
+  Inode:                 69677982
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               72821f6a0435ea3fa57d937c5d1722ace1b08c65c4c82b17a410ccd57b79975b
@@ -16802,10 +16904,10 @@ CREATE TABLE user_roles (
   Relative path:         migrations/0002_auth_credentials.down.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0002_auth_credentials.down.sql
   Size:                  234 B (234 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919136
+  Inode:                 69677983
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               79b2c5bd77223ad9142760db321704d05f28a2564ce752da96d3b141bb5cdea5
@@ -16829,10 +16931,10 @@ DROP TABLE IF EXISTS password_credentials;
   Relative path:         migrations/0002_auth_credentials.up.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0002_auth_credentials.up.sql
   Size:                  2.6 KiB (2752 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919137
+  Inode:                 69677984
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               bf3c630679a72cb7ee7cdfa553dec38e0d84cf71f214a31b63057212152879ac
@@ -16916,10 +17018,10 @@ CREATE INDEX totp_recovery_codes_user_id_idx ON totp_recovery_codes (user_id);
   Relative path:         migrations/0003_sessions.down.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0003_sessions.down.sql
   Size:                  57 B (57 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919138
+  Inode:                 69677985
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               c3b9a3af65db3899f1455411a8ceb82c1c522ca01032dd98ea8a9ad3650060aa
@@ -16939,10 +17041,10 @@ DROP TABLE IF EXISTS sessions;
   Relative path:         migrations/0003_sessions.up.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0003_sessions.up.sql
   Size:                  684 B (684 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919139
+  Inode:                 69677986
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               c93fb2d83b1fbcc3fb36800bc6a19bd1ba8c8738ea45c2f1c6d31821502e0aa4
@@ -16976,10 +17078,10 @@ CREATE INDEX sessions_expires_at_idx ON sessions (expires_at);
   Relative path:         migrations/0004_activity_and_health.down.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0004_activity_and_health.down.sql
   Size:                  111 B (111 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919140
+  Inode:                 69677987
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               fe2b7f6edc05481da8954f0d0c98b77aee8b786463245bf107f1e74d541af81d
@@ -17000,10 +17102,10 @@ DROP TABLE IF EXISTS activity_log;
   Relative path:         migrations/0004_activity_and_health.up.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0004_activity_and_health.up.sql
   Size:                  1.2 KiB (1255 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919141
+  Inode:                 69677988
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               fe5bd997f092b2117dbad1891c95568e51888e6dc99da2bea4b3eb2f14429c35
@@ -17054,10 +17156,10 @@ CREATE INDEX health_check_log_created_at_idx
   Relative path:         migrations/0005_csp_reports.down.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0005_csp_reports.down.sql
   Size:                  63 B (63 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919142
+  Inode:                 69677989
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               3a9a26edcbdb182fdfe2b12846fbe5799fe88ad40ce7d33b750f943f3d2e3039
@@ -17077,10 +17179,10 @@ DROP TABLE IF EXISTS csp_reports;
   Relative path:         migrations/0005_csp_reports.up.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0005_csp_reports.up.sql
   Size:                  1.3 KiB (1428 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919143
+  Inode:                 69677990
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               f9f9b6fa9db1a52dc0645f99ddcf58da3b59172606da0f0788449b719d659dad
@@ -17127,10 +17229,10 @@ CREATE INDEX csp_reports_violated_directive_idx
   Relative path:         migrations/0006_captcha_and_prefs.down.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0006_captcha_and_prefs.down.sql
   Size:                  104 B (104 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919144
+  Inode:                 69677991
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               a0abefc648dab18f27df4a599ad53a12b1d2b445bf76088f35db6a5d73fb7f1a
@@ -17151,10 +17253,10 @@ DROP TABLE IF EXISTS captcha_stats;
   Relative path:         migrations/0006_captcha_and_prefs.up.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0006_captcha_and_prefs.up.sql
   Size:                  1.9 KiB (2013 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919145
+  Inode:                 69677992
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               774e92eafa7037d26131da0c0cf45687c8143bcbba7709baba8f3b4fb805f468
@@ -17209,10 +17311,10 @@ CREATE TABLE user_prefs (
   Relative path:         migrations/0007_notes.down.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0007_notes.down.sql
   Size:                  51 B (51 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919146
+  Inode:                 69677993
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               9e0c4a80f1acd77d7aa328542b96d8bd23264d0d0eb84e4915bfc4f1f5fb77d5
@@ -17232,10 +17334,10 @@ DROP TABLE IF EXISTS notes;
   Relative path:         migrations/0007_notes.up.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0007_notes.up.sql
   Size:                  1.0 KiB (1124 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919147
+  Inode:                 69677994
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               c10ee3bd0e0760fc82d2bf7ae6755a8ab5fa0b8437fcb25ea44069d89ae95f13
@@ -17273,10 +17375,10 @@ CREATE INDEX notes_user_id_idx ON notes (user_id);
   Relative path:         migrations/0008_sessions_optional_expiry.down.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0008_sessions_optional_expiry.down.sql
   Size:                  503 B (503 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919148
+  Inode:                 69677995
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               7996d4b8c021c8d3fdfdb5875b6ee3b4c06c181e7a52d5625b4c4d4c6ec141f8
@@ -17303,10 +17405,10 @@ CREATE INDEX sessions_expires_at_idx ON sessions (expires_at);
   Relative path:         migrations/0008_sessions_optional_expiry.up.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0008_sessions_optional_expiry.up.sql
   Size:                  1.1 KiB (1225 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919149
+  Inode:                 69677996
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               7c39db968acc03fde44602f2cdf73b3fdcb2d1f1d2e6349201c6891eb5494ee3
@@ -17344,10 +17446,10 @@ CREATE INDEX sessions_expires_at_idx ON sessions (expires_at) WHERE expires_at I
   Relative path:         migrations/0009_totp_replay_guard.down.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0009_totp_replay_guard.down.sql
   Size:                  98 B (98 bytes)
-  Last modified:         2026-10-16 10:48:20.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919150
+  Inode:                 69677997
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               78abd0fa0df8d0da708b52638981da554f7d308f9c93278dddf85cdfb27416c4
@@ -17367,10 +17469,10 @@ ALTER TABLE totp_secrets DROP COLUMN IF EXISTS last_used_step;
   Relative path:         migrations/0009_totp_replay_guard.up.sql
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/0009_totp_replay_guard.up.sql
   Size:                  305 B (305 bytes)
-  Last modified:         2026-10-16 10:48:20.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919151
+  Inode:                 69677998
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               fd5b3246dc17d92c94c4c31d28b3a87800ca3395436380a04a65679136f959de
@@ -17393,10 +17495,10 @@ ALTER TABLE totp_secrets ADD COLUMN last_used_step bigint;
   Relative path:         migrations/embed.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/migrations/embed.go
   Size:                  288 B (288 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919152
+  Inode:                 69677999
   Hard links:            1
   MIME type:             text/plain
   SHA-256:               6dc0ef604d65911820ea5155ff6c0ca55f1e268619fd33af7089c0fc85bbfa58
@@ -17423,15 +17525,15 @@ var FS embed.FS
   File name:             README.md
   Relative path:         README.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/README.md
-  Size:                  13.2 KiB (13517 bytes)
-  Last modified:         2026-11-06 07:19:58.000000000 -0500
+  Size:                  13.4 KiB (13722 bytes)
+  Last modified:         2026-11-06 10:05:50.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650506
+  Inode:                 69677875
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               d5a36c0f56b19e5a08931b8808a4c4a344e74d59f450bb29f777f946139aa945
-  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
+  SHA-256:               a921653aa38eebf130569497eaf246f9552a732316ce9b326df62834c5c51666
+  Last git commit:       b171479 2026-11-06 10:16:47 -0500 add claude response
 
 --- CONTENT ---
 # GoTunnels
@@ -17559,7 +17661,10 @@ Replace `podman` with `docker` (and drop `--depend`) on Docker.
 ### Prerequisites
 
 - **Podman** (with `podman compose` or `podman-compose`) or **Docker** (with
-  `docker compose`). Podman on Fedora is the primary target.
+  `docker compose`). Podman on Fedora is the primary target. Older
+  podman-compose releases (e.g. 1.3 from Debian trixie apt) work through the
+  scripts, which seed compose defaults into the environment first (see
+  [docs/CONFIGURATION.md](docs/CONFIGURATION.md)).
 - Outbound internet access (to pull base images and, on the first API build, to
   resolve Go modules).
 - `openssl` (for secret generation) — present on essentially every Linux box.
@@ -17714,10 +17819,10 @@ the corresponding source.
   Relative path:         scripts/ci-container-test.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/ci-container-test.sh
   Size:                  15.6 KiB (15987 bytes)
-  Last modified:         2026-10-16 10:59:43.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919154
+  Inode:                 69678000
   Hard links:            1
   MIME type:             text/x-shellscript
   SHA-256:               18fbc6c975cebe035da2acec4a6dfb11fb16f082f0586b72faf553927ef263a9
@@ -18070,10 +18175,10 @@ ok "container smoke test passed."
   Relative path:         scripts/down.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/down.sh
   Size:                  593 B (593 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919155
+  Inode:                 69678001
   Hard links:            1
   MIME type:             text/x-shellscript
   SHA-256:               2eecb48ee740a9f6c89565b00574cc581d04a556cfe8c5f46d3a6f99a6849c4b
@@ -18114,15 +18219,15 @@ ok "instance '$PROJECT' removed (containers + volumes)."
   File name:             lib.sh
   Relative path:         scripts/lib.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/lib.sh
-  Size:                  20.1 KiB (20608 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Size:                  21.6 KiB (22204 bytes)
+  Last modified:         2026-11-06 10:04:21.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919156
+  Inode:                 69678002
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               97109596340ab8ec03c53fcfb8e6cb27d38647fbab1a51539c4ee4b1048fc4e5
-  Last git commit:       2e5be2f 2026-07-07 17:53:07 -0400 add claude response
+  SHA-256:               29d579357f94da2dfb19753be712101e30f1e55ce6e37d6b88c99c27dfaf2cad
+  Last git commit:       b171479 2026-11-06 10:16:47 -0500 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -18260,9 +18365,43 @@ ensure_podman_socket() {
 # IFS=$'\n\t' (no space), which would otherwise keep "podman compose" as one
 # nonexistent command — so restore a normal IFS locally just for the split.
 dc() {
+  seed_compose_defaults
   local IFS=$' \t\n'
   # shellcheck disable=SC2086
   $COMPOSE -f "$REPO_ROOT/compose.yaml" "$@"
+}
+
+# seed_compose_defaults [compose-file] — export NAME=default for every
+# ${NAME:-default} / ${NAME-default} reference in the compose file whose NAME
+# is not set in the environment. Variables that are already set (even to an
+# empty string) are left untouched.
+#
+# Why: podman-compose before 1.6 (Debian trixie ships 1.3) resolves an
+# environment entry that references a variable of its own name — e.g.
+#   GOTUNNELS_SIGNUP_IP_INTERVAL: "${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m}"
+# — to the LITERAL string "${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m}" whenever the
+# variable is unset on the host, instead of applying the default. The API then
+# refuses to start ("is not a duration"), crash-loops, and the browser reports
+# every API call as a CORS error because Cloudflare answers 502 with no CORS
+# headers. Seeding the defaults into the environment first means compose only
+# ever substitutes set variables, which every implementation gets right, and
+# compose.yaml stays the single place the defaults are written down.
+seed_compose_defaults() {
+  local file="${1:-$REPO_ROOT/compose.yaml}" line trimmed name def
+  local re='\$\{([A-Za-z_][A-Za-z0-9_]*):?-([^}]*)\}'
+  [ -f "$file" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    trimmed="${line#"${line%%[![:space:]]*}"}"
+    [ "${trimmed:0:1}" = "#" ] && continue
+    while [[ $line =~ $re ]]; do
+      name="${BASH_REMATCH[1]}"
+      def="${BASH_REMATCH[2]}"
+      if [ -z "${!name+x}" ]; then
+        export "$name=$def"
+      fi
+      line="${line#*"${BASH_REMATCH[0]}"}"
+    done
+  done < "$file"
 }
 
 # ---------------------------------------------------------------------------
@@ -18575,10 +18714,10 @@ EOF
   Relative path:         scripts/run.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/run.sh
   Size:                  1.4 KiB (1436 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919157
+  Inode:                 69678003
   Hard links:            1
   MIME type:             text/x-shellscript
   SHA-256:               87838e42d9b4df4225a62746a17b1aca93f964a31af5009fe1bac9ce6a4b473b
@@ -18639,6 +18778,137 @@ bash "$SCRIPT_DIR/up.sh" "$PROJECT"
 
 
 ################################################################################
+# FILE: scripts/tests/compose-defaults-test.sh
+################################################################################
+
+--- METADATA ---
+  File name:             compose-defaults-test.sh
+  Relative path:         scripts/tests/compose-defaults-test.sh
+  Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/tests/compose-defaults-test.sh
+  Size:                  4.6 KiB (4789 bytes)
+  Last modified:         2026-11-06 10:04:28.000000000 -0500
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 69677862
+  Hard links:            1
+  MIME type:             text/x-shellscript
+  SHA-256:               5e198af08f205d40c7bb29abf5e1b78dcd08be3288b8911a38315ec807210f75
+  Last git commit:       b171479 2026-11-06 10:16:47 -0500 add claude response
+
+--- CONTENT ---
+#!/usr/bin/env bash
+# scripts/tests/compose-defaults-test.sh — hermetic unit tests for
+# seed_compose_defaults() in scripts/lib.sh.
+#
+# What it pins: podman-compose before 1.6 turns an environment entry such as
+#   GOTUNNELS_SIGNUP_IP_INTERVAL: "${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m}"
+# into the literal "${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m}" when the variable is
+# unset on the host, which crash-looped the API. dc() therefore seeds every
+# compose default into the environment first. These tests check that:
+#   1. every ${NAME:-default} in compose.yaml ends up set after seeding,
+#      with exactly the default compose.yaml declares;
+#   2. variables already set (including set-but-empty) are never overridden;
+#   3. defaults containing spaces, quotes, '*' and ':' survive intact;
+#   4. references inside YAML comments are ignored.
+#
+# Usage: bash scripts/tests/compose-defaults-test.sh
+
+set -euo pipefail
+IFS=$'\n\t'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB="$SCRIPT_DIR/../lib.sh"
+COMPOSE_FILE="$SCRIPT_DIR/../../compose.yaml"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+pass() { printf 'PASS: %s\n' "$*"; }
+fail() { printf 'FAIL: %s\n' "$*" >&2; FAILED=1; }
+
+run_seed() { # file, then NAME=VALUE presets; prints the resulting env
+  local file="$1"
+  shift
+  # shellcheck disable=SC2016
+  env -i PATH="$PATH" "$@" bash -c '
+    set -euo pipefail
+    . "$1" >/dev/null 2>&1
+    seed_compose_defaults "$2"
+    env
+  ' _ "$LIB" "$file"
+}
+
+value_of() { # name, env dump
+  printf '%s\n' "$2" | sed -n "s/^$1=//p"
+}
+
+# --- 1. every default in the real compose.yaml gets seeded -----------------
+out="$(run_seed "$COMPOSE_FILE")"
+count=0
+while IFS= read -r ref; do
+  name="$(printf '%s' "$ref" | sed -E 's/^\$\{([A-Za-z_][A-Za-z0-9_]*):?-.*$/\1/')"
+  def="$(printf '%s' "$ref" | sed -E 's/^\$\{[A-Za-z_][A-Za-z0-9_]*:?-(.*)\}$/\1/')"
+  if ! printf '%s\n' "$out" | grep -q "^${name}="; then
+    fail "compose.yaml: $name was not seeded"
+  elif [ "$(value_of "$name" "$out")" != "$def" ]; then
+    fail "compose.yaml: $name seeded as '$(value_of "$name" "$out")', want '$def'"
+  fi
+  count=$((count + 1))
+done < <(grep -v '^[[:space:]]*#' "$COMPOSE_FILE" | grep -oE '\$\{[A-Za-z_][A-Za-z0-9_]*:?-[^}]*\}' | sort -u -t: -k1,1)
+if [ "$count" -lt 10 ]; then
+  fail "expected at least 10 defaulted references in compose.yaml, found $count"
+else
+  pass "all $count defaulted compose.yaml references are seeded with their defaults"
+fi
+for name in GOTUNNELS_SIGNUP_IP_INTERVAL GOTUNNELS_AUTH_ATTEMPT_BURST GOTUNNELS_MAINTENANCE_INTERVAL GOTUNNELS_RP_ORIGIN_PATTERNS GOTUNNELS_API_UPSTREAM; do
+  if printf '%s\n' "$out" | grep -q "^${name}=" && [ "$(value_of "$name" "$out")" != "" ]; then
+    pass "$name seeded ($(value_of "$name" "$out"))"
+  else
+    fail "$name not seeded"
+  fi
+done
+
+# --- 2..4. synthetic fixture ------------------------------------------------
+cat > "$TMP/compose.yaml" <<'YAML'
+services:
+  api:
+    environment:
+      # COMMENTED: "${COMMENTED_VAR:-nope}"
+      PLAIN: "${PLAIN:-5m}"
+      PRESET: "${PRESET:-default}"
+      EMPTYSET: "${EMPTYSET:-default}"
+      SPACED: "${SPACED:-default-src 'self'; connect-src 'self' https:}"
+      STAR: "${STAR:-https://*.trycloudflare.com}"
+      DASHONLY: "${DASHONLY-dash}"
+      TWO: "${TWO_A:-a}:${TWO_B:-b}"
+      EMPTYDEF: "${EMPTYDEF:-}"
+      NODEF: "${NODEF}"
+YAML
+out="$(run_seed "$TMP/compose.yaml" PRESET=mine EMPTYSET=)"
+
+check() { # name want description
+  if [ "$(value_of "$1" "$out")" = "$2" ]; then pass "$3"; else fail "$3 (got '$(value_of "$1" "$out")', want '$2')"; fi
+}
+check PLAIN 5m "unset variable gets its default"
+check PRESET mine "set variable is not overridden"
+if printf '%s\n' "$out" | grep -q '^EMPTYSET=$'; then pass "set-but-empty variable is not overridden"; else fail "set-but-empty variable was overridden"; fi
+check SPACED "default-src 'self'; connect-src 'self' https:" "default with spaces and quotes survives"
+check STAR "https://*.trycloudflare.com" "default with '*' and ':' survives"
+check DASHONLY dash "\${NAME-default} form is seeded"
+check TWO_A a "first of two references on one line is seeded"
+check TWO_B b "second of two references on one line is seeded"
+if printf '%s\n' "$out" | grep -q '^EMPTYDEF=$'; then pass "empty default is seeded as empty"; else fail "empty default not seeded"; fi
+if printf '%s\n' "$out" | grep -q '^COMMENTED_VAR='; then fail "reference inside a comment was seeded"; else pass "references in comments are ignored"; fi
+if printf '%s\n' "$out" | grep -q '^NODEF='; then fail "reference without a default was seeded"; else pass "references without a default are left alone"; fi
+
+if [ "$FAILED" -ne 0 ]; then
+  printf '\nsome compose-defaults tests FAILED\n' >&2
+  exit 1
+fi
+printf '\nall compose-defaults tests passed\n'
+
+
+################################################################################
 # FILE: scripts/test.sh
 ################################################################################
 
@@ -18647,10 +18917,10 @@ bash "$SCRIPT_DIR/up.sh" "$PROJECT"
   Relative path:         scripts/test.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/test.sh
   Size:                  2.5 KiB (2580 bytes)
-  Last modified:         2026-11-06 07:19:35.000000000 -0500
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 69650541
+  Inode:                 69678004
   Hard links:            1
   MIME type:             text/x-shellscript
   SHA-256:               c4be8b5f48734a1cf344de757a593e5c009f6d31ee997167558d62430ba64f55
@@ -18752,10 +19022,10 @@ main "$@"
   Relative path:         scripts/tests/lib-detect-test.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/tests/lib-detect-test.sh
   Size:                  8.7 KiB (8927 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Last modified:         2026-11-06 09:23:45.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919160
+  Inode:                 69678005
   Hard links:            1
   MIME type:             text/x-shellscript
   SHA-256:               fc20bcd0ce17dca5680b4735afe7235d8aecfec74a9b0ac5fd032b6509e27df4
@@ -18996,15 +19266,15 @@ printf 'lib-detect-test: all cases passed.\n'
   File name:             up.sh
   Relative path:         scripts/up.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/up.sh
-  Size:                  8.0 KiB (8260 bytes)
-  Last modified:         2026-10-16 11:00:00.000000000 -0400
+  Size:                  8.5 KiB (8757 bytes)
+  Last modified:         2026-11-06 10:03:51.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919161
+  Inode:                 69678006
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               52f329c9eac2b600c729e47e419db1445fa91d9b34941023ff74666351ba7804
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               160892c30cbab1636b0d9350680814a836aeaae4853bc5790b5da11e960aa918
+  Last git commit:       b171479 2026-11-06 10:16:47 -0500 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -19122,8 +19392,18 @@ fi
 log "starting API and its tunnel…"
 dc -p "$PROJECT" up -d --no-deps api cloudflared-api
 
-# 7) API readiness (best-effort) then discover its public URL.
-wait_for_log "$PROJECT" api 'http server listening' 60 || warn "did not observe API listening log yet"
+# 7) API readiness, then discover its public URL. An API that never logs
+#    "http server listening" is crash-looping (restart: unless-stopped hides
+#    that from `ps`) and every browser call would surface as a CORS error on
+#    Cloudflare's 502. Stop here and show why instead of reporting success.
+if ! wait_for_log "$PROJECT" api 'http server listening' 60; then
+  _api_cid="$(cid_of "$PROJECT" api)"
+  if [ -n "$_api_cid" ]; then
+    err "API did not start; last log lines ($CR logs $_api_cid):"
+    "$CR" logs --tail 20 "$_api_cid" >&2 2>&1 || true
+  fi
+  die "API failed to start. Fix the error above, then: scripts/down.sh $PROJECT && scripts/up.sh"
+fi
 log "waiting for the API Quick Tunnel URL…"
 API_URL="$(poll_tunnel_url "$PROJECT" cloudflared-api 90)" \
   || die "timed out waiting for API tunnel URL (check: dc -p $PROJECT logs cloudflared-api)"
@@ -19191,10 +19471,10 @@ done
 ################################################################################
 # DUMP SUMMARY
 ################################################################################
-  Files dumped   : 105
-  Total size     : 605.3 KiB (619900 bytes)
+  Files dumped   : 107
+  Total size     : 615.4 KiB (630218 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-11-06T07:28:23-05:00
+  Completed at   : 2026-11-06T10:17:00-05:00
 ################################################################################
 # END OF DUMP
 ################################################################################
