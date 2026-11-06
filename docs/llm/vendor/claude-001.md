@@ -1398,3 +1398,203 @@ strict-origin-when-cross-origin
 
 
 
+Claude
+/
+Ran 49 commands, read memory
+Checking uploads and memory files for the CORS problem.
+Checking whether the API service keeps restarting.
+Trying module proxy and download options.
+Tracing the earlier failing run and its prompt.
+Checking the WebAuthn library's new configuration requirements.
+Tracing the crash to a dependency upgrade.
+Setting up the build and dependencies.
+Checking how a Go submodule resolves within the repo.
+Checking the module path and repository layout.
+Checking whether the old server process is still running.
+Checking which module tags hold the packages.
+Checking whether stale state caused the build error.
+Checking a dependency's checksum history.
+I haven’t found the fix yet, so there are no files to change this round. I’m fairly sure the CORS error is a side effect, though, and one log will tell us what the real problem is.
+
+The API container is crashing on startup. When nothing is running behind the API tunnel, Cloudflare returns its own error page. That page has no Access-Control-Allow-Origin header, so the browser reports it as a CORS failure. That fits both signup paths, desktop and iPhone all failing the same way.
+
+The clues are in docs/llm/vendor/virginia.txt from the gotunnels-7wggkw run:
+
+up.sh printed did not observe API listening log yet, so the API never logged http server listening within 60 seconds.
+podman ps -a shows gotunnels-7wggkw_api_1 created 2 minutes earlier but “Up Less than a second”. That means it keeps exiting and being restarted.
+The Oct 16 run (gotunnels-7yivoa) did the same thing and shows Exited (1). The last run that worked was ogz9jw.
+Between the working run and the first crash, three things changed: go-webauthn went from v0.11.2 to v0.18.2, Postgres went from 16 to 18, and Go went to 1.27. The newest commit also switched to encoding/json/v2, but the crash started before that, so it isn’t the original cause.
+
+I tried to build and run the API here to see the actual error, but my sandbox couldn’t put together the full Go module graph.
+
+Please run these on virginia and paste the output:
+
+bash
+podman logs gotunnels-7wggkw_api_1 2>&1 | tail -60
+podman inspect gotunnels-7wggkw_api_1 --format '{{.State.ExitCode}} {{.RestartCount}}'
+curl -sS -i https://walls-nodes-mothers-declare.trycloudflare.com/healthz | head -20
+The first command will show the fatal line that main.go logs before exiting, which names the failing step. The last one confirms whether the tunnel is serving a Cloudflare error page instead of the API.
+
+Once I have that error line, I’ll send the full files for the fix plus the matching doc updates. If you redeploy before then, run scripts/down.sh gotunnels-7wggkw first, since the containers from that run are still around.
+
+
+kushal@fedora:~/src/golang/GoTunnels$ ssh virginia Linux virginia 6.12.113+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.113-1 (2026-10-15) x86_64 The programs included with the Debian GNU/Linux system are free software; the exact distribution terms for each program are described in the individua
+
+pasted
+
+I had already shut down the instance so I am starting a new one 
+so now the script you gave me 
+
+podman logs gotunnels-7wggkw_api_1 2>&1 | tail -60
+podman inspect gotunnels-7wggkw_api_1 --format '{{.State.ExitCode}} {{.RestartCount}}'
+curl -sS -i https://walls-nodes-mothers-declare.trycloudflare.com/healthz | head -20
+
+will be 
+
+podman logs gotunnels-65uofq_api_1 2>&1 | tail -60
+podman inspect gotunnels-65uofq_api_1 --format '{{.State.ExitCode}} {{.RestartCount}}'
+curl -sS -i https://investigated-wagon-lat-pic.trycloudflare.com/healthz | head -20
+
+but even before that 
+https://investigated-wagon-lat-pic.trycloudflare.com/healthz
+
+Request URL
+https://investigated-wagon-lat-pic.trycloudflare.com/healthz
+Request method
+GET
+Status code
+502 Bad Gateway
+Remote address
+104.16.231.132:443
+Referrer policy
+strict-origin-when-cross-origin
+
+Ran 26 commands, shared files
+Adding failure handling to lib.sh.
+Checking how the container logs get redirected.
+Checking which tests run from inside the repo.
+Now CI and docs.
+Planning the delivery of the eight files.
+Presented file
+The API wasn’t starting at all on virginia, and the “CORS error” was just how the browser reported that. Your log shows it: the config values arrived as literal text like ${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m} instead of 5m. The API refused them, so podman restarted it 1,366 times, and Cloudflare answered every request with a 502 page. That page has no CORS headers, so the browser called it a CORS error.
+
+Root cause: podman-compose before version 1.6 has a bug with lines in compose.yaml like NAME: "${NAME:-default}". When NAME isn’t set on the host, it passes the text through literally instead of using the default. Debian trixie ships podman-compose 1.3, which has this bug; 1.6 handles it correctly, which would explain why Fedora works. I reproduced this here by running podman-compose 1.3.0’s code against your compose.yaml.
+
+It started on Oct 16, when the signup, auth-attempt, maintenance and retention settings were added. Those are the variables that aren’t in .env. Two others were broken the same way but without crashing anything:
+
+GOTUNNELS_RP_ORIGIN_PATTERNS, which lets passkeys work when the tunnel hostname changes.
+The frontend’s GOTUNNELS_API_UPSTREAM, which forwards CSP reports to the API.
+Fixes:
+
+scripts/lib.sh: every compose command now first sets each ${NAME:-default} from compose.yaml whose variable is unset. Values you’ve already set are left alone, and the defaults still live only in compose.yaml. With this in place, the 1.3 code produces no literal placeholders.
+scripts/up.sh: if the API never logs http server listening, the script now prints the API’s last 20 log lines and exits with an error. Before, it printed “GoTunnels is up”, which hid this crash for three weeks.
+internal/config/config.go: any setting that still contains ${ now stops startup with an error that names the setting and explains the cause.
+I also added two new tests (scripts/tests/compose-defaults-test.sh and internal/config/placeholder_test.go), run the new script in CI, and updated README.md and docs/CONFIGURATION.md.
+
+Both new tests and the existing ones pass, and shellcheck is clean. I also broke the new code on purpose and confirmed the tests catch it.
+
+There are 8 changed files, so the archive gotunnels-compose-defaults.tar.gz holds the whole project:
+
+Path	Status
+scripts/lib.sh	modified
+scripts/up.sh	modified
+internal/config/config.go	modified
+.github/workflows/ci.yaml	modified
+docs/CONFIGURATION.md	modified
+README.md	modified
+internal/config/placeholder_test.go	new
+scripts/tests/compose-defaults-test.sh	new
+No files need to be deleted, and .env doesn’t need changes.
+
+To confirm the cause on virginia, run podman-compose --version; I expect it to show 1.5 or older. Then redeploy with bash scripts/up.sh as usual.
+
+Gotunnels compose defaults.tar
+GZ
+
+
+
+Claude is AI and can make mistakes. Please double-check responses.
+Claude finished the response
+
+60
+43
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
