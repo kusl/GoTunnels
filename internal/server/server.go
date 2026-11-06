@@ -116,6 +116,7 @@ func New(d Deps) *http.Server {
 		httpx.RequestID(),
 		httpx.Recoverer(d.Log),
 		httpx.SecurityHeaders(),
+		httpx.MaxBody(httpx.DefaultMaxBody),
 		httpx.CORS(d.Config.CORSAllowedOrigins, d.Config.CORSAllowsAny()),
 	)
 	handler = httpx.Instrument(handler, "gotunnels-api")

@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"encoding/json"
+	"bytes"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-webauthn/webauthn/webauthn"
 
 	"github.com/kusl/GoTunnels/internal/store"
 )
@@ -88,15 +90,14 @@ func TestExtractToken(t *testing.T) {
 }
 
 func TestFlowEnvelopeRoundTrip(t *testing.T) {
-	sess := json.RawMessage(`{"challenge":"abc","user_id":"aWQ="}`)
 	env := flowEnvelope{
 		Origin:  "https://tart-panda.trycloudflare.com",
 		Signup:  &signupFlowData{UserID: "11111111-2222-4333-8444-555555555555", Username: "alice", DisplayName: "Alice"},
-		Session: sess,
+		Session: &webauthn.SessionData{Challenge: "abc", UserID: []byte("id")},
 	}
-	blob, err := json.Marshal(env)
+	blob, err := encodeFlowEnvelope(env)
 	if err != nil {
-		t.Fatalf("marshal: %v", err)
+		t.Fatalf("encode: %v", err)
 	}
 	got, sd, err := decodeFlowEnvelope(blob)
 	if err != nil {
@@ -108,13 +109,49 @@ func TestFlowEnvelopeRoundTrip(t *testing.T) {
 	if got.Signup == nil || got.Signup.Username != "alice" || got.Signup.UserID != env.Signup.UserID {
 		t.Fatalf("roundtrip lost signup data: %+v", got.Signup)
 	}
-	if sd == nil || sd.Challenge != "abc" {
+	if sd == nil || sd.Challenge != "abc" || string(sd.UserID) != "id" {
 		t.Fatalf("roundtrip lost session data: %+v", sd)
 	}
 }
 
+func TestEncodeFlowEnvelopeRequiresSession(t *testing.T) {
+	if _, err := encodeFlowEnvelope(flowEnvelope{Origin: "https://a.example"}); err == nil {
+		t.Fatal("encoding an envelope without session data must fail")
+	}
+}
+
+func TestFlowEnvelopeRoundTripsRealCeremonyState(t *testing.T) {
+	wa, err := NewWebAuthn("localhost", "GoTunnels", []string{"http://localhost:8081"})
+	if err != nil {
+		t.Fatalf("NewWebAuthn: %v", err)
+	}
+	user := &WebAuthnUser{User: store.User{ID: newCandidateID(), Username: "alice", DisplayName: "Alice"}}
+	_, sd, err := wa.BeginRegistration(user)
+	if err != nil {
+		t.Fatalf("BeginRegistration: %v", err)
+	}
+	blob, err := encodeFlowEnvelope(flowEnvelope{Origin: "http://localhost:8081", Session: sd})
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	_, got, err := decodeFlowEnvelope(blob)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Challenge != sd.Challenge || got.RelyingPartyID != sd.RelyingPartyID ||
+		!bytes.Equal(got.UserID, sd.UserID) || len(got.CredParams) != len(sd.CredParams) ||
+		got.UserVerification != sd.UserVerification || !got.Expires.Equal(sd.Expires) {
+		t.Fatalf("session data changed across the envelope:\n got  %+v\n want %+v", got, sd)
+	}
+}
+
 func TestDecodeFlowEnvelopeRejectsMalformed(t *testing.T) {
-	for _, blob := range []string{"not json at all", `{"origin":"https://a.example"}`, `{"session":"nope"}`} {
+	for _, blob := range []string{
+		"not json at all",
+		`{"origin":"https://a.example"}`,
+		`{"session":"nope"}`,
+		`{"origin":"https://a.example","origin":"https://b.example","session":{"challenge":"abc"}}`,
+	} {
 		if _, _, err := decodeFlowEnvelope([]byte(blob)); err == nil {
 			t.Errorf("decodeFlowEnvelope(%q) must fail", blob)
 		}
@@ -151,19 +188,16 @@ func TestValidatePassword(t *testing.T) {
 	}
 }
 
-func TestNewUUIDv4(t *testing.T) {
+func TestNewCandidateID(t *testing.T) {
 	seen := map[string]bool{}
 	re := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
-	for i := 0; i < 64; i++ {
-		id, err := newUUIDv4()
-		if err != nil {
-			t.Fatalf("newUUIDv4: %v", err)
-		}
+	for range 64 {
+		id := newCandidateID()
 		if !re.MatchString(id) {
-			t.Fatalf("id %q is not a canonical v4 uuid", id)
+			t.Fatalf("candidate id %q is not a canonical version 4 uuid", id)
 		}
 		if seen[id] {
-			t.Fatalf("duplicate uuid generated: %s", id)
+			t.Fatalf("duplicate candidate id %q", id)
 		}
 		seen[id] = true
 	}

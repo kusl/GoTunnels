@@ -1,6 +1,7 @@
 package notes
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -110,9 +111,16 @@ func TestParseAuthors(t *testing.T) {
 			t.Fatalf("ids = %v", ids)
 		}
 	})
-	t.Run("skips empty segments", func(t *testing.T) {
-		ids, problem := parseAuthors(u1 + ",," + u1)
-		if problem != "" || len(ids) != 2 {
+	t.Run("skips empty segments and duplicates", func(t *testing.T) {
+		ids, problem := parseAuthors(u1 + ",," + u1 + "," + strings.ToUpper(u1))
+		if problem != "" || len(ids) != 1 || ids[0] != u1 {
+			t.Fatalf("got (%v, %q)", ids, problem)
+		}
+	})
+	t.Run("canonicalises accepted uuid spellings", func(t *testing.T) {
+		raw := "{" + u1 + "},urn:uuid:" + strings.ToUpper(u2) + "," + strings.ReplaceAll(u1, "-", "")
+		ids, problem := parseAuthors(raw)
+		if problem != "" || len(ids) != 2 || ids[0] != u1 || ids[1] != strings.ToLower(u2) {
 			t.Fatalf("got (%v, %q)", ids, problem)
 		}
 	})
@@ -123,39 +131,17 @@ func TestParseAuthors(t *testing.T) {
 			}
 		}
 	})
-	t.Run("caps the list", func(t *testing.T) {
-		parts := make([]string, maxAuthorFilter+1)
-		for i := range parts {
-			parts[i] = u1
-		}
-		if _, problem := parseAuthors(strings.Join(parts, ",")); problem == "" {
-			t.Fatal("over-cap list accepted, want rejection")
-		}
-	})
 }
 
-func TestIsUUIDString(t *testing.T) {
-	good := []string{
-		"11111111-2222-4333-8444-555555555555",
-		"AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE",
-		"00000000-0000-0000-0000-000000000000",
+func TestParseAuthorsCapCountsDistinctIDs(t *testing.T) {
+	parts := make([]string, 0, maxAuthorFilter+1)
+	for i := range maxAuthorFilter + 1 {
+		parts = append(parts, fmt.Sprintf("00000000-0000-4000-8000-%012d", i))
 	}
-	for _, s := range good {
-		if !isUUIDString(s) {
-			t.Errorf("expected %q to be a uuid", s)
-		}
+	if _, problem := parseAuthors(strings.Join(parts[:maxAuthorFilter], ",")); problem != "" {
+		t.Fatalf("exactly-at-cap list rejected: %s", problem)
 	}
-	bad := []string{
-		"",
-		"11111111-2222-4333-8444-55555555555",   // too short
-		"11111111-2222-4333-8444-5555555555556", // too long
-		"11111111x2222-4333-8444-555555555555",  // wrong separator
-		"1111111g-2222-4333-8444-555555555555",  // non-hex
-		"11111111-2222-4333-8444_555555555555",  // underscore
-	}
-	for _, s := range bad {
-		if isUUIDString(s) {
-			t.Errorf("expected %q to be rejected", s)
-		}
+	if _, problem := parseAuthors(strings.Join(parts, ",")); problem == "" {
+		t.Fatal("over-cap list of distinct ids accepted, want rejection")
 	}
 }

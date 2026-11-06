@@ -44,7 +44,7 @@ func TestTokenStoredInLocalStorage(t *testing.T) {
 	// nothing more. Count only executable lines so the explanatory comments
 	// above the code do not inflate the total.
 	codeUses := 0
-	for _, line := range strings.Split(api, "\n") {
+	for line := range strings.SplitSeq(api, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "//") {
 			continue
 		}

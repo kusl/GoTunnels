@@ -2,15 +2,22 @@
 // application lives here, so the rest of the code deals in Go types and never
 // in SQL strings. It wraps a pgx connection pool.
 //
-// UUID handling note: to avoid pulling in a separate UUID dependency, user ids
-// are exchanged as plain strings. Queries always select `id::text` and always
-// bind uuid parameters with an explicit `$N::uuid` cast, which sidesteps the
-// lack of an implicit text->uuid cast in PostgreSQL.
+// UUID handling note: user ids are exchanged as canonical lowercase strings.
+// Queries always select `id::text` and always bind uuid parameters with an
+// explicit `$N::uuid` cast, which sidesteps the lack of an implicit text->uuid
+// cast in PostgreSQL. Ids that arrive from clients are parsed and
+// canonicalised with the standard library uuid package before they reach a
+// query, and new ids are minted the same way.
+//
+// JSON note: jsonb columns are written and read with encoding/json/v2. The
+// WebAuthn credential blob is both produced and consumed here, so it always
+// round-trips under the same semantics (see marshalCredential).
 package store
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"strings"
 	"time"
@@ -74,16 +81,16 @@ type Flow struct {
 
 // Activity is one audit-log row.
 type Activity struct {
-	ID         int64           `json:"id"`
-	UserID     *string         `json:"user_id,omitempty"`
-	Username   string          `json:"username"`
-	EventType  string          `json:"event_type"`
-	AuthMethod string          `json:"auth_method"`
-	Outcome    string          `json:"outcome"`
-	IPHash     string          `json:"ip_hash"`
-	UserAgent  string          `json:"user_agent,omitempty"`
-	Detail     json.RawMessage `json:"detail,omitempty"`
-	CreatedAt  time.Time       `json:"created_at"`
+	ID         int64          `json:"id"`
+	UserID     *string        `json:"user_id,omitzero"`
+	Username   string         `json:"username"`
+	EventType  string         `json:"event_type"`
+	AuthMethod string         `json:"auth_method"`
+	Outcome    string         `json:"outcome"`
+	IPHash     string         `json:"ip_hash"`
+	UserAgent  string         `json:"user_agent,omitempty"`
+	Detail     jsontext.Value `json:"detail,omitzero"`
+	CreatedAt  time.Time      `json:"created_at"`
 }
 
 // ActivityInput is the payload for recording an activity event.
@@ -114,7 +121,7 @@ type CSPReportInput struct {
 	ScriptSample       string
 	IPHash             string
 	UserAgent          string
-	Raw                json.RawMessage
+	Raw                jsontext.Value
 }
 
 // CaptchaStats is a user's aggregate CAPTCHA game record. One row per user;
@@ -301,7 +308,7 @@ type execer interface {
 // source of truth for later reconstruction) alongside broken-out columns used
 // for indexing and uniqueness.
 func insertWebAuthnCredential(ctx context.Context, db execer, userID string, cred *webauthn.Credential) error {
-	blob, err := json.Marshal(cred)
+	blob, err := marshalCredential(cred)
 	if err != nil {
 		return err
 	}
@@ -341,8 +348,8 @@ func (s *Store) GetWebAuthnCredentials(ctx context.Context, userID string) ([]we
 		if err := rows.Scan(&blob); err != nil {
 			return nil, err
 		}
-		var c webauthn.Credential
-		if err := json.Unmarshal(blob, &c); err != nil {
+		c, err := unmarshalCredential(blob)
+		if err != nil {
 			return nil, err
 		}
 		creds = append(creds, c)
@@ -360,7 +367,7 @@ func (s *Store) CountWebAuthnCredentials(ctx context.Context, userID string) (in
 
 // UpdateWebAuthnCredential persists post-login changes (sign count, flags).
 func (s *Store) UpdateWebAuthnCredential(ctx context.Context, userID string, cred *webauthn.Credential) error {
-	blob, err := json.Marshal(cred)
+	blob, err := marshalCredential(cred)
 	if err != nil {
 		return err
 	}
@@ -375,6 +382,18 @@ func (s *Store) UpdateWebAuthnCredential(ctx context.Context, userID string, cre
 		cred.ID,
 	)
 	return err
+}
+
+// marshalCredential encodes a credential for the credential jsonb column.
+func marshalCredential(cred *webauthn.Credential) ([]byte, error) {
+	return json.Marshal(cred, json.Deterministic(true))
+}
+
+// unmarshalCredential decodes a credential written by marshalCredential.
+func unmarshalCredential(blob []byte) (webauthn.Credential, error) {
+	var c webauthn.Credential
+	err := json.Unmarshal(blob, &c)
+	return c, err
 }
 
 // ---------------------------------------------------------------------------
@@ -593,11 +612,7 @@ func (s *Store) RevokeAllSessionsForUser(ctx context.Context, userID string) (in
 
 // InsertActivity records an audit event.
 func (s *Store) InsertActivity(ctx context.Context, in ActivityInput) error {
-	detail := in.Detail
-	if detail == nil {
-		detail = map[string]any{}
-	}
-	blob, err := json.Marshal(detail)
+	blob, err := marshalActivityDetail(in.Detail)
 	if err != nil {
 		return err
 	}
@@ -615,6 +630,14 @@ func (s *Store) InsertActivity(ctx context.Context, in ActivityInput) error {
 		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8)`,
 		uid, in.Username, in.EventType, in.AuthMethod, outcome, in.IPHash, in.UserAgent, blob)
 	return err
+}
+
+// marshalActivityDetail encodes an audit event's detail map. A nil map
+// encodes as {} (the v2 default). Invalid UTF-8 — possible in error text
+// derived from client input — is replaced with U+FFFD rather than failing,
+// so an odd byte can never cost the audit trail an event.
+func marshalActivityDetail(detail map[string]any) ([]byte, error) {
+	return json.Marshal(detail, json.Deterministic(true), jsontext.AllowInvalidUTF8(true))
 }
 
 // ListActivityForUser returns a user's most recent audit events.
@@ -675,7 +698,7 @@ func (s *Store) PruneHealthChecks(ctx context.Context, before time.Time) (int64,
 func (s *Store) InsertCSPReport(ctx context.Context, in CSPReportInput) error {
 	raw := in.Raw
 	if len(raw) == 0 {
-		raw = json.RawMessage("{}")
+		raw = jsontext.Value("{}")
 	}
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO csp_reports
@@ -994,8 +1017,8 @@ func mapErr(err error) error {
 // into a friendly 409 — the authoritative "already taken" signal that closes
 // any check-then-insert race.
 func IsUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+	pgErr, ok := errors.AsType[*pgconn.PgError](err)
+	return ok && pgErr.Code == "23505"
 }
 
 // normalizeUsername lowercases and trims a username for case-insensitive

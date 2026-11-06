@@ -108,6 +108,57 @@ func TestNormalizeCustom(t *testing.T) {
 	}
 }
 
+func TestNormalizeLegacyContentTypeWithoutMemberIsRejected(t *testing.T) {
+	body := []byte(`{"documentURI":"https://f.example/","blockedURI":"inline"}`)
+	if _, err := Normalize("application/csp-report; charset=utf-8", body); err == nil {
+		t.Fatal("application/csp-report body without csp-report member must be rejected, not stored empty")
+	}
+}
+
+func TestNormalizeReportingAPIKeepsEachItemRaw(t *testing.T) {
+	first := `{"type":"csp-violation","url":"https://f.example/a","body":{"blockedURL":"inline","effectiveDirective":"script-src-elem"}}`
+	second := `{"type":"csp-violation","url":"https://f.example/b","body":{"blockedURL":"eval","effectiveDirective":"script-src"}}`
+	reports, err := Normalize("application/reports+json", []byte("["+first+", "+second+"]"))
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	if len(reports) != 2 {
+		t.Fatalf("expected 2 reports, got %d", len(reports))
+	}
+	if string(reports[0].Raw) != first || string(reports[1].Raw) != second {
+		t.Fatalf("raw payloads not preserved per item:\n%s\n%s", reports[0].Raw, reports[1].Raw)
+	}
+	if reports[0].DocumentURI != "https://f.example/a" {
+		t.Fatalf("document uri fallback to item url = %q", reports[0].DocumentURI)
+	}
+}
+
+func TestNormalizeReportingAPISkipsMalformedItems(t *testing.T) {
+	body := []byte(`[{"type":"csp-violation","body":{"lineNumber":"nope"}},
+		{"type":"csp-violation","url":"https://f.example/","body":{"blockedURL":"inline","effectiveDirective":"style-src"}}]`)
+	reports, err := Normalize("application/reports+json", body)
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	if len(reports) != 1 || reports[0].BlockedURI != "inline" {
+		t.Fatalf("got %+v, want only the well-formed report", reports)
+	}
+}
+
+func TestNormalizeRejectsDuplicateNames(t *testing.T) {
+	body := []byte(`{"csp-report":{"blocked-uri":"https://a.example/","blocked-uri":"https://b.example/"}}`)
+	if _, err := Normalize("application/csp-report", body); err == nil {
+		t.Fatal("duplicate member names must be rejected")
+	}
+}
+
+func TestNormalizeRejectsTrailingData(t *testing.T) {
+	body := []byte(`{"csp-report":{"blocked-uri":"inline"}} {"extra":true}`)
+	if _, err := Normalize("application/csp-report", body); err == nil {
+		t.Fatal("trailing data after the report must be rejected")
+	}
+}
+
 func TestNormalizeEmpty(t *testing.T) {
 	if _, err := Normalize("application/json", []byte("   ")); err == nil {
 		t.Fatal("expected error for empty body")

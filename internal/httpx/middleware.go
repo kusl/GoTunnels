@@ -1,16 +1,25 @@
 // Package httpx holds transport-level helpers and middleware that do not
-// depend on the data store: CORS, request identifiers, panic recovery, a small
-// in-memory rate limiter, OpenTelemetry HTTP instrumentation, and JSON writing
-// helpers. Keeping these store-agnostic makes them trivial to unit test.
+// depend on the data store: CORS, request identifiers, panic recovery, body
+// size limits, a small in-memory rate limiter, OpenTelemetry HTTP
+// instrumentation, and the JSON request/response helpers. Keeping these
+// store-agnostic makes them trivial to unit test.
+//
+// JSON on the wire uses encoding/json/v2 (Go 1.27). Requests are decoded
+// strictly: exact-case member names, no unknown members, no duplicate names,
+// valid UTF-8 only, and exactly one JSON value per body. Responses are encoded
+// deterministically (sorted map keys) and nil slices/maps encode as [] / {}.
 package httpx
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/v2"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -28,8 +37,8 @@ type Middleware func(http.Handler) http.Handler
 
 // Chain applies middleware in order (the first listed is outermost).
 func Chain(h http.Handler, mws ...Middleware) http.Handler {
-	for i := len(mws) - 1; i >= 0; i-- {
-		h = mws[i](h)
+	for _, mw := range slices.Backward(mws) {
+		h = mw(h)
 	}
 	return h
 }
@@ -368,17 +377,66 @@ func (rl *RateLimiter) LimitWith(keyFn func(*http.Request) string, message strin
 }
 
 // ---------------------------------------------------------------------------
+// Request body limits
+// ---------------------------------------------------------------------------
+
+// DefaultMaxBody is the request body ceiling applied to every route by
+// MaxBody, and the default for DecodeJSON. Handlers that expect less tighten
+// it further for themselves.
+const DefaultMaxBody int64 = 1 << 20
+
+// MaxBody caps every request body at n bytes. It is a backstop for handlers
+// that hand the raw request to a library (the WebAuthn ceremonies) or read it
+// themselves; reading past the cap fails with *http.MaxBytesError.
+func MaxBody(n int64) Middleware {
+	if n <= 0 {
+		n = DefaultMaxBody
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Body != nil && r.Body != http.NoBody {
+				r.Body = http.MaxBytesReader(w, r.Body, n)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
 // JSON helpers
 // ---------------------------------------------------------------------------
 
-// WriteJSON writes v as JSON with the given status code.
+// responseOptions are the encoding/json/v2 options for every response body.
+// Deterministic output keeps responses byte-stable for identical data, which
+// makes them diffable and cache-friendly.
+var responseOptions = json.Deterministic(true)
+
+// requestOptions are the encoding/json/v2 options for every request body.
+// v2 already rejects duplicate names, invalid UTF-8, case-mismatched names,
+// and trailing data; unknown members are rejected as well so a typo in a
+// client payload fails loudly instead of being silently ignored.
+var requestOptions = json.RejectUnknownMembers(true)
+
+const internalErrorBody = `{"error":"internal server error"}` + "\n"
+
+// WriteJSON writes v as JSON with the given status code. The body is encoded
+// before anything is written, so an encoding failure becomes a clean 500
+// rather than a success status followed by truncated JSON.
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
 	if v == nil {
+		w.WriteHeader(status)
 		return
 	}
-	_ = json.NewEncoder(w).Encode(v)
+	body, err := json.Marshal(v, responseOptions)
+	if err != nil {
+		slog.Error("httpx: encode response", slog.String("error", err.Error()), slog.Int("status", status))
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(internalErrorBody))
+		return
+	}
+	w.WriteHeader(status)
+	_, _ = w.Write(append(body, '\n'))
 }
 
 // WriteError writes a JSON error body: {"error": "..."}.
@@ -396,21 +454,33 @@ func ServerError(w http.ResponseWriter, r *http.Request, log *slog.Logger, msg s
 	WriteError(w, http.StatusInternalServerError, "internal server error")
 }
 
-// DecodeJSON reads a size-limited JSON body into dst, writing a 400 and
-// returning false on failure. maxBytes <= 0 defaults to 1 MiB.
+// DecodeJSON reads a size-limited JSON body into dst, writing an error
+// response and returning false on failure: 413 when the body exceeds
+// maxBytes, otherwise 400 with a message naming the offending member when
+// there is one. maxBytes <= 0 means DefaultMaxBody.
 func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64) bool {
 	if maxBytes <= 0 {
-		maxBytes = 1 << 20
+		maxBytes = DefaultMaxBody
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
-	dec := json.NewDecoder(r.Body)
-	if err := dec.Decode(dst); err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid JSON body")
-		return false
-	}
-	if dec.More() {
-		WriteError(w, http.StatusBadRequest, "invalid JSON body")
+	if err := json.UnmarshalRead(r.Body, dst, requestOptions); err != nil {
+		status, msg := decodeProblem(err)
+		WriteError(w, status, msg)
 		return false
 	}
 	return true
+}
+
+// decodeProblem maps a decode failure to a status and a client-safe message.
+func decodeProblem(err error) (int, string) {
+	if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+		return http.StatusRequestEntityTooLarge, "request body too large"
+	}
+	if serr, ok := errors.AsType[*json.SemanticError](err); ok && serr.JSONPointer != "" {
+		if errors.Is(serr.Err, json.ErrUnknownName) {
+			return http.StatusBadRequest, fmt.Sprintf("unknown field %q", serr.JSONPointer.LastToken())
+		}
+		return http.StatusBadRequest, fmt.Sprintf("invalid value for %q", serr.JSONPointer.LastToken())
+	}
+	return http.StatusBadRequest, "invalid JSON body"
 }

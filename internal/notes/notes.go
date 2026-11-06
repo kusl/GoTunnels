@@ -18,6 +18,7 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+	"uuid"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -111,9 +112,6 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, "notes: list", err)
 		return
 	}
-	if rows == nil {
-		rows = []store.Note{}
-	}
 	trace.SpanFromContext(r.Context()).SetAttributes(
 		attribute.Int("notes.returned", len(rows)),
 		attribute.Int64("notes.before", beforeID),
@@ -133,9 +131,6 @@ func (h *Handlers) Authors(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.serverError(w, r, "notes: authors", err)
 		return
-	}
-	if authors == nil {
-		authors = []store.NoteAuthor{}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"authors": authors})
 }
@@ -254,52 +249,37 @@ func forbiddenRune(r rune) bool {
 const maxAuthorFilter = 50
 
 // parseAuthors parses the ?authors= query parameter: a comma-separated list
-// of user uuids. Empty input means "no filter". Every entry must look like a
+// of user uuids. Empty input means "no filter". Every entry must parse as a
 // uuid — the ids go into a `$n::uuid[]` bind, and a malformed value would
-// otherwise surface as an opaque database cast error instead of a 400.
+// otherwise surface as an opaque database cast error instead of a 400. Ids
+// are returned canonicalised (lowercase 8-4-4-4-12) and de-duplicated in
+// first-seen order, so the cap counts distinct authors.
 func parseAuthors(raw string) ([]string, string) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil, ""
 	}
-	parts := strings.Split(raw, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
+	var out []string
+	seen := map[uuid.UUID]bool{}
+	for p := range strings.SplitSeq(raw, ",") {
 		p = strings.TrimSpace(p)
 		if p == "" {
 			continue
 		}
-		if !isUUIDString(p) {
+		id, err := uuid.Parse(p)
+		if err != nil {
 			return nil, "invalid author id"
 		}
-		out = append(out, strings.ToLower(p))
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id.String())
 	}
 	if len(out) > maxAuthorFilter {
 		return nil, fmt.Sprintf("at most %d authors may be selected", maxAuthorFilter)
 	}
 	return out, ""
-}
-
-// isUUIDString reports whether s is a canonical 8-4-4-4-12 hex uuid.
-func isUUIDString(s string) bool {
-	if len(s) != 36 {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch i {
-		case 8, 13, 18, 23:
-			if c != '-' {
-				return false
-			}
-		default:
-			isHex := (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-			if !isHex {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg string, err error) {

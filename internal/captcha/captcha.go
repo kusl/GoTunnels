@@ -195,9 +195,6 @@ func (h *Handlers) Leaderboard(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, "captcha: own rank", err)
 		return
 	}
-	if rows == nil {
-		rows = []store.CaptchaLeaderboardRow{}
-	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"leaderboard": rows, "me": mine})
 }
 
@@ -208,21 +205,12 @@ func clampSync(in store.CaptchaSyncInput) store.CaptchaSyncInput {
 	in.ManualDelta = clamp(in.ManualDelta, 0, maxDeltaPerSync)
 	in.AutoDelta = clamp(in.AutoDelta, 0, maxDeltaPerSync)
 	in.CurrentStreak = clamp(in.CurrentStreak, 0, maxStreak)
-	in.BestStreak = clamp(in.BestStreak, 0, maxStreak)
-	if in.BestStreak < in.CurrentStreak {
-		in.BestStreak = in.CurrentStreak
-	}
+	in.BestStreak = max(clamp(in.BestStreak, 0, maxStreak), in.CurrentStreak)
 	return in
 }
 
 func clamp(v, lo, hi int64) int64 {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
+	return max(lo, min(v, hi))
 }
 
 func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg string, err error) {

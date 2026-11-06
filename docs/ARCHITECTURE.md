@@ -126,6 +126,14 @@ Hardening details:
   as "logged out".
 - **Account creation is atomic.** The user, role, and first credential
   (password hash or passkey) are written in one transaction.
+- **Passkey user handles are opaque.** Passkey-first signup mints the
+  candidate user id with the standard-library `uuid.NewV4` — random, and
+  deliberately not the time-ordered version 7, which would expose the signup
+  time to every authenticator that stores the handle.
+- **Request bodies are bounded.** Every request is capped at 1 MiB by
+  middleware, and the WebAuthn finish endpoints cap theirs at 128 KiB before
+  handing the request to go-webauthn, which otherwise reads and drains the
+  whole body itself.
 - **Sign-in attempts are rate limited** (see `GOTUNNELS_AUTH_ATTEMPT_*`), and
   unknown usernames still pay for one argon2 derivation so timing does not
   reveal which accounts exist.
@@ -172,7 +180,11 @@ occur before any JavaScript loads.
 `internal/csp` normalises the report shapes browsers actually send — the
 legacy `application/csp-report` object and the Reporting API
 `application/reports+json` array (plus the camelCase shape the former in-page
-listener posted, kept for compatibility) — into one row. Each report is both
+listener posted, kept for compatibility) — into one row. A Reporting API array
+is split into raw items first, so each stored row keeps its own original JSON
+and a malformed or non-CSP item does not discard its neighbours; a body
+declared as `application/csp-report` without a `csp-report` member is rejected
+rather than stored as an empty report. Each report is both
 stored in `csp_reports` and logged through the OpenTelemetry-backed logger, so
 violations show up in telemetry too.
 `internal/config/csp_deployment_test.go` pins every duplicated copy of the
@@ -193,11 +205,41 @@ multiple instances reporting to one backend stay distinguishable.
 ## Request lifecycle
 
 An API request passes through: OpenTelemetry HTTP instrumentation (span +
-metrics) → CORS (which also answers `OPTIONS` preflight before routing) → panic
-recovery → request-id assignment → the method-aware `ServeMux` → for protected
-routes, the `RequireAuth` middleware that resolves the Bearer token to a session
-and loads the user → the handler. Handlers speak only to `internal/store`, never
-raw SQL.
+metrics) → request-id assignment → panic recovery → security headers → the
+1 MiB body cap → CORS (which also answers `OPTIONS` preflight before routing)
+→ the method-aware `ServeMux` → for protected routes, the `RequireAuth`
+middleware that resolves the Bearer token to a session and loads the user →
+the handler. Handlers speak only to `internal/store`, never raw SQL.
+
+## JSON: `encoding/json/v2`
+
+All JSON is handled with the Go 1.27 `encoding/json/v2` and
+`encoding/json/jsontext` packages; nothing imports the v1 `encoding/json`
+API.
+
+- **Requests** go through `httpx.DecodeJSON`, a single `json.UnmarshalRead`
+  call. v2's defaults already reject duplicate member names (an ambiguity
+  attackers have exploited before), invalid UTF-8, case-mismatched names, and
+  trailing data; `RejectUnknownMembers` is added so a typo in a payload fails
+  loudly. Failures name the offending member (`unknown field "nmae"`,
+  `invalid value for "count"`), and an oversized body is a 413, not a 400.
+- **Responses** go through `httpx.WriteJSON`, which encodes before writing the
+  status line — an encoding failure is a clean 500 instead of a 200 followed
+  by truncated JSON — with `Deterministic` output, so map keys are sorted and
+  identical data produces identical bytes. Nil slices and maps encode as `[]`
+  and `{}`, so handlers no longer need `if rows == nil` guards.
+- **Struct tags** use `omitzero` for optional pointers and raw values (v2's
+  `omitempty` means "encodes as an empty JSON value", which is not the same
+  thing for numbers, bools, or pointers).
+- **Persistence.** The WebAuthn flow envelope (origin, signup candidate, and
+  the go-webauthn `SessionData`) is one v2 document, and stored
+  `webauthn.Credential` blobs are written and read by the same pair of
+  functions; tests pin both round trips against real ceremony state. Audit
+  `detail` objects are the one place invalid UTF-8 is tolerated (replaced with
+  U+FFFD), because they can carry library error text and a stray byte must
+  never cost the audit trail an event. Raw values (`activity_log.detail`,
+  `csp_reports.raw`) are `jsontext.Value`, which pgx binds and scans exactly as
+  it did `json.RawMessage` (the latter is now an alias of the former).
 
 ## Migrations
 
@@ -297,6 +339,10 @@ create, delete. The constraints are the feature:
   $2` — authorization is part of the statement, not a separate read followed
   by a write. Deleting someone else's note and deleting a nonexistent note are
   the same uniform 404, so the endpoint is not an existence oracle.
+- **Validated author filter.** `?authors=` ids are parsed with the
+  standard-library `uuid` package, canonicalised, and de-duplicated before
+  they reach the `uuid[]` bind, so the 50-author cap counts distinct people
+  and a malformed id is a 400 rather than a database cast error.
 - **Rate-limited creation.** `POST /api/notes` sits behind the existing token
   bucket (0.5 rps sustained, burst 5) keyed by the *authenticated user id* —
   inside `RequireAuth`, so the key is server-derived, not client-controlled.

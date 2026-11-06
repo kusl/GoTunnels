@@ -170,11 +170,11 @@ func randomRecoveryCode() (string, error) {
 		return "", err
 	}
 	var b strings.Builder
-	for g := 0; g < groups; g++ {
+	for g := range groups {
 		if g > 0 {
 			b.WriteByte('-')
 		}
-		for i := 0; i < perGroup; i++ {
+		for i := range perGroup {
 			idx := int(buf[g*perGroup+i]) % len(recoveryAlphabet)
 			b.WriteByte(recoveryAlphabet[idx])
 		}

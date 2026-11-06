@@ -44,6 +44,9 @@ ten independent instances side by side without configuring anything.
   reported back to the API, stored, and logged to telemetry.
 - **No exposed host ports**; everything talks over the internal Compose network
   by service name.
+- **Go 1.27 idioms throughout**: strict `encoding/json/v2` on the wire
+  (unknown fields, duplicate names, and invalid UTF-8 are rejected), the
+  standard-library `uuid` package, and `go fix` modernizers enforced in CI.
 
 ## Architecture
 
@@ -180,7 +183,7 @@ enforcing policy.
 Tests run through one script, locally and in CI:
 
 ```bash
-./scripts/test.sh all         # build + vet + unit tests
+./scripts/test.sh all         # build + gofmt/go fix/vet + unit tests
 ./scripts/test.sh unit        # just unit tests
 ./scripts/test.sh vuln        # govulncheck (reachability-aware)
 ./scripts/test.sh freshness   # bump deps, tidy, retest (drift check)
@@ -190,7 +193,8 @@ If you have Go installed it uses it directly; otherwise it runs the suite in a
 `golang` container. The GitHub Actions workflows are intentionally thin — they
 call these script functions rather than embedding logic:
 
-- `ci.yaml` — gofmt, build, vet, unit tests on every push/PR, plus a job that
+- `ci.yaml` — gofmt, `go fix -diff` (pending modernizations fail the build),
+  build, vet, unit tests on every push/PR, plus a job that
   builds both images and smoke-tests the real stack against PostgreSQL.
 - `govulncheck.yaml` — vulnerability scan on push/PR and weekly.
 - `dependency-freshness.yaml` — weekly update-and-retest drift check.

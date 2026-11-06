@@ -12,7 +12,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -258,9 +260,7 @@ func (c *Config) resolveTelemetry() {
 		tc.Enabled = true
 		tc.EndpointURL = ep
 		tc.Insecure = strings.HasPrefix(ep, "http://")
-		for k, v := range parseHeaders(os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")) {
-			tc.Headers[k] = v
-		}
+		maps.Copy(tc.Headers, parseHeaders(os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")))
 	}
 	c.Telemetry = tc
 }
@@ -332,12 +332,7 @@ func (c *Config) TOTPAESKey() [32]byte { return c.totpAESKey }
 
 // CORSAllowsAny reports whether the wildcard "*" origin is configured.
 func (c *Config) CORSAllowsAny() bool {
-	for _, o := range c.CORSAllowedOrigins {
-		if o == "*" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(c.CORSAllowedOrigins, "*")
 }
 
 // ---------------------------------------------------------------------------
@@ -435,7 +430,7 @@ func splitList(s string) []string {
 // parseHeaders parses OTEL_EXPORTER_OTLP_HEADERS ("k1=v1,k2=v2").
 func parseHeaders(s string) map[string]string {
 	out := map[string]string{}
-	for _, pair := range strings.Split(s, ",") {
+	for pair := range strings.SplitSeq(s, ",") {
 		pair = strings.TrimSpace(pair)
 		if pair == "" {
 			continue
@@ -460,8 +455,8 @@ func endpointFromDSN(dsn string) (endpoint string, insecure bool) {
 		scheme = rest[:i]
 		rest = rest[i+3:]
 	}
-	if at := strings.LastIndex(rest, "@"); at >= 0 {
-		rest = rest[at+1:]
+	if _, host, ok := strings.CutLast(rest, "@"); ok {
+		rest = host
 	}
 	// strip any path/query
 	if q := strings.IndexAny(rest, "/?"); q >= 0 {

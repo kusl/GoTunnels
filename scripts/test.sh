@@ -45,9 +45,9 @@ cmd_unit() {
 }
 
 cmd_vet() {
-  log "checking gofmt and running go vet…"
-  run_go "test -z \"\$(gofmt -l .)\" || { gofmt -l . >&2; echo 'gofmt needed on the files above' >&2; exit 1; }; go mod tidy && go vet ./..."
-  ok "gofmt + go vet clean"
+  log "checking gofmt, go fix modernizers, and running go vet…"
+  run_go "test -z \"\$(gofmt -l .)\" || { gofmt -l . >&2; echo 'gofmt needed on the files above' >&2; exit 1; }; go mod tidy && { go fix -diff ./... || { echo 'go fix has pending modernizations; run: go fix ./...' >&2; exit 1; }; } && go vet ./..."
+  ok "gofmt + go fix + go vet clean"
 }
 
 cmd_build() {

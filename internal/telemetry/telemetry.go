@@ -16,6 +16,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -50,8 +51,8 @@ type Providers struct {
 // Shutdown flushes and stops all providers. Safe to call once during teardown.
 func (p *Providers) Shutdown(ctx context.Context) error {
 	var errs []error
-	for i := len(p.shutdown) - 1; i >= 0; i-- {
-		if err := p.shutdown[i](ctx); err != nil {
+	for _, fn := range slices.Backward(p.shutdown) {
+		if err := fn(ctx); err != nil {
 			errs = append(errs, err)
 		}
 	}

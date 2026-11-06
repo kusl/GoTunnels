@@ -2,7 +2,9 @@ package httpx
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -285,7 +287,7 @@ func TestRateLimiterSweepsFullBuckets(t *testing.T) {
 	now := time.Unix(1_000, 0)
 	rl := NewRateLimiter(1, 2)
 	rl.now = func() time.Time { return now }
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		rl.Allow(strconv.Itoa(i))
 	}
 	if rl.Len() != 100 {
@@ -356,5 +358,102 @@ func TestDecodeJSONRejectsTrailingData(t *testing.T) {
 	}
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestWriteJSONDeterministicAndEmptySlices(t *testing.T) {
+	rec := httptest.NewRecorder()
+	WriteJSON(rec, http.StatusOK, map[string]any{"b": 1, "a": []string(nil), "c": map[string]int(nil)})
+	if got, want := rec.Body.String(), `{"a":[],"b":1,"c":{}}`+"\n"; got != want {
+		t.Fatalf("body = %q, want %q", got, want)
+	}
+}
+
+func TestWriteJSONEncodingFailureIs500(t *testing.T) {
+	rec := httptest.NewRecorder()
+	WriteJSON(rec, http.StatusOK, map[string]any{"d": time.Second})
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
+	}
+	var e map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &e); err != nil || e["error"] == "" {
+		t.Fatalf("body = %q (%v), want a JSON error", rec.Body.String(), err)
+	}
+}
+
+func decodeInto(t *testing.T, body string, maxBytes int64) (*httptest.ResponseRecorder, bool) {
+	t.Helper()
+	var dst struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	return rec, DecodeJSON(rec, req, &dst, maxBytes)
+}
+
+func errorMessage(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	var e map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &e); err != nil {
+		t.Fatalf("error body not json: %v", err)
+	}
+	return e["error"]
+}
+
+func TestDecodeJSONStrictness(t *testing.T) {
+	cases := []struct {
+		name, body string
+		status     int
+		msg        string
+	}{
+		{"unknown member", `{"name":"x","nmae":"y"}`, http.StatusBadRequest, `unknown field "nmae"`},
+		{"case mismatch is unknown", `{"Name":"x"}`, http.StatusBadRequest, `unknown field "Name"`},
+		{"duplicate name", `{"name":"x","name":"y"}`, http.StatusBadRequest, "invalid JSON body"},
+		{"invalid utf-8", "{\"name\":\"\xff\"}", http.StatusBadRequest, "invalid JSON body"},
+		{"wrong type", `{"count":"seven"}`, http.StatusBadRequest, `invalid value for "count"`},
+		{"empty body", ``, http.StatusBadRequest, "invalid JSON body"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec, ok := decodeInto(t, tc.body, 0)
+			if ok {
+				t.Fatal("decode succeeded, want failure")
+			}
+			if rec.Code != tc.status {
+				t.Fatalf("status = %d, want %d", rec.Code, tc.status)
+			}
+			if got := errorMessage(t, rec); got != tc.msg {
+				t.Fatalf("message = %q, want %q", got, tc.msg)
+			}
+		})
+	}
+}
+
+func TestDecodeJSONAcceptsExactPayload(t *testing.T) {
+	if rec, ok := decodeInto(t, " {\"name\":\"x\",\"count\":3}\n", 0); !ok {
+		t.Fatalf("decode failed: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDecodeJSONTooLargeIs413(t *testing.T) {
+	rec, ok := decodeInto(t, `{"name":"`+strings.Repeat("a", 100)+`"}`, 32)
+	if ok {
+		t.Fatal("oversized body accepted")
+	}
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want 413", rec.Code)
+	}
+}
+
+func TestMaxBodyCapsReads(t *testing.T) {
+	var readErr error
+	h := MaxBody(8)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, readErr = io.ReadAll(r.Body)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(strings.Repeat("x", 64)))
+	h.ServeHTTP(httptest.NewRecorder(), req)
+	if _, ok := errors.AsType[*http.MaxBytesError](readErr); !ok {
+		t.Fatalf("read error = %v, want *http.MaxBytesError", readErr)
 	}
 }

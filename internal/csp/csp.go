@@ -8,7 +8,9 @@
 package csp
 
 import (
-	"encoding/json"
+	"bytes"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"io"
 	"log/slog"
@@ -21,6 +23,9 @@ import (
 	"github.com/kusl/GoTunnels/internal/store"
 )
 
+// legacyMediaType is the Content-Type of the legacy report-uri mechanism.
+const legacyMediaType = "application/csp-report"
+
 // Normalize parses a CSP report request body into zero or more normalised
 // reports. It understands:
 //
@@ -30,71 +35,68 @@ import (
 //     violation listener posted; parsing is kept so anything still speaking
 //     it keeps working
 //
-// The raw JSON of each individual report is preserved in Raw.
+// Parsing uses encoding/json/v2, so member names match exactly, duplicate
+// names and invalid UTF-8 are rejected, and trailing data is an error. The
+// original JSON of each individual report is preserved verbatim in Raw.
 func Normalize(contentType string, body []byte) ([]store.CSPReportInput, error) {
-	trimmed := strings.TrimSpace(string(body))
-	if trimmed == "" {
+	v := jsontext.Value(bytes.TrimSpace(body))
+	if len(v) == 0 {
 		return nil, errors.New("csp: empty body")
 	}
-
-	// Reporting API sends a JSON array.
-	if trimmed[0] == '[' {
-		return parseReportingAPI(body)
-	}
-
-	// Object: could be the legacy wrapper or our custom shape.
-	if strings.Contains(mediaType(contentType), "csp-report") || looksLegacy(body) {
-		if r, ok := parseLegacy(body); ok {
-			return []store.CSPReportInput{r}, nil
-		}
-	}
-	if r, ok := parseCustom(body); ok {
-		return []store.CSPReportInput{r}, nil
+	switch v[0] {
+	case '[':
+		return parseReportingAPI(v)
+	case '{':
+		return parseObject(mediaType(contentType) == legacyMediaType, v)
 	}
 	return nil, errors.New("csp: unrecognised report shape")
 }
 
 func mediaType(ct string) string {
-	if i := strings.IndexByte(ct, ';'); i >= 0 {
-		ct = ct[:i]
-	}
+	ct, _, _ = strings.Cut(ct, ";")
 	return strings.ToLower(strings.TrimSpace(ct))
 }
 
-func looksLegacy(body []byte) bool {
-	var probe map[string]json.RawMessage
-	if err := json.Unmarshal(body, &probe); err != nil {
-		return false
+// parseObject handles a single-object body. A "csp-report" member selects
+// the legacy shape; a body declared as application/csp-report without one is
+// rejected instead of being stored as an empty report.
+func parseObject(declaredLegacy bool, v jsontext.Value) ([]store.CSPReportInput, error) {
+	var probe struct {
+		CSPReport *legacyReport `json:"csp-report"`
 	}
-	_, ok := probe["csp-report"]
-	return ok
+	if err := json.Unmarshal(v, &probe); err != nil {
+		return nil, err
+	}
+	if probe.CSPReport != nil {
+		return []store.CSPReportInput{probe.CSPReport.normalize(v)}, nil
+	}
+	if declaredLegacy {
+		return nil, errors.New("csp: csp-report body has no csp-report member")
+	}
+	if r, ok := parseCustom(v); ok {
+		return []store.CSPReportInput{r}, nil
+	}
+	return nil, errors.New("csp: unrecognised report shape")
 }
 
 // --- legacy application/csp-report --------------------------------------
 
-type legacyWrapper struct {
-	CSPReport struct {
-		DocumentURI        string `json:"document-uri"`
-		Referrer           string `json:"referrer"`
-		BlockedURI         string `json:"blocked-uri"`
-		ViolatedDirective  string `json:"violated-directive"`
-		EffectiveDirective string `json:"effective-directive"`
-		OriginalPolicy     string `json:"original-policy"`
-		Disposition        string `json:"disposition"`
-		SourceFile         string `json:"source-file"`
-		ScriptSample       string `json:"script-sample"`
-		LineNumber         int    `json:"line-number"`
-		ColumnNumber       int    `json:"column-number"`
-		StatusCode         int    `json:"status-code"`
-	} `json:"csp-report"`
+type legacyReport struct {
+	DocumentURI        string `json:"document-uri"`
+	Referrer           string `json:"referrer"`
+	BlockedURI         string `json:"blocked-uri"`
+	ViolatedDirective  string `json:"violated-directive"`
+	EffectiveDirective string `json:"effective-directive"`
+	OriginalPolicy     string `json:"original-policy"`
+	Disposition        string `json:"disposition"`
+	SourceFile         string `json:"source-file"`
+	ScriptSample       string `json:"script-sample"`
+	LineNumber         int    `json:"line-number"`
+	ColumnNumber       int    `json:"column-number"`
+	StatusCode         int    `json:"status-code"`
 }
 
-func parseLegacy(body []byte) (store.CSPReportInput, bool) {
-	var w legacyWrapper
-	if err := json.Unmarshal(body, &w); err != nil {
-		return store.CSPReportInput{}, false
-	}
-	c := w.CSPReport
+func (c legacyReport) normalize(raw jsontext.Value) store.CSPReportInput {
 	return store.CSPReportInput{
 		DocumentURI:        c.DocumentURI,
 		Referrer:           c.Referrer,
@@ -108,8 +110,8 @@ func parseLegacy(body []byte) (store.CSPReportInput, bool) {
 		ColumnNumber:       c.ColumnNumber,
 		StatusCode:         c.StatusCode,
 		ScriptSample:       c.ScriptSample,
-		Raw:                json.RawMessage(body),
-	}, true
+		Raw:                raw,
+	}
 }
 
 // --- Reporting API application/reports+json -----------------------------
@@ -133,25 +135,26 @@ type reportingItem struct {
 	} `json:"body"`
 }
 
-func parseReportingAPI(body []byte) ([]store.CSPReportInput, error) {
-	var items []reportingItem
-	if err := json.Unmarshal(body, &items); err != nil {
+// parseReportingAPI splits the array into raw items first, so each stored
+// report keeps its own original JSON and one malformed or foreign item does
+// not discard the valid CSP reports delivered alongside it.
+func parseReportingAPI(v jsontext.Value) ([]store.CSPReportInput, error) {
+	var items []jsontext.Value
+	if err := json.Unmarshal(v, &items); err != nil {
 		return nil, err
 	}
 	var out []store.CSPReportInput
-	for _, it := range items {
-		// Ignore non-CSP report types that may share the endpoint.
+	for _, raw := range items {
+		var it reportingItem
+		if err := json.Unmarshal(raw, &it); err != nil {
+			continue
+		}
 		if it.Type != "" && it.Type != "csp-violation" && it.Type != "csp" {
 			continue
 		}
 		b := it.Body
-		raw, _ := json.Marshal(it)
-		doc := b.DocumentURL
-		if doc == "" {
-			doc = it.URL
-		}
 		out = append(out, store.CSPReportInput{
-			DocumentURI:        doc,
+			DocumentURI:        firstNonEmpty(b.DocumentURL, it.URL),
 			Referrer:           b.Referrer,
 			BlockedURI:         b.BlockedURL,
 			ViolatedDirective:  firstNonEmpty(b.ViolatedDirective, b.EffectiveDirective),
@@ -163,7 +166,7 @@ func parseReportingAPI(body []byte) ([]store.CSPReportInput, error) {
 			ColumnNumber:       b.ColumnNumber,
 			StatusCode:         b.StatusCode,
 			ScriptSample:       b.Sample,
-			Raw:                json.RawMessage(raw),
+			Raw:                raw,
 		})
 	}
 	if len(out) == 0 {
@@ -189,13 +192,11 @@ type customReport struct {
 	StatusCode         int    `json:"statusCode"`
 }
 
-func parseCustom(body []byte) (store.CSPReportInput, bool) {
+func parseCustom(v jsontext.Value) (store.CSPReportInput, bool) {
 	var c customReport
-	dec := json.NewDecoder(strings.NewReader(string(body)))
-	if err := dec.Decode(&c); err != nil {
+	if err := json.Unmarshal(v, &c); err != nil {
 		return store.CSPReportInput{}, false
 	}
-	// Require at least one meaningful field to avoid storing empty objects.
 	if c.DocumentURI == "" && c.ViolatedDirective == "" && c.EffectiveDirective == "" && c.BlockedURI == "" {
 		return store.CSPReportInput{}, false
 	}
@@ -212,7 +213,7 @@ func parseCustom(body []byte) (store.CSPReportInput, bool) {
 		ColumnNumber:       c.ColumnNumber,
 		StatusCode:         c.StatusCode,
 		ScriptSample:       c.Sample,
-		Raw:                json.RawMessage(body),
+		Raw:                v,
 	}, true
 }
 
@@ -285,9 +286,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func readAll(r *http.Request, max int64) ([]byte, error) {
+func readAll(r *http.Request, limit int64) ([]byte, error) {
 	defer func() { _ = r.Body.Close() }()
-	return io.ReadAll(io.LimitReader(r.Body, max))
+	return io.ReadAll(io.LimitReader(r.Body, limit))
 }
 
 // ---------------------------------------------------------------------------
@@ -327,9 +328,6 @@ func (h *Handler) Recent(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpx.ServerError(w, r, h.log, "csp: list recent", err)
 		return
-	}
-	if rows == nil {
-		rows = []store.CSPReportRow{}
 	}
 	for i := range rows {
 		rows[i].DocumentURI = truncateRunes(rows[i].DocumentURI, maxURILen)

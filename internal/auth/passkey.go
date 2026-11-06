@@ -158,8 +158,8 @@ func hostOfOrigin(origin string) string {
 	if i := strings.IndexByte(origin, '/'); i >= 0 {
 		origin = origin[:i]
 	}
-	if i := strings.LastIndexByte(origin, ':'); i >= 0 {
-		origin = origin[:i]
+	if host, _, ok := strings.CutLast(origin, ":"); ok {
+		origin = host
 	}
 	return origin
 }

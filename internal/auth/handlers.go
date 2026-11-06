@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -169,7 +170,7 @@ type userResponse struct {
 
 type sessionResponse struct {
 	Token     string       `json:"token"`
-	ExpiresAt *time.Time   `json:"expires_at,omitempty"`
+	ExpiresAt *time.Time   `json:"expires_at,omitzero"`
 	User      userResponse `json:"user"`
 }
 
@@ -350,9 +351,6 @@ func (h *Handlers) Activity(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.serverError(w, r, "activity: list", err)
 		return
-	}
-	if events == nil {
-		events = []store.Activity{}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"activity": events})
 }
@@ -560,11 +558,7 @@ func (h *Handlers) PasskeySignupBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	candidateID, err := newUUIDv4()
-	if err != nil {
-		h.serverError(w, r, "passkey signup: candidate id", err)
-		return
-	}
+	candidateID := newCandidateID()
 	waUser := &WebAuthnUser{User: store.User{ID: candidateID, Username: username, DisplayName: displayName}}
 	creation, sessionData, err := wa.BeginRegistration(waUser,
 		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred))
@@ -768,11 +762,12 @@ const (
 
 // flowEnvelope wraps the go-webauthn ceremony state with the origin the flow
 // was created for (so begin and finish agree on the relying party) and, for
-// passkey-first signup, the candidate account created only on success.
+// passkey-first signup, the candidate account created only on success. The
+// whole envelope, session included, is one encoding/json/v2 document.
 type flowEnvelope struct {
-	Origin  string          `json:"origin,omitempty"`
-	Signup  *signupFlowData `json:"signup,omitempty"`
-	Session json.RawMessage `json:"session"`
+	Origin  string                `json:"origin,omitempty"`
+	Signup  *signupFlowData       `json:"signup,omitzero"`
+	Session *webauthn.SessionData `json:"session"`
 }
 
 type signupFlowData struct {
@@ -789,27 +784,26 @@ type liveFlow struct {
 	wa      *webauthn.WebAuthn
 }
 
+func encodeFlowEnvelope(env flowEnvelope) ([]byte, error) {
+	if env.Session == nil {
+		return nil, errors.New("auth: flow has no session data")
+	}
+	return json.Marshal(env, json.Deterministic(true))
+}
+
 func decodeFlowEnvelope(blob []byte) (flowEnvelope, *webauthn.SessionData, error) {
 	var env flowEnvelope
 	if err := json.Unmarshal(blob, &env); err != nil {
 		return flowEnvelope{}, nil, err
 	}
-	if len(env.Session) == 0 {
+	if env.Session == nil {
 		return flowEnvelope{}, nil, errors.New("auth: flow has no session data")
 	}
-	var sd webauthn.SessionData
-	if err := json.Unmarshal(env.Session, &sd); err != nil {
-		return flowEnvelope{}, nil, err
-	}
-	return env, &sd, nil
+	return env, env.Session, nil
 }
 
 func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind, origin string, signup *signupFlowData, sd *webauthn.SessionData) (string, error) {
-	sess, err := json.Marshal(sd)
-	if err != nil {
-		return "", err
-	}
-	blob, err := json.Marshal(flowEnvelope{Origin: origin, Signup: signup, Session: sess})
+	blob, err := encodeFlowEnvelope(flowEnvelope{Origin: origin, Signup: signup, Session: sd})
 	if err != nil {
 		return "", err
 	}
@@ -830,11 +824,17 @@ func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind, origin st
 	return id, nil
 }
 
-// consumeFlow atomically takes the flow named by ?flow= out of the store, so
-// each ceremony can be finished at most once, then decodes it and resolves
-// the relying party pinned when it began. On failure it has already written
-// the response.
+// maxCeremonyBody caps a WebAuthn finish body. go-webauthn reads (and then
+// drains) the whole request itself, so the cap must be in place before the
+// request is handed over; real attestation responses are a few kilobytes.
+const maxCeremonyBody = 128 << 10
+
+// consumeFlow caps the request body for the ceremony library, atomically
+// takes the flow named by ?flow= out of the store, so each ceremony can be
+// finished at most once, then decodes it and resolves the relying party
+// pinned when it began. On failure it has already written the response.
 func (h *Handlers) consumeFlow(w http.ResponseWriter, r *http.Request, kind string) (liveFlow, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxCeremonyBody)
 	id := r.URL.Query().Get("flow")
 	if id == "" {
 		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired flow")
@@ -940,9 +940,6 @@ func (h *Handlers) userResponse(ctx context.Context, u store.User) (userResponse
 	roles, err := h.store.UserRoles(ctx, u.ID)
 	if err != nil {
 		return userResponse{}, err
-	}
-	if roles == nil {
-		roles = []string{}
 	}
 	totp, err := h.totpEnabled(ctx, u.ID)
 	if err != nil {
@@ -1061,17 +1058,12 @@ func newFlowID() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// newUUIDv4 generates an RFC 9562 version 4 UUID string for the passkey
-// signup candidate, which must exist as a WebAuthn user handle before any row
-// exists in the database.
-func newUUIDv4() (string, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
+// newCandidateID mints the passkey-signup candidate user id, which must exist
+// as a WebAuthn user handle before any database row does. Version 4 is chosen
+// explicitly over uuid.New's default: the handle is shown to authenticators
+// and must stay opaque, so a time-ordered version 7 would leak signup time.
+func newCandidateID() string {
+	return uuid.NewV4().String()
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {

@@ -23,7 +23,7 @@ func TestNewSessionToken(t *testing.T) {
 
 func TestSessionTokensUnique(t *testing.T) {
 	seen := map[string]bool{}
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		token, _, err := NewSessionToken()
 		if err != nil {
 			t.Fatalf("NewSessionToken: %v", err)
