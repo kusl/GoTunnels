@@ -113,8 +113,18 @@ fi
 log "starting API and its tunnel…"
 dc -p "$PROJECT" up -d --no-deps api cloudflared-api
 
-# 7) API readiness (best-effort) then discover its public URL.
-wait_for_log "$PROJECT" api 'http server listening' 60 || warn "did not observe API listening log yet"
+# 7) API readiness, then discover its public URL. An API that never logs
+#    "http server listening" is crash-looping (restart: unless-stopped hides
+#    that from `ps`) and every browser call would surface as a CORS error on
+#    Cloudflare's 502. Stop here and show why instead of reporting success.
+if ! wait_for_log "$PROJECT" api 'http server listening' 60; then
+  _api_cid="$(cid_of "$PROJECT" api)"
+  if [ -n "$_api_cid" ]; then
+    err "API did not start; last log lines ($CR logs $_api_cid):"
+    "$CR" logs --tail 20 "$_api_cid" >&2 2>&1 || true
+  fi
+  die "API failed to start. Fix the error above, then: scripts/down.sh $PROJECT && scripts/up.sh"
+fi
 log "waiting for the API Quick Tunnel URL…"
 API_URL="$(poll_tunnel_url "$PROJECT" cloudflared-api 90)" \
   || die "timed out waiting for API tunnel URL (check: dc -p $PROJECT logs cloudflared-api)"

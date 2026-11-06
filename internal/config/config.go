@@ -350,8 +350,20 @@ func (e *env) err() error { return errors.Join(e.errs...) }
 // raw returns the trimmed value and whether the variable is set to anything
 // at all. A whitespace-only value counts as set, so it can deliberately clear
 // a list setting such as GOTUNNELS_RP_ORIGIN_PATTERNS.
+//
+// A value still containing a "${" placeholder is an error: it means the
+// compose tool passed compose.yaml's "${NAME:-default}" through literally
+// instead of substituting it (podman-compose before 1.6 does this for
+// variables unset on the host). Failing here names the real cause instead of
+// a confusing parse error — or, for plain strings such as
+// GOTUNNELS_RP_ORIGIN_PATTERNS, instead of silently running with garbage.
 func (e *env) raw(key string) (string, bool) {
 	v, ok := os.LookupEnv(key)
+	if strings.Contains(v, "${") {
+		e.errs = append(e.errs, fmt.Errorf(
+			"config: %s=%q is an unexpanded compose placeholder; the compose tool did not substitute it (podman-compose < 1.6 does this for unset variables) — start the stack with scripts/up.sh, which seeds every compose default", key, v))
+		return "", false
+	}
 	return strings.TrimSpace(v), ok && v != ""
 }
 

@@ -13,6 +13,17 @@ Most values are generated for you by `scripts/up.sh` on first run and written to
 a gitignored `.env`. You only ever set variables by hand if you are bypassing
 the scripts. See also [`.env.example`](../.env.example).
 
+Defaults for everything the API and frontend read live in
+[`compose.yaml`](../compose.yaml) as `${NAME:-default}`. Before every compose
+command the scripts export each of those defaults whose variable is unset
+(`seed_compose_defaults` in `scripts/lib.sh`), so compose only ever substitutes
+variables that are set. This works around podman-compose before 1.6 (Debian
+trixie ships 1.3), which passes `"${NAME:-default}"` through literally when an
+environment entry references an unset variable of its own name. If you run
+compose directly instead of through the scripts, either use podman-compose 1.6+
+/ docker compose or set the variables yourself. The API refuses to start on any
+value that still contains `${`, and names the variable.
+
 ## Identity
 
 | Variable | Default | Meaning |

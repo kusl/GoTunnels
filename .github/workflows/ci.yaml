@@ -23,12 +23,14 @@ jobs:
 
       # Fast, host-only checks on the bash layer: syntax, shellcheck (ships on
       # ubuntu runners), and the hermetic detect_runtime/ensure_podman_socket
-      # unit tests (stubbed binaries — no containers, no sockets, no network).
+      # and seed_compose_defaults unit tests (no containers, no sockets, no
+      # network).
       - name: Shell script checks
         run: |
           for f in scripts/*.sh scripts/tests/*.sh; do bash -n "$f"; done
           shellcheck -x -P SCRIPTDIR scripts/*.sh scripts/tests/*.sh
           bash scripts/tests/lib-detect-test.sh
+          bash scripts/tests/compose-defaults-test.sh
 
       - uses: actions/setup-go@v7
         with:

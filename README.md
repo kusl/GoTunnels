@@ -123,7 +123,10 @@ Replace `podman` with `docker` (and drop `--depend`) on Docker.
 ### Prerequisites
 
 - **Podman** (with `podman compose` or `podman-compose`) or **Docker** (with
-  `docker compose`). Podman on Fedora is the primary target.
+  `docker compose`). Podman on Fedora is the primary target. Older
+  podman-compose releases (e.g. 1.3 from Debian trixie apt) work through the
+  scripts, which seed compose defaults into the environment first (see
+  [docs/CONFIGURATION.md](docs/CONFIGURATION.md)).
 - Outbound internet access (to pull base images and, on the first API build, to
   resolve Go modules).
 - `openssl` (for secret generation) — present on essentially every Linux box.

@@ -133,9 +133,43 @@ ensure_podman_socket() {
 # IFS=$'\n\t' (no space), which would otherwise keep "podman compose" as one
 # nonexistent command — so restore a normal IFS locally just for the split.
 dc() {
+  seed_compose_defaults
   local IFS=$' \t\n'
   # shellcheck disable=SC2086
   $COMPOSE -f "$REPO_ROOT/compose.yaml" "$@"
+}
+
+# seed_compose_defaults [compose-file] — export NAME=default for every
+# ${NAME:-default} / ${NAME-default} reference in the compose file whose NAME
+# is not set in the environment. Variables that are already set (even to an
+# empty string) are left untouched.
+#
+# Why: podman-compose before 1.6 (Debian trixie ships 1.3) resolves an
+# environment entry that references a variable of its own name — e.g.
+#   GOTUNNELS_SIGNUP_IP_INTERVAL: "${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m}"
+# — to the LITERAL string "${GOTUNNELS_SIGNUP_IP_INTERVAL:-5m}" whenever the
+# variable is unset on the host, instead of applying the default. The API then
+# refuses to start ("is not a duration"), crash-loops, and the browser reports
+# every API call as a CORS error because Cloudflare answers 502 with no CORS
+# headers. Seeding the defaults into the environment first means compose only
+# ever substitutes set variables, which every implementation gets right, and
+# compose.yaml stays the single place the defaults are written down.
+seed_compose_defaults() {
+  local file="${1:-$REPO_ROOT/compose.yaml}" line trimmed name def
+  local re='\$\{([A-Za-z_][A-Za-z0-9_]*):?-([^}]*)\}'
+  [ -f "$file" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    trimmed="${line#"${line%%[![:space:]]*}"}"
+    [ "${trimmed:0:1}" = "#" ] && continue
+    while [[ $line =~ $re ]]; do
+      name="${BASH_REMATCH[1]}"
+      def="${BASH_REMATCH[2]}"
+      if [ -z "${!name+x}" ]; then
+        export "$name=$def"
+      fi
+      line="${line#*"${BASH_REMATCH[0]}"}"
+    done
+  done < "$file"
 }
 
 # ---------------------------------------------------------------------------
