@@ -415,4 +415,13 @@ da2dd63fa4f9  docker.io/cloudflare/cloudflared:2026.10.1  tunnel --no-autou...  
 c6cb21de4d3a  docker.io/library/postgres:18-alpine        postgres              2 weeks ago  Exited (0) 2 weeks ago    5432/tcp                                      gotunnels-7yivoa_db_1
 bb957e44fa15  docker.io/cloudflare/cloudflared:2026.10.1  tunnel --no-autou...  2 weeks ago  Exited (143) 2 weeks ago                                                gotunnels-7yivoa_cloudflared-api_1
 52def067c2cc  localhost/gotunnels-7yivoa_api:latest                             2 weeks ago  Exited (1) 2 weeks ago    8080/tcp                                      gotunnels-7yivoa_api_1
-kushal@virginia:~/src/golang/GoTunnels$ cd ~/src/golang/GoTunnels/; time git status; time git fetch; time git status; time git remote show origin; time git pull; time git status; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/up.sh; podman ps -a;
+kushal@virginia:~/src/golang/GoTunnels$ podman logs gotunnels-7wggkw_api_1 2>&1 | tail -60
+podman inspect gotunnels-7wggkw_api_1 --format '{{.State.ExitCode}} {{.RestartCount}}'
+curl -sS -i https://walls-nodes-mothers-declare.trycloudflare.com/healthz | head -20
+Error: no container with name or ID "gotunnels-7wggkw_api_1" found: no such container
+Error: no such object: "gotunnels-7wggkw_api_1"
+curl: (6) Could not resolve host: walls-nodes-mothers-declare.trycloudflare.com
+kushal@virginia:~/src/golang/GoTunnels$ exit
+logout
+Connection to virginia closed.
+kushal@fedora:~/src/golang/GoTunnels$ 
