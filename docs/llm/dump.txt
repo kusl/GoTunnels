@@ -7,7 +7,7 @@
 
 DUMP METADATA
 ═════════════════════════════════════════════════════════════════════════════════
-  Generated at   : 2026-11-06T06:44:12-05:00
+  Generated at   : 2026-11-06T07:28:20-05:00
   Generator      : export.sh
   Host           : fedora
   User           : kushal
@@ -17,12 +17,12 @@ REPOSITORY METADATA
 ═════════════════════════════════════════════════════════════════════════════════
   Repository root: /home/kushal/src/golang/GoTunnels
   Branch         : main
-  Commit (full)  : e2cd9c93bde468d764684511b10254470a57f777
-  Commit (short) : e2cd9c9
-  Commit date    : 2026-10-16 12:28:25 -0400
-  Commit message : add logs
+  Commit (full)  : cb4bce9ab9a8693ee1d3358d96acee5fbcf6d8d5
+  Commit (short) : cb4bce9
+  Commit date    : 2026-11-06 07:27:47 -0500
+  Commit message : add claude response
   Remote origin  : git@github.com:kusl/GoTunnels.git
-  Files included : 104
+  Files included : 105
   Excluded path  : docs/llm/
   Excluded files : yarn.lock
 
@@ -424,7 +424,7 @@ FOOTER
 mv -f "$TMP_FILE" "$OUTPUT_FILE"
 
 ################################################################################
-# FILE TREE  (all 104 included files)
+# FILE TREE  (all 105 included files)
 ################################################################################
 .
 .
@@ -521,7 +521,8 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 │   ├── server
 │   │   └── server.go
 │   ├── store
-│   │   └── store.go
+│   │   ├── store.go
+│   │   └── store_test.go
 │   └── telemetry
 │       ├── multihandler.go
 │       ├── multihandler_test.go
@@ -1094,15 +1095,15 @@ README.md
   File name:             ARCHITECTURE.md
   Relative path:         docs/ARCHITECTURE.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/docs/ARCHITECTURE.md
-  Size:                  18.6 KiB (19094 bytes)
-  Last modified:         2026-10-16 11:00:50.000000000 -0400
+  Size:                  21.5 KiB (22091 bytes)
+  Last modified:         2026-11-06 07:20:06.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919052
+  Inode:                 69650508
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               b5c563e74acd4e7e90b6e31d86f2a23b837e4ed5092767d4c2e4a61ba50ffa2d
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               fecfbc45fd8adf17ab7cf5311bbd42a3f6bcc2112ad27cec138a150d64099356
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 # Architecture
@@ -1233,6 +1234,14 @@ Hardening details:
   as "logged out".
 - **Account creation is atomic.** The user, role, and first credential
   (password hash or passkey) are written in one transaction.
+- **Passkey user handles are opaque.** Passkey-first signup mints the
+  candidate user id with the standard-library `uuid.NewV4` — random, and
+  deliberately not the time-ordered version 7, which would expose the signup
+  time to every authenticator that stores the handle.
+- **Request bodies are bounded.** Every request is capped at 1 MiB by
+  middleware, and the WebAuthn finish endpoints cap theirs at 128 KiB before
+  handing the request to go-webauthn, which otherwise reads and drains the
+  whole body itself.
 - **Sign-in attempts are rate limited** (see `GOTUNNELS_AUTH_ATTEMPT_*`), and
   unknown usernames still pay for one argon2 derivation so timing does not
   reveal which accounts exist.
@@ -1279,7 +1288,11 @@ occur before any JavaScript loads.
 `internal/csp` normalises the report shapes browsers actually send — the
 legacy `application/csp-report` object and the Reporting API
 `application/reports+json` array (plus the camelCase shape the former in-page
-listener posted, kept for compatibility) — into one row. Each report is both
+listener posted, kept for compatibility) — into one row. A Reporting API array
+is split into raw items first, so each stored row keeps its own original JSON
+and a malformed or non-CSP item does not discard its neighbours; a body
+declared as `application/csp-report` without a `csp-report` member is rejected
+rather than stored as an empty report. Each report is both
 stored in `csp_reports` and logged through the OpenTelemetry-backed logger, so
 violations show up in telemetry too.
 `internal/config/csp_deployment_test.go` pins every duplicated copy of the
@@ -1300,11 +1313,41 @@ multiple instances reporting to one backend stay distinguishable.
 ## Request lifecycle
 
 An API request passes through: OpenTelemetry HTTP instrumentation (span +
-metrics) → CORS (which also answers `OPTIONS` preflight before routing) → panic
-recovery → request-id assignment → the method-aware `ServeMux` → for protected
-routes, the `RequireAuth` middleware that resolves the Bearer token to a session
-and loads the user → the handler. Handlers speak only to `internal/store`, never
-raw SQL.
+metrics) → request-id assignment → panic recovery → security headers → the
+1 MiB body cap → CORS (which also answers `OPTIONS` preflight before routing)
+→ the method-aware `ServeMux` → for protected routes, the `RequireAuth`
+middleware that resolves the Bearer token to a session and loads the user →
+the handler. Handlers speak only to `internal/store`, never raw SQL.
+
+## JSON: `encoding/json/v2`
+
+All JSON is handled with the Go 1.27 `encoding/json/v2` and
+`encoding/json/jsontext` packages; nothing imports the v1 `encoding/json`
+API.
+
+- **Requests** go through `httpx.DecodeJSON`, a single `json.UnmarshalRead`
+  call. v2's defaults already reject duplicate member names (an ambiguity
+  attackers have exploited before), invalid UTF-8, case-mismatched names, and
+  trailing data; `RejectUnknownMembers` is added so a typo in a payload fails
+  loudly. Failures name the offending member (`unknown field "nmae"`,
+  `invalid value for "count"`), and an oversized body is a 413, not a 400.
+- **Responses** go through `httpx.WriteJSON`, which encodes before writing the
+  status line — an encoding failure is a clean 500 instead of a 200 followed
+  by truncated JSON — with `Deterministic` output, so map keys are sorted and
+  identical data produces identical bytes. Nil slices and maps encode as `[]`
+  and `{}`, so handlers no longer need `if rows == nil` guards.
+- **Struct tags** use `omitzero` for optional pointers and raw values (v2's
+  `omitempty` means "encodes as an empty JSON value", which is not the same
+  thing for numbers, bools, or pointers).
+- **Persistence.** The WebAuthn flow envelope (origin, signup candidate, and
+  the go-webauthn `SessionData`) is one v2 document, and stored
+  `webauthn.Credential` blobs are written and read by the same pair of
+  functions; tests pin both round trips against real ceremony state. Audit
+  `detail` objects are the one place invalid UTF-8 is tolerated (replaced with
+  U+FFFD), because they can carry library error text and a stray byte must
+  never cost the audit trail an event. Raw values (`activity_log.detail`,
+  `csp_reports.raw`) are `jsontext.Value`, which pgx binds and scans exactly as
+  it did `json.RawMessage` (the latter is now an alias of the former).
 
 ## Migrations
 
@@ -1404,6 +1447,10 @@ create, delete. The constraints are the feature:
   $2` — authorization is part of the statement, not a separate read followed
   by a write. Deleting someone else's note and deleting a nonexistent note are
   the same uniform 404, so the endpoint is not an existence oracle.
+- **Validated author filter.** `?authors=` ids are parsed with the
+  standard-library `uuid` package, canonicalised, and de-duplicated before
+  they reach the `uuid[]` bind, so the 50-author cap counts distinct people
+  and a malformed id is a 400 rather than a database cast error.
 - **Rate-limited creation.** `POST /api/notes` sits behind the existing token
   bucket (0.5 rps sustained, burst 5) keyed by the *authenticated user id* —
   inside `RequireAuth`, so the key is server-derived, not client-controlled.
@@ -6944,14 +6991,14 @@ docs/llm/dump.txt
   Relative path:         go.mod
   Absolute path:         /home/kushal/src/golang/GoTunnels/go.mod
   Size:                  811 B (811 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 07:20:21.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919081
+  Inode:                 69650509
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               4c235a24824f6ef3463147b01e51cfb17a3d03eab838d16697b8549dafcff877
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               4706749cbc63b83be4711d93f5ffd045be985f6a70b63dc2523eb48ad26d0748
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 module github.com/kusl/GoTunnels
@@ -6960,7 +7007,7 @@ go 1.27.0
 
 require (
 	github.com/go-webauthn/webauthn v0.18.2
-	github.com/jackc/pgx/v5 v5.11.0
+	github.com/jackc/pgx/v5 v5.12.0
 	github.com/pquerna/otp v1.5.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
@@ -7207,15 +7254,15 @@ func TestTruncate(t *testing.T) {
   File name:             handlers.go
   Relative path:         internal/auth/handlers.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/handlers.go
-  Size:                  35.6 KiB (36511 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  35.8 KiB (36751 bytes)
+  Last modified:         2026-11-06 07:19:27.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919087
+  Inode:                 69650512
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               35185e3f44fcade509a7f5e0dde8443d784c8fd058ebc0054c06c21b84722db9
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               a74ebe4bfb6bde93f5eb99c91fd85102e77e222257983c83a56b8d3dc91e684c
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 package auth
@@ -7224,7 +7271,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -7233,6 +7280,7 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -7389,7 +7437,7 @@ type userResponse struct {
 
 type sessionResponse struct {
 	Token     string       `json:"token"`
-	ExpiresAt *time.Time   `json:"expires_at,omitempty"`
+	ExpiresAt *time.Time   `json:"expires_at,omitzero"`
 	User      userResponse `json:"user"`
 }
 
@@ -7570,9 +7618,6 @@ func (h *Handlers) Activity(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.serverError(w, r, "activity: list", err)
 		return
-	}
-	if events == nil {
-		events = []store.Activity{}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"activity": events})
 }
@@ -7780,11 +7825,7 @@ func (h *Handlers) PasskeySignupBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	candidateID, err := newUUIDv4()
-	if err != nil {
-		h.serverError(w, r, "passkey signup: candidate id", err)
-		return
-	}
+	candidateID := newCandidateID()
 	waUser := &WebAuthnUser{User: store.User{ID: candidateID, Username: username, DisplayName: displayName}}
 	creation, sessionData, err := wa.BeginRegistration(waUser,
 		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred))
@@ -7988,11 +8029,12 @@ const (
 
 // flowEnvelope wraps the go-webauthn ceremony state with the origin the flow
 // was created for (so begin and finish agree on the relying party) and, for
-// passkey-first signup, the candidate account created only on success.
+// passkey-first signup, the candidate account created only on success. The
+// whole envelope, session included, is one encoding/json/v2 document.
 type flowEnvelope struct {
-	Origin  string          `json:"origin,omitempty"`
-	Signup  *signupFlowData `json:"signup,omitempty"`
-	Session json.RawMessage `json:"session"`
+	Origin  string                `json:"origin,omitempty"`
+	Signup  *signupFlowData       `json:"signup,omitzero"`
+	Session *webauthn.SessionData `json:"session"`
 }
 
 type signupFlowData struct {
@@ -8009,27 +8051,26 @@ type liveFlow struct {
 	wa      *webauthn.WebAuthn
 }
 
+func encodeFlowEnvelope(env flowEnvelope) ([]byte, error) {
+	if env.Session == nil {
+		return nil, errors.New("auth: flow has no session data")
+	}
+	return json.Marshal(env, json.Deterministic(true))
+}
+
 func decodeFlowEnvelope(blob []byte) (flowEnvelope, *webauthn.SessionData, error) {
 	var env flowEnvelope
 	if err := json.Unmarshal(blob, &env); err != nil {
 		return flowEnvelope{}, nil, err
 	}
-	if len(env.Session) == 0 {
+	if env.Session == nil {
 		return flowEnvelope{}, nil, errors.New("auth: flow has no session data")
 	}
-	var sd webauthn.SessionData
-	if err := json.Unmarshal(env.Session, &sd); err != nil {
-		return flowEnvelope{}, nil, err
-	}
-	return env, &sd, nil
+	return env, env.Session, nil
 }
 
 func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind, origin string, signup *signupFlowData, sd *webauthn.SessionData) (string, error) {
-	sess, err := json.Marshal(sd)
-	if err != nil {
-		return "", err
-	}
-	blob, err := json.Marshal(flowEnvelope{Origin: origin, Signup: signup, Session: sess})
+	blob, err := encodeFlowEnvelope(flowEnvelope{Origin: origin, Signup: signup, Session: sd})
 	if err != nil {
 		return "", err
 	}
@@ -8050,11 +8091,17 @@ func (h *Handlers) saveFlow(ctx context.Context, userID *string, kind, origin st
 	return id, nil
 }
 
-// consumeFlow atomically takes the flow named by ?flow= out of the store, so
-// each ceremony can be finished at most once, then decodes it and resolves
-// the relying party pinned when it began. On failure it has already written
-// the response.
+// maxCeremonyBody caps a WebAuthn finish body. go-webauthn reads (and then
+// drains) the whole request itself, so the cap must be in place before the
+// request is handed over; real attestation responses are a few kilobytes.
+const maxCeremonyBody = 128 << 10
+
+// consumeFlow caps the request body for the ceremony library, atomically
+// takes the flow named by ?flow= out of the store, so each ceremony can be
+// finished at most once, then decodes it and resolves the relying party
+// pinned when it began. On failure it has already written the response.
 func (h *Handlers) consumeFlow(w http.ResponseWriter, r *http.Request, kind string) (liveFlow, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxCeremonyBody)
 	id := r.URL.Query().Get("flow")
 	if id == "" {
 		httpx.WriteError(w, http.StatusBadRequest, "invalid or expired flow")
@@ -8160,9 +8207,6 @@ func (h *Handlers) userResponse(ctx context.Context, u store.User) (userResponse
 	roles, err := h.store.UserRoles(ctx, u.ID)
 	if err != nil {
 		return userResponse{}, err
-	}
-	if roles == nil {
-		roles = []string{}
 	}
 	totp, err := h.totpEnabled(ctx, u.ID)
 	if err != nil {
@@ -8281,17 +8325,12 @@ func newFlowID() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// newUUIDv4 generates an RFC 9562 version 4 UUID string for the passkey
-// signup candidate, which must exist as a WebAuthn user handle before any row
-// exists in the database.
-func newUUIDv4() (string, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
+// newCandidateID mints the passkey-signup candidate user id, which must exist
+// as a WebAuthn user handle before any database row does. Version 4 is chosen
+// explicitly over uuid.New's default: the handle is shown to authenticators
+// and must stay opaque, so a time-ordered version 7 would leak signup time.
+func newCandidateID() string {
+	return uuid.NewV4().String()
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
@@ -8357,21 +8396,21 @@ func validUsername(u string) bool {
   File name:             handlers_test.go
   Relative path:         internal/auth/handlers_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/handlers_test.go
-  Size:                  9.1 KiB (9367 bytes)
-  Last modified:         2026-10-16 11:01:06.000000000 -0400
+  Size:                  10.4 KiB (10694 bytes)
+  Last modified:         2026-11-06 07:17:41.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919088
+  Inode:                 69650513
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               856b1aef6591b55585c3ac0ac579dbe3fea18d61d2710b56e31fc623a4588365
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               46e56571da7db2359693ac72dbc92de807f753fbd35906c9d19bbe4f683e61b3
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 package auth
 
 import (
-	"encoding/json"
+	"bytes"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -8380,6 +8419,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-webauthn/webauthn/webauthn"
 
 	"github.com/kusl/GoTunnels/internal/store"
 )
@@ -8458,15 +8499,14 @@ func TestExtractToken(t *testing.T) {
 }
 
 func TestFlowEnvelopeRoundTrip(t *testing.T) {
-	sess := json.RawMessage(`{"challenge":"abc","user_id":"aWQ="}`)
 	env := flowEnvelope{
 		Origin:  "https://tart-panda.trycloudflare.com",
 		Signup:  &signupFlowData{UserID: "11111111-2222-4333-8444-555555555555", Username: "alice", DisplayName: "Alice"},
-		Session: sess,
+		Session: &webauthn.SessionData{Challenge: "abc", UserID: []byte("id")},
 	}
-	blob, err := json.Marshal(env)
+	blob, err := encodeFlowEnvelope(env)
 	if err != nil {
-		t.Fatalf("marshal: %v", err)
+		t.Fatalf("encode: %v", err)
 	}
 	got, sd, err := decodeFlowEnvelope(blob)
 	if err != nil {
@@ -8478,13 +8518,49 @@ func TestFlowEnvelopeRoundTrip(t *testing.T) {
 	if got.Signup == nil || got.Signup.Username != "alice" || got.Signup.UserID != env.Signup.UserID {
 		t.Fatalf("roundtrip lost signup data: %+v", got.Signup)
 	}
-	if sd == nil || sd.Challenge != "abc" {
+	if sd == nil || sd.Challenge != "abc" || string(sd.UserID) != "id" {
 		t.Fatalf("roundtrip lost session data: %+v", sd)
 	}
 }
 
+func TestEncodeFlowEnvelopeRequiresSession(t *testing.T) {
+	if _, err := encodeFlowEnvelope(flowEnvelope{Origin: "https://a.example"}); err == nil {
+		t.Fatal("encoding an envelope without session data must fail")
+	}
+}
+
+func TestFlowEnvelopeRoundTripsRealCeremonyState(t *testing.T) {
+	wa, err := NewWebAuthn("localhost", "GoTunnels", []string{"http://localhost:8081"})
+	if err != nil {
+		t.Fatalf("NewWebAuthn: %v", err)
+	}
+	user := &WebAuthnUser{User: store.User{ID: newCandidateID(), Username: "alice", DisplayName: "Alice"}}
+	_, sd, err := wa.BeginRegistration(user)
+	if err != nil {
+		t.Fatalf("BeginRegistration: %v", err)
+	}
+	blob, err := encodeFlowEnvelope(flowEnvelope{Origin: "http://localhost:8081", Session: sd})
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	_, got, err := decodeFlowEnvelope(blob)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Challenge != sd.Challenge || got.RelyingPartyID != sd.RelyingPartyID ||
+		!bytes.Equal(got.UserID, sd.UserID) || len(got.CredParams) != len(sd.CredParams) ||
+		got.UserVerification != sd.UserVerification || !got.Expires.Equal(sd.Expires) {
+		t.Fatalf("session data changed across the envelope:\n got  %+v\n want %+v", got, sd)
+	}
+}
+
 func TestDecodeFlowEnvelopeRejectsMalformed(t *testing.T) {
-	for _, blob := range []string{"not json at all", `{"origin":"https://a.example"}`, `{"session":"nope"}`} {
+	for _, blob := range []string{
+		"not json at all",
+		`{"origin":"https://a.example"}`,
+		`{"session":"nope"}`,
+		`{"origin":"https://a.example","origin":"https://b.example","session":{"challenge":"abc"}}`,
+	} {
 		if _, _, err := decodeFlowEnvelope([]byte(blob)); err == nil {
 			t.Errorf("decodeFlowEnvelope(%q) must fail", blob)
 		}
@@ -8521,19 +8597,16 @@ func TestValidatePassword(t *testing.T) {
 	}
 }
 
-func TestNewUUIDv4(t *testing.T) {
+func TestNewCandidateID(t *testing.T) {
 	seen := map[string]bool{}
 	re := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
-	for i := 0; i < 64; i++ {
-		id, err := newUUIDv4()
-		if err != nil {
-			t.Fatalf("newUUIDv4: %v", err)
-		}
+	for range 64 {
+		id := newCandidateID()
 		if !re.MatchString(id) {
-			t.Fatalf("id %q is not a canonical v4 uuid", id)
+			t.Fatalf("candidate id %q is not a canonical version 4 uuid", id)
 		}
 		if seen[id] {
-			t.Fatalf("duplicate uuid generated: %s", id)
+			t.Fatalf("duplicate candidate id %q", id)
 		}
 		seen[id] = true
 	}
@@ -8673,15 +8746,15 @@ func TestAuthLookupFailedDistinguishesMissingFromOutage(t *testing.T) {
   File name:             passkey.go
   Relative path:         internal/auth/passkey.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/passkey.go
-  Size:                  6.5 KiB (6713 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Size:                  6.5 KiB (6707 bytes)
+  Last modified:         2026-11-06 07:15:57.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919089
+  Inode:                 69650514
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               300a87bbc9bbab9a30c4a17982710883421d63bd54e64d102e005875744e6226
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  SHA-256:               2dc21ac4eaed56d55a5167528244afa02a13cfd8638f0550a1d3a1eb52a96821
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 package auth
@@ -8844,8 +8917,8 @@ func hostOfOrigin(origin string) string {
 	if i := strings.IndexByte(origin, '/'); i >= 0 {
 		origin = origin[:i]
 	}
-	if i := strings.LastIndexByte(origin, ':'); i >= 0 {
-		origin = origin[:i]
+	if host, _, ok := strings.CutLast(origin, ":"); ok {
+		origin = host
 	}
 	return origin
 }
@@ -9367,15 +9440,15 @@ func HashSessionToken(token string) string {
   File name:             session_test.go
   Relative path:         internal/auth/session_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/session_test.go
-  Size:                  1.0 KiB (1091 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Size:                  1.0 KiB (1080 bytes)
+  Last modified:         2026-11-06 07:11:38.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919094
+  Inode:                 69650515
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               96b644d9041564b348644b5e0a6c75e2196d4be8168d7a3c03c6ae41d625cc85
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               62edec748dd89ff5deede779fb85637f9eac0088f2da0c5c7a497edfd2d2d288
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 package auth
@@ -9403,7 +9476,7 @@ func TestNewSessionToken(t *testing.T) {
 
 func TestSessionTokensUnique(t *testing.T) {
 	seen := map[string]bool{}
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		token, _, err := NewSessionToken()
 		if err != nil {
 			t.Fatalf("NewSessionToken: %v", err)
@@ -9433,15 +9506,15 @@ func TestHashSessionTokenDeterministic(t *testing.T) {
   File name:             totp.go
   Relative path:         internal/auth/totp.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/auth/totp.go
-  Size:                  5.2 KiB (5385 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  5.2 KiB (5373 bytes)
+  Last modified:         2026-11-06 07:11:38.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919095
+  Inode:                 69650516
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               dbef2f50bf70be6bbf35efbf50792dd421fc1f4587327a44a89999270ac27a59
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               5cfd1f6434681a314801db831638660d34a953d51eb492a4b7bd2f70b7ab03bc
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 package auth
@@ -9616,11 +9689,11 @@ func randomRecoveryCode() (string, error) {
 		return "", err
 	}
 	var b strings.Builder
-	for g := 0; g < groups; g++ {
+	for g := range groups {
 		if g > 0 {
 			b.WriteByte('-')
 		}
-		for i := 0; i < perGroup; i++ {
+		for i := range perGroup {
 			idx := int(buf[g*perGroup+i]) % len(recoveryAlphabet)
 			b.WriteByte(recoveryAlphabet[idx])
 		}
@@ -9828,15 +9901,15 @@ func TestMatchTOTPStepWindowAndStep(t *testing.T) {
   File name:             captcha.go
   Relative path:         internal/captcha/captcha.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/captcha/captcha.go
-  Size:                  7.9 KiB (8149 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  7.8 KiB (7995 bytes)
+  Last modified:         2026-11-06 07:17:00.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919098
+  Inode:                 69650518
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               74b784a2e35564957366fc535ba7a45f890cfdd9b48125d9ac8f818c0cf16bed
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               4e6b3846bf9d1b6626a0187621f838cdde13a2323d0b674b29533ce409c7348d
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 // Package captcha persists per-user statistics for the CAPTCHA demo page and
@@ -10036,9 +10109,6 @@ func (h *Handlers) Leaderboard(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, "captcha: own rank", err)
 		return
 	}
-	if rows == nil {
-		rows = []store.CaptchaLeaderboardRow{}
-	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"leaderboard": rows, "me": mine})
 }
 
@@ -10049,21 +10119,12 @@ func clampSync(in store.CaptchaSyncInput) store.CaptchaSyncInput {
 	in.ManualDelta = clamp(in.ManualDelta, 0, maxDeltaPerSync)
 	in.AutoDelta = clamp(in.AutoDelta, 0, maxDeltaPerSync)
 	in.CurrentStreak = clamp(in.CurrentStreak, 0, maxStreak)
-	in.BestStreak = clamp(in.BestStreak, 0, maxStreak)
-	if in.BestStreak < in.CurrentStreak {
-		in.BestStreak = in.CurrentStreak
-	}
+	in.BestStreak = max(clamp(in.BestStreak, 0, maxStreak), in.CurrentStreak)
 	return in
 }
 
 func clamp(v, lo, hi int64) int64 {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
+	return max(lo, min(v, hi))
 }
 
 func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg string, err error) {
@@ -10160,15 +10221,15 @@ func TestClamp(t *testing.T) {
   File name:             config.go
   Relative path:         internal/config/config.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/config.go
-  Size:                  18.3 KiB (18814 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  18.3 KiB (18762 bytes)
+  Last modified:         2026-11-06 07:15:57.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919101
+  Inode:                 69650520
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               b7386b4a97d493a770a9937d8c6dfcf4ed999ee577a7d93425da0287362aeda6
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               e0890334a4492b5644ed19f2946c37bbee94cf254910babb395dbba69f0cc662
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 // Package config is the single source of truth for every runtime setting.
@@ -10185,7 +10246,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -10431,9 +10494,7 @@ func (c *Config) resolveTelemetry() {
 		tc.Enabled = true
 		tc.EndpointURL = ep
 		tc.Insecure = strings.HasPrefix(ep, "http://")
-		for k, v := range parseHeaders(os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")) {
-			tc.Headers[k] = v
-		}
+		maps.Copy(tc.Headers, parseHeaders(os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")))
 	}
 	c.Telemetry = tc
 }
@@ -10505,12 +10566,7 @@ func (c *Config) TOTPAESKey() [32]byte { return c.totpAESKey }
 
 // CORSAllowsAny reports whether the wildcard "*" origin is configured.
 func (c *Config) CORSAllowsAny() bool {
-	for _, o := range c.CORSAllowedOrigins {
-		if o == "*" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(c.CORSAllowedOrigins, "*")
 }
 
 // ---------------------------------------------------------------------------
@@ -10608,7 +10664,7 @@ func splitList(s string) []string {
 // parseHeaders parses OTEL_EXPORTER_OTLP_HEADERS ("k1=v1,k2=v2").
 func parseHeaders(s string) map[string]string {
 	out := map[string]string{}
-	for _, pair := range strings.Split(s, ",") {
+	for pair := range strings.SplitSeq(s, ",") {
 		pair = strings.TrimSpace(pair)
 		if pair == "" {
 			continue
@@ -10633,8 +10689,8 @@ func endpointFromDSN(dsn string) (endpoint string, insecure bool) {
 		scheme = rest[:i]
 		rest = rest[i+3:]
 	}
-	if at := strings.LastIndex(rest, "@"); at >= 0 {
-		rest = rest[at+1:]
+	if _, host, ok := strings.CutLast(rest, "@"); ok {
+		rest = host
 	}
 	// strip any path/query
 	if q := strings.IndexAny(rest, "/?"); q >= 0 {
@@ -11263,14 +11319,14 @@ func TestConfigurationDocsShowCanonicalPolicy(t *testing.T) {
   Relative path:         internal/config/session_persistence_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/config/session_persistence_test.go
   Size:                  7.8 KiB (8021 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Last modified:         2026-11-06 07:11:38.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919104
+  Inode:                 69650521
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               d3632ea0eb87035530b1dcb276d551edbea73759c448c36e334ec98c3192b38f
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               cb5b811432899aa965022500308ff835ca9b61ddd7f21a53c3560ab924f2ef8c
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 package config
@@ -11319,7 +11375,7 @@ func TestTokenStoredInLocalStorage(t *testing.T) {
 	// nothing more. Count only executable lines so the explanatory comments
 	// above the code do not inflate the total.
 	codeUses := 0
-	for _, line := range strings.Split(api, "\n") {
+	for line := range strings.SplitSeq(api, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "//") {
 			continue
 		}
@@ -11479,15 +11535,15 @@ func TestFrontendImportsWhatItCalls(t *testing.T) {
   File name:             csp.go
   Relative path:         internal/csp/csp.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/csp/csp.go
-  Size:                  11.7 KiB (12039 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  12.1 KiB (12430 bytes)
+  Last modified:         2026-11-06 07:19:25.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919106
+  Inode:                 69650523
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               887408b90a9daea62c173ae5db9f67d4e7257f703a34f99dee738364554e5a51
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               a6d257204244e0709d2a4d917efc6bd1b0782b16c6080ac32b676166b70272dc
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 // Package csp accepts Content-Security-Policy violation reports and
@@ -11500,7 +11556,9 @@ func TestFrontendImportsWhatItCalls(t *testing.T) {
 package csp
 
 import (
-	"encoding/json"
+	"bytes"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"io"
 	"log/slog"
@@ -11513,6 +11571,9 @@ import (
 	"github.com/kusl/GoTunnels/internal/store"
 )
 
+// legacyMediaType is the Content-Type of the legacy report-uri mechanism.
+const legacyMediaType = "application/csp-report"
+
 // Normalize parses a CSP report request body into zero or more normalised
 // reports. It understands:
 //
@@ -11522,71 +11583,68 @@ import (
 //     violation listener posted; parsing is kept so anything still speaking
 //     it keeps working
 //
-// The raw JSON of each individual report is preserved in Raw.
+// Parsing uses encoding/json/v2, so member names match exactly, duplicate
+// names and invalid UTF-8 are rejected, and trailing data is an error. The
+// original JSON of each individual report is preserved verbatim in Raw.
 func Normalize(contentType string, body []byte) ([]store.CSPReportInput, error) {
-	trimmed := strings.TrimSpace(string(body))
-	if trimmed == "" {
+	v := jsontext.Value(bytes.TrimSpace(body))
+	if len(v) == 0 {
 		return nil, errors.New("csp: empty body")
 	}
-
-	// Reporting API sends a JSON array.
-	if trimmed[0] == '[' {
-		return parseReportingAPI(body)
-	}
-
-	// Object: could be the legacy wrapper or our custom shape.
-	if strings.Contains(mediaType(contentType), "csp-report") || looksLegacy(body) {
-		if r, ok := parseLegacy(body); ok {
-			return []store.CSPReportInput{r}, nil
-		}
-	}
-	if r, ok := parseCustom(body); ok {
-		return []store.CSPReportInput{r}, nil
+	switch v[0] {
+	case '[':
+		return parseReportingAPI(v)
+	case '{':
+		return parseObject(mediaType(contentType) == legacyMediaType, v)
 	}
 	return nil, errors.New("csp: unrecognised report shape")
 }
 
 func mediaType(ct string) string {
-	if i := strings.IndexByte(ct, ';'); i >= 0 {
-		ct = ct[:i]
-	}
+	ct, _, _ = strings.Cut(ct, ";")
 	return strings.ToLower(strings.TrimSpace(ct))
 }
 
-func looksLegacy(body []byte) bool {
-	var probe map[string]json.RawMessage
-	if err := json.Unmarshal(body, &probe); err != nil {
-		return false
+// parseObject handles a single-object body. A "csp-report" member selects
+// the legacy shape; a body declared as application/csp-report without one is
+// rejected instead of being stored as an empty report.
+func parseObject(declaredLegacy bool, v jsontext.Value) ([]store.CSPReportInput, error) {
+	var probe struct {
+		CSPReport *legacyReport `json:"csp-report"`
 	}
-	_, ok := probe["csp-report"]
-	return ok
+	if err := json.Unmarshal(v, &probe); err != nil {
+		return nil, err
+	}
+	if probe.CSPReport != nil {
+		return []store.CSPReportInput{probe.CSPReport.normalize(v)}, nil
+	}
+	if declaredLegacy {
+		return nil, errors.New("csp: csp-report body has no csp-report member")
+	}
+	if r, ok := parseCustom(v); ok {
+		return []store.CSPReportInput{r}, nil
+	}
+	return nil, errors.New("csp: unrecognised report shape")
 }
 
 // --- legacy application/csp-report --------------------------------------
 
-type legacyWrapper struct {
-	CSPReport struct {
-		DocumentURI        string `json:"document-uri"`
-		Referrer           string `json:"referrer"`
-		BlockedURI         string `json:"blocked-uri"`
-		ViolatedDirective  string `json:"violated-directive"`
-		EffectiveDirective string `json:"effective-directive"`
-		OriginalPolicy     string `json:"original-policy"`
-		Disposition        string `json:"disposition"`
-		SourceFile         string `json:"source-file"`
-		ScriptSample       string `json:"script-sample"`
-		LineNumber         int    `json:"line-number"`
-		ColumnNumber       int    `json:"column-number"`
-		StatusCode         int    `json:"status-code"`
-	} `json:"csp-report"`
+type legacyReport struct {
+	DocumentURI        string `json:"document-uri"`
+	Referrer           string `json:"referrer"`
+	BlockedURI         string `json:"blocked-uri"`
+	ViolatedDirective  string `json:"violated-directive"`
+	EffectiveDirective string `json:"effective-directive"`
+	OriginalPolicy     string `json:"original-policy"`
+	Disposition        string `json:"disposition"`
+	SourceFile         string `json:"source-file"`
+	ScriptSample       string `json:"script-sample"`
+	LineNumber         int    `json:"line-number"`
+	ColumnNumber       int    `json:"column-number"`
+	StatusCode         int    `json:"status-code"`
 }
 
-func parseLegacy(body []byte) (store.CSPReportInput, bool) {
-	var w legacyWrapper
-	if err := json.Unmarshal(body, &w); err != nil {
-		return store.CSPReportInput{}, false
-	}
-	c := w.CSPReport
+func (c legacyReport) normalize(raw jsontext.Value) store.CSPReportInput {
 	return store.CSPReportInput{
 		DocumentURI:        c.DocumentURI,
 		Referrer:           c.Referrer,
@@ -11600,8 +11658,8 @@ func parseLegacy(body []byte) (store.CSPReportInput, bool) {
 		ColumnNumber:       c.ColumnNumber,
 		StatusCode:         c.StatusCode,
 		ScriptSample:       c.ScriptSample,
-		Raw:                json.RawMessage(body),
-	}, true
+		Raw:                raw,
+	}
 }
 
 // --- Reporting API application/reports+json -----------------------------
@@ -11625,25 +11683,26 @@ type reportingItem struct {
 	} `json:"body"`
 }
 
-func parseReportingAPI(body []byte) ([]store.CSPReportInput, error) {
-	var items []reportingItem
-	if err := json.Unmarshal(body, &items); err != nil {
+// parseReportingAPI splits the array into raw items first, so each stored
+// report keeps its own original JSON and one malformed or foreign item does
+// not discard the valid CSP reports delivered alongside it.
+func parseReportingAPI(v jsontext.Value) ([]store.CSPReportInput, error) {
+	var items []jsontext.Value
+	if err := json.Unmarshal(v, &items); err != nil {
 		return nil, err
 	}
 	var out []store.CSPReportInput
-	for _, it := range items {
-		// Ignore non-CSP report types that may share the endpoint.
+	for _, raw := range items {
+		var it reportingItem
+		if err := json.Unmarshal(raw, &it); err != nil {
+			continue
+		}
 		if it.Type != "" && it.Type != "csp-violation" && it.Type != "csp" {
 			continue
 		}
 		b := it.Body
-		raw, _ := json.Marshal(it)
-		doc := b.DocumentURL
-		if doc == "" {
-			doc = it.URL
-		}
 		out = append(out, store.CSPReportInput{
-			DocumentURI:        doc,
+			DocumentURI:        firstNonEmpty(b.DocumentURL, it.URL),
 			Referrer:           b.Referrer,
 			BlockedURI:         b.BlockedURL,
 			ViolatedDirective:  firstNonEmpty(b.ViolatedDirective, b.EffectiveDirective),
@@ -11655,7 +11714,7 @@ func parseReportingAPI(body []byte) ([]store.CSPReportInput, error) {
 			ColumnNumber:       b.ColumnNumber,
 			StatusCode:         b.StatusCode,
 			ScriptSample:       b.Sample,
-			Raw:                json.RawMessage(raw),
+			Raw:                raw,
 		})
 	}
 	if len(out) == 0 {
@@ -11681,13 +11740,11 @@ type customReport struct {
 	StatusCode         int    `json:"statusCode"`
 }
 
-func parseCustom(body []byte) (store.CSPReportInput, bool) {
+func parseCustom(v jsontext.Value) (store.CSPReportInput, bool) {
 	var c customReport
-	dec := json.NewDecoder(strings.NewReader(string(body)))
-	if err := dec.Decode(&c); err != nil {
+	if err := json.Unmarshal(v, &c); err != nil {
 		return store.CSPReportInput{}, false
 	}
-	// Require at least one meaningful field to avoid storing empty objects.
 	if c.DocumentURI == "" && c.ViolatedDirective == "" && c.EffectiveDirective == "" && c.BlockedURI == "" {
 		return store.CSPReportInput{}, false
 	}
@@ -11704,7 +11761,7 @@ func parseCustom(body []byte) (store.CSPReportInput, bool) {
 		ColumnNumber:       c.ColumnNumber,
 		StatusCode:         c.StatusCode,
 		ScriptSample:       c.Sample,
-		Raw:                json.RawMessage(body),
+		Raw:                v,
 	}, true
 }
 
@@ -11777,9 +11834,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func readAll(r *http.Request, max int64) ([]byte, error) {
+func readAll(r *http.Request, limit int64) ([]byte, error) {
 	defer func() { _ = r.Body.Close() }()
-	return io.ReadAll(io.LimitReader(r.Body, max))
+	return io.ReadAll(io.LimitReader(r.Body, limit))
 }
 
 // ---------------------------------------------------------------------------
@@ -11820,9 +11877,6 @@ func (h *Handler) Recent(w http.ResponseWriter, r *http.Request) {
 		httpx.ServerError(w, r, h.log, "csp: list recent", err)
 		return
 	}
-	if rows == nil {
-		rows = []store.CSPReportRow{}
-	}
 	for i := range rows {
 		rows[i].DocumentURI = truncateRunes(rows[i].DocumentURI, maxURILen)
 		rows[i].BlockedURI = truncateRunes(rows[i].BlockedURI, maxURILen)
@@ -11855,15 +11909,15 @@ func truncateRunes(s string, n int) string {
   File name:             csp_test.go
   Relative path:         internal/csp/csp_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/csp/csp_test.go
-  Size:                  5.9 KiB (6109 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Size:                  8.1 KiB (8374 bytes)
+  Last modified:         2026-11-06 07:18:03.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919107
+  Inode:                 69650524
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               50539f31c7cfaae020de3c606c072ca79ab848974a63d4b92f732b9eba2de94e
-  Last git commit:       fd88d04 2026-07-06 02:35:59 -0400 add claude response
+  SHA-256:               53de0590497751cf11365fb123ebf57a8e2e7bbeb1ecba8dc2561b5a7e26b4c1
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 package csp
@@ -11973,6 +12027,57 @@ func TestNormalizeCustom(t *testing.T) {
 	}
 	if reports[0].DocumentURI != "https://f.example/page" {
 		t.Fatalf("document uri = %q", reports[0].DocumentURI)
+	}
+}
+
+func TestNormalizeLegacyContentTypeWithoutMemberIsRejected(t *testing.T) {
+	body := []byte(`{"documentURI":"https://f.example/","blockedURI":"inline"}`)
+	if _, err := Normalize("application/csp-report; charset=utf-8", body); err == nil {
+		t.Fatal("application/csp-report body without csp-report member must be rejected, not stored empty")
+	}
+}
+
+func TestNormalizeReportingAPIKeepsEachItemRaw(t *testing.T) {
+	first := `{"type":"csp-violation","url":"https://f.example/a","body":{"blockedURL":"inline","effectiveDirective":"script-src-elem"}}`
+	second := `{"type":"csp-violation","url":"https://f.example/b","body":{"blockedURL":"eval","effectiveDirective":"script-src"}}`
+	reports, err := Normalize("application/reports+json", []byte("["+first+", "+second+"]"))
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	if len(reports) != 2 {
+		t.Fatalf("expected 2 reports, got %d", len(reports))
+	}
+	if string(reports[0].Raw) != first || string(reports[1].Raw) != second {
+		t.Fatalf("raw payloads not preserved per item:\n%s\n%s", reports[0].Raw, reports[1].Raw)
+	}
+	if reports[0].DocumentURI != "https://f.example/a" {
+		t.Fatalf("document uri fallback to item url = %q", reports[0].DocumentURI)
+	}
+}
+
+func TestNormalizeReportingAPISkipsMalformedItems(t *testing.T) {
+	body := []byte(`[{"type":"csp-violation","body":{"lineNumber":"nope"}},
+		{"type":"csp-violation","url":"https://f.example/","body":{"blockedURL":"inline","effectiveDirective":"style-src"}}]`)
+	reports, err := Normalize("application/reports+json", body)
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	if len(reports) != 1 || reports[0].BlockedURI != "inline" {
+		t.Fatalf("got %+v, want only the well-formed report", reports)
+	}
+}
+
+func TestNormalizeRejectsDuplicateNames(t *testing.T) {
+	body := []byte(`{"csp-report":{"blocked-uri":"https://a.example/","blocked-uri":"https://b.example/"}}`)
+	if _, err := Normalize("application/csp-report", body); err == nil {
+		t.Fatal("duplicate member names must be rejected")
+	}
+}
+
+func TestNormalizeRejectsTrailingData(t *testing.T) {
+	body := []byte(`{"csp-report":{"blocked-uri":"inline"}} {"extra":true}`)
+	if _, err := Normalize("application/csp-report", body); err == nil {
+		t.Fatal("trailing data after the report must be rejected")
 	}
 }
 
@@ -12493,21 +12598,21 @@ func (h *Handler) InfoHandler(w http.ResponseWriter, r *http.Request) {
   File name:             health_test.go
   Relative path:         internal/health/health_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/health/health_test.go
-  Size:                  1.4 KiB (1457 bytes)
-  Last modified:         2026-10-16 10:34:07.000000000 -0400
+  Size:                  1.4 KiB (1460 bytes)
+  Last modified:         2026-11-06 07:17:32.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919113
+  Inode:                 69650526
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               f18968265d692f3d129bf8a24898ad1dfa062ce6f17dc017d8fc903fd4504f92
-  Last git commit:       95ea6d9 2026-07-01 16:49:07 -0400 add claude response
+  SHA-256:               c116d1315c244b5744a3e5154e2581232d77f70f1538233a8561c1bd7b8f402d
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 package health
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12572,30 +12677,39 @@ func TestInfoHandler(t *testing.T) {
   File name:             middleware.go
   Relative path:         internal/httpx/middleware.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/httpx/middleware.go
-  Size:                  12.8 KiB (13187 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  15.9 KiB (16321 bytes)
+  Last modified:         2026-11-06 07:19:28.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919115
+  Inode:                 69650528
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               d5db16eb1dd45efc27c7cd09a152894f7fe6be827014424927402e6c81f175b0
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               2e2088b6341bc8978c015610863750192af13893bd76c0ae4a890ccc72bea2e8
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 // Package httpx holds transport-level helpers and middleware that do not
-// depend on the data store: CORS, request identifiers, panic recovery, a small
-// in-memory rate limiter, OpenTelemetry HTTP instrumentation, and JSON writing
-// helpers. Keeping these store-agnostic makes them trivial to unit test.
+// depend on the data store: CORS, request identifiers, panic recovery, body
+// size limits, a small in-memory rate limiter, OpenTelemetry HTTP
+// instrumentation, and the JSON request/response helpers. Keeping these
+// store-agnostic makes them trivial to unit test.
+//
+// JSON on the wire uses encoding/json/v2 (Go 1.27). Requests are decoded
+// strictly: exact-case member names, no unknown members, no duplicate names,
+// valid UTF-8 only, and exactly one JSON value per body. Responses are encoded
+// deterministically (sorted map keys) and nil slices/maps encode as [] / {}.
 package httpx
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/v2"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -12613,8 +12727,8 @@ type Middleware func(http.Handler) http.Handler
 
 // Chain applies middleware in order (the first listed is outermost).
 func Chain(h http.Handler, mws ...Middleware) http.Handler {
-	for i := len(mws) - 1; i >= 0; i-- {
-		h = mws[i](h)
+	for _, mw := range slices.Backward(mws) {
+		h = mw(h)
 	}
 	return h
 }
@@ -12953,17 +13067,66 @@ func (rl *RateLimiter) LimitWith(keyFn func(*http.Request) string, message strin
 }
 
 // ---------------------------------------------------------------------------
+// Request body limits
+// ---------------------------------------------------------------------------
+
+// DefaultMaxBody is the request body ceiling applied to every route by
+// MaxBody, and the default for DecodeJSON. Handlers that expect less tighten
+// it further for themselves.
+const DefaultMaxBody int64 = 1 << 20
+
+// MaxBody caps every request body at n bytes. It is a backstop for handlers
+// that hand the raw request to a library (the WebAuthn ceremonies) or read it
+// themselves; reading past the cap fails with *http.MaxBytesError.
+func MaxBody(n int64) Middleware {
+	if n <= 0 {
+		n = DefaultMaxBody
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Body != nil && r.Body != http.NoBody {
+				r.Body = http.MaxBytesReader(w, r.Body, n)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
 // JSON helpers
 // ---------------------------------------------------------------------------
 
-// WriteJSON writes v as JSON with the given status code.
+// responseOptions are the encoding/json/v2 options for every response body.
+// Deterministic output keeps responses byte-stable for identical data, which
+// makes them diffable and cache-friendly.
+var responseOptions = json.Deterministic(true)
+
+// requestOptions are the encoding/json/v2 options for every request body.
+// v2 already rejects duplicate names, invalid UTF-8, case-mismatched names,
+// and trailing data; unknown members are rejected as well so a typo in a
+// client payload fails loudly instead of being silently ignored.
+var requestOptions = json.RejectUnknownMembers(true)
+
+const internalErrorBody = `{"error":"internal server error"}` + "\n"
+
+// WriteJSON writes v as JSON with the given status code. The body is encoded
+// before anything is written, so an encoding failure becomes a clean 500
+// rather than a success status followed by truncated JSON.
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
 	if v == nil {
+		w.WriteHeader(status)
 		return
 	}
-	_ = json.NewEncoder(w).Encode(v)
+	body, err := json.Marshal(v, responseOptions)
+	if err != nil {
+		slog.Error("httpx: encode response", slog.String("error", err.Error()), slog.Int("status", status))
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(internalErrorBody))
+		return
+	}
+	w.WriteHeader(status)
+	_, _ = w.Write(append(body, '\n'))
 }
 
 // WriteError writes a JSON error body: {"error": "..."}.
@@ -12981,23 +13144,35 @@ func ServerError(w http.ResponseWriter, r *http.Request, log *slog.Logger, msg s
 	WriteError(w, http.StatusInternalServerError, "internal server error")
 }
 
-// DecodeJSON reads a size-limited JSON body into dst, writing a 400 and
-// returning false on failure. maxBytes <= 0 defaults to 1 MiB.
+// DecodeJSON reads a size-limited JSON body into dst, writing an error
+// response and returning false on failure: 413 when the body exceeds
+// maxBytes, otherwise 400 with a message naming the offending member when
+// there is one. maxBytes <= 0 means DefaultMaxBody.
 func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64) bool {
 	if maxBytes <= 0 {
-		maxBytes = 1 << 20
+		maxBytes = DefaultMaxBody
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
-	dec := json.NewDecoder(r.Body)
-	if err := dec.Decode(dst); err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid JSON body")
-		return false
-	}
-	if dec.More() {
-		WriteError(w, http.StatusBadRequest, "invalid JSON body")
+	if err := json.UnmarshalRead(r.Body, dst, requestOptions); err != nil {
+		status, msg := decodeProblem(err)
+		WriteError(w, status, msg)
 		return false
 	}
 	return true
+}
+
+// decodeProblem maps a decode failure to a status and a client-safe message.
+func decodeProblem(err error) (int, string) {
+	if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+		return http.StatusRequestEntityTooLarge, "request body too large"
+	}
+	if serr, ok := errors.AsType[*json.SemanticError](err); ok && serr.JSONPointer != "" {
+		if errors.Is(serr.Err, json.ErrUnknownName) {
+			return http.StatusBadRequest, fmt.Sprintf("unknown field %q", serr.JSONPointer.LastToken())
+		}
+		return http.StatusBadRequest, fmt.Sprintf("invalid value for %q", serr.JSONPointer.LastToken())
+	}
+	return http.StatusBadRequest, "invalid JSON body"
 }
 
 
@@ -13009,22 +13184,24 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64)
   File name:             middleware_test.go
   Relative path:         internal/httpx/middleware_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/httpx/middleware_test.go
-  Size:                  11.7 KiB (12029 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  14.9 KiB (15351 bytes)
+  Last modified:         2026-11-06 07:17:32.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919116
+  Inode:                 69650529
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               5d9a5041c691d16ca39c52ea52d300bcdac1147e3547afeb14d4724e5392f3e0
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               bbe44f7adb3c6fc2a85bfc33241822d8b4301037307e76acae3cc65666397ba5
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 package httpx
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -13307,7 +13484,7 @@ func TestRateLimiterSweepsFullBuckets(t *testing.T) {
 	now := time.Unix(1_000, 0)
 	rl := NewRateLimiter(1, 2)
 	rl.now = func() time.Time { return now }
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		rl.Allow(strconv.Itoa(i))
 	}
 	if rl.Len() != 100 {
@@ -13378,6 +13555,103 @@ func TestDecodeJSONRejectsTrailingData(t *testing.T) {
 	}
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestWriteJSONDeterministicAndEmptySlices(t *testing.T) {
+	rec := httptest.NewRecorder()
+	WriteJSON(rec, http.StatusOK, map[string]any{"b": 1, "a": []string(nil), "c": map[string]int(nil)})
+	if got, want := rec.Body.String(), `{"a":[],"b":1,"c":{}}`+"\n"; got != want {
+		t.Fatalf("body = %q, want %q", got, want)
+	}
+}
+
+func TestWriteJSONEncodingFailureIs500(t *testing.T) {
+	rec := httptest.NewRecorder()
+	WriteJSON(rec, http.StatusOK, map[string]any{"d": time.Second})
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
+	}
+	var e map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &e); err != nil || e["error"] == "" {
+		t.Fatalf("body = %q (%v), want a JSON error", rec.Body.String(), err)
+	}
+}
+
+func decodeInto(t *testing.T, body string, maxBytes int64) (*httptest.ResponseRecorder, bool) {
+	t.Helper()
+	var dst struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	return rec, DecodeJSON(rec, req, &dst, maxBytes)
+}
+
+func errorMessage(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	var e map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &e); err != nil {
+		t.Fatalf("error body not json: %v", err)
+	}
+	return e["error"]
+}
+
+func TestDecodeJSONStrictness(t *testing.T) {
+	cases := []struct {
+		name, body string
+		status     int
+		msg        string
+	}{
+		{"unknown member", `{"name":"x","nmae":"y"}`, http.StatusBadRequest, `unknown field "nmae"`},
+		{"case mismatch is unknown", `{"Name":"x"}`, http.StatusBadRequest, `unknown field "Name"`},
+		{"duplicate name", `{"name":"x","name":"y"}`, http.StatusBadRequest, "invalid JSON body"},
+		{"invalid utf-8", "{\"name\":\"\xff\"}", http.StatusBadRequest, "invalid JSON body"},
+		{"wrong type", `{"count":"seven"}`, http.StatusBadRequest, `invalid value for "count"`},
+		{"empty body", ``, http.StatusBadRequest, "invalid JSON body"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec, ok := decodeInto(t, tc.body, 0)
+			if ok {
+				t.Fatal("decode succeeded, want failure")
+			}
+			if rec.Code != tc.status {
+				t.Fatalf("status = %d, want %d", rec.Code, tc.status)
+			}
+			if got := errorMessage(t, rec); got != tc.msg {
+				t.Fatalf("message = %q, want %q", got, tc.msg)
+			}
+		})
+	}
+}
+
+func TestDecodeJSONAcceptsExactPayload(t *testing.T) {
+	if rec, ok := decodeInto(t, " {\"name\":\"x\",\"count\":3}\n", 0); !ok {
+		t.Fatalf("decode failed: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDecodeJSONTooLargeIs413(t *testing.T) {
+	rec, ok := decodeInto(t, `{"name":"`+strings.Repeat("a", 100)+`"}`, 32)
+	if ok {
+		t.Fatal("oversized body accepted")
+	}
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want 413", rec.Code)
+	}
+}
+
+func TestMaxBodyCapsReads(t *testing.T) {
+	var readErr error
+	h := MaxBody(8)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, readErr = io.ReadAll(r.Body)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(strings.Repeat("x", 64)))
+	h.ServeHTTP(httptest.NewRecorder(), req)
+	if _, ok := errors.AsType[*http.MaxBytesError](readErr); !ok {
+		t.Fatalf("read error = %v, want *http.MaxBytesError", readErr)
 	}
 }
 
@@ -13613,15 +13887,15 @@ func TestRunStopsOnCancel(t *testing.T) {
   File name:             notes.go
   Relative path:         internal/notes/notes.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/notes/notes.go
-  Size:                  9.4 KiB (9672 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  9.1 KiB (9353 bytes)
+  Last modified:         2026-11-06 07:19:25.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919121
+  Inode:                 69650531
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               7713cc46c877cf04c1bc016b78c773b5a36dc26391b2a1e8d3724ae7ddb4af3c
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               ecb288f19f3f31fe8b468ef71ac077cff063439cec8f743e1d6c8d1b05c9375c
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 // Package notes implements a deliberately plain public microblog: short
@@ -13644,6 +13918,7 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+	"uuid"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -13737,9 +14012,6 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, "notes: list", err)
 		return
 	}
-	if rows == nil {
-		rows = []store.Note{}
-	}
 	trace.SpanFromContext(r.Context()).SetAttributes(
 		attribute.Int("notes.returned", len(rows)),
 		attribute.Int64("notes.before", beforeID),
@@ -13759,9 +14031,6 @@ func (h *Handlers) Authors(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.serverError(w, r, "notes: authors", err)
 		return
-	}
-	if authors == nil {
-		authors = []store.NoteAuthor{}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"authors": authors})
 }
@@ -13880,52 +14149,37 @@ func forbiddenRune(r rune) bool {
 const maxAuthorFilter = 50
 
 // parseAuthors parses the ?authors= query parameter: a comma-separated list
-// of user uuids. Empty input means "no filter". Every entry must look like a
+// of user uuids. Empty input means "no filter". Every entry must parse as a
 // uuid — the ids go into a `$n::uuid[]` bind, and a malformed value would
-// otherwise surface as an opaque database cast error instead of a 400.
+// otherwise surface as an opaque database cast error instead of a 400. Ids
+// are returned canonicalised (lowercase 8-4-4-4-12) and de-duplicated in
+// first-seen order, so the cap counts distinct authors.
 func parseAuthors(raw string) ([]string, string) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil, ""
 	}
-	parts := strings.Split(raw, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
+	var out []string
+	seen := map[uuid.UUID]bool{}
+	for p := range strings.SplitSeq(raw, ",") {
 		p = strings.TrimSpace(p)
 		if p == "" {
 			continue
 		}
-		if !isUUIDString(p) {
+		id, err := uuid.Parse(p)
+		if err != nil {
 			return nil, "invalid author id"
 		}
-		out = append(out, strings.ToLower(p))
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id.String())
 	}
 	if len(out) > maxAuthorFilter {
 		return nil, fmt.Sprintf("at most %d authors may be selected", maxAuthorFilter)
 	}
 	return out, ""
-}
-
-// isUUIDString reports whether s is a canonical 8-4-4-4-12 hex uuid.
-func isUUIDString(s string) bool {
-	if len(s) != 36 {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch i {
-		case 8, 13, 18, 23:
-			if c != '-' {
-				return false
-			}
-		default:
-			isHex := (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-			if !isHex {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg string, err error) {
@@ -13941,20 +14195,21 @@ func (h *Handlers) serverError(w http.ResponseWriter, r *http.Request, msg strin
   File name:             notes_test.go
   Relative path:         internal/notes/notes_test.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/notes/notes_test.go
-  Size:                  4.7 KiB (4915 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  4.7 KiB (4865 bytes)
+  Last modified:         2026-11-06 07:18:03.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919122
+  Inode:                 69650532
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               d6e38c4d5cb4a6bed93c756d5bcd423bb40c31ecb5394ef3c3bcba9e8186f975
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               9b4bb2164e0aaf12bf87b2b9ddb3aedda5a305e5bc6b4a28aa371b67b5b66a77
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 package notes
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -14064,9 +14319,16 @@ func TestParseAuthors(t *testing.T) {
 			t.Fatalf("ids = %v", ids)
 		}
 	})
-	t.Run("skips empty segments", func(t *testing.T) {
-		ids, problem := parseAuthors(u1 + ",," + u1)
-		if problem != "" || len(ids) != 2 {
+	t.Run("skips empty segments and duplicates", func(t *testing.T) {
+		ids, problem := parseAuthors(u1 + ",," + u1 + "," + strings.ToUpper(u1))
+		if problem != "" || len(ids) != 1 || ids[0] != u1 {
+			t.Fatalf("got (%v, %q)", ids, problem)
+		}
+	})
+	t.Run("canonicalises accepted uuid spellings", func(t *testing.T) {
+		raw := "{" + u1 + "},urn:uuid:" + strings.ToUpper(u2) + "," + strings.ReplaceAll(u1, "-", "")
+		ids, problem := parseAuthors(raw)
+		if problem != "" || len(ids) != 2 || ids[0] != u1 || ids[1] != strings.ToLower(u2) {
 			t.Fatalf("got (%v, %q)", ids, problem)
 		}
 	})
@@ -14077,40 +14339,18 @@ func TestParseAuthors(t *testing.T) {
 			}
 		}
 	})
-	t.Run("caps the list", func(t *testing.T) {
-		parts := make([]string, maxAuthorFilter+1)
-		for i := range parts {
-			parts[i] = u1
-		}
-		if _, problem := parseAuthors(strings.Join(parts, ",")); problem == "" {
-			t.Fatal("over-cap list accepted, want rejection")
-		}
-	})
 }
 
-func TestIsUUIDString(t *testing.T) {
-	good := []string{
-		"11111111-2222-4333-8444-555555555555",
-		"AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE",
-		"00000000-0000-0000-0000-000000000000",
+func TestParseAuthorsCapCountsDistinctIDs(t *testing.T) {
+	parts := make([]string, 0, maxAuthorFilter+1)
+	for i := range maxAuthorFilter + 1 {
+		parts = append(parts, fmt.Sprintf("00000000-0000-4000-8000-%012d", i))
 	}
-	for _, s := range good {
-		if !isUUIDString(s) {
-			t.Errorf("expected %q to be a uuid", s)
-		}
+	if _, problem := parseAuthors(strings.Join(parts[:maxAuthorFilter], ",")); problem != "" {
+		t.Fatalf("exactly-at-cap list rejected: %s", problem)
 	}
-	bad := []string{
-		"",
-		"11111111-2222-4333-8444-55555555555",   // too short
-		"11111111-2222-4333-8444-5555555555556", // too long
-		"11111111x2222-4333-8444-555555555555",  // wrong separator
-		"1111111g-2222-4333-8444-555555555555",  // non-hex
-		"11111111-2222-4333-8444_555555555555",  // underscore
-	}
-	for _, s := range bad {
-		if isUUIDString(s) {
-			t.Errorf("expected %q to be rejected", s)
-		}
+	if _, problem := parseAuthors(strings.Join(parts, ",")); problem == "" {
+		t.Fatal("over-cap list of distinct ids accepted, want rejection")
 	}
 }
 
@@ -14323,15 +14563,15 @@ func TestValidKey(t *testing.T) {
   File name:             server.go
   Relative path:         internal/server/server.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/server/server.go
-  Size:                  7.6 KiB (7815 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  7.6 KiB (7854 bytes)
+  Last modified:         2026-11-06 07:15:57.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919127
+  Inode:                 69650534
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               5cd40d506e728a27138589e3532b4a023a6f3fbf24d96bd6d823d5c0b37bdfba
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               1bc828ae43d1b3c6fab7c856e9e0ba76c65a0eaa32d448348f676291f8d927c8
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 // Package server assembles the HTTP routes and middleware into a ready-to-run
@@ -14452,6 +14692,7 @@ func New(d Deps) *http.Server {
 		httpx.RequestID(),
 		httpx.Recoverer(d.Log),
 		httpx.SecurityHeaders(),
+		httpx.MaxBody(httpx.DefaultMaxBody),
 		httpx.CORS(d.Config.CORSAllowedOrigins, d.Config.CORSAllowsAny()),
 	)
 	handler = httpx.Instrument(handler, "gotunnels-api")
@@ -14522,30 +14763,37 @@ func userRateKey() func(*http.Request) string {
   File name:             store.go
   Relative path:         internal/store/store.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/store/store.go
-  Size:                  36.3 KiB (37203 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  37.4 KiB (38366 bytes)
+  Last modified:         2026-11-06 07:19:24.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919129
+  Inode:                 69650536
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               80bd0bc8ae316de9db838c50754744a30c218f82d82b6538ea1c2257b92d06ed
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               0db310da602178dc3d9f23161168f611a296af8ef316c7461d2d830c6e2bc7de
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 // Package store is the single data-access layer. Every SQL query in the
 // application lives here, so the rest of the code deals in Go types and never
 // in SQL strings. It wraps a pgx connection pool.
 //
-// UUID handling note: to avoid pulling in a separate UUID dependency, user ids
-// are exchanged as plain strings. Queries always select `id::text` and always
-// bind uuid parameters with an explicit `$N::uuid` cast, which sidesteps the
-// lack of an implicit text->uuid cast in PostgreSQL.
+// UUID handling note: user ids are exchanged as canonical lowercase strings.
+// Queries always select `id::text` and always bind uuid parameters with an
+// explicit `$N::uuid` cast, which sidesteps the lack of an implicit text->uuid
+// cast in PostgreSQL. Ids that arrive from clients are parsed and
+// canonicalised with the standard library uuid package before they reach a
+// query, and new ids are minted the same way.
+//
+// JSON note: jsonb columns are written and read with encoding/json/v2. The
+// WebAuthn credential blob is both produced and consumed here, so it always
+// round-trips under the same semantics (see marshalCredential).
 package store
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"strings"
 	"time"
@@ -14609,16 +14857,16 @@ type Flow struct {
 
 // Activity is one audit-log row.
 type Activity struct {
-	ID         int64           `json:"id"`
-	UserID     *string         `json:"user_id,omitempty"`
-	Username   string          `json:"username"`
-	EventType  string          `json:"event_type"`
-	AuthMethod string          `json:"auth_method"`
-	Outcome    string          `json:"outcome"`
-	IPHash     string          `json:"ip_hash"`
-	UserAgent  string          `json:"user_agent,omitempty"`
-	Detail     json.RawMessage `json:"detail,omitempty"`
-	CreatedAt  time.Time       `json:"created_at"`
+	ID         int64          `json:"id"`
+	UserID     *string        `json:"user_id,omitzero"`
+	Username   string         `json:"username"`
+	EventType  string         `json:"event_type"`
+	AuthMethod string         `json:"auth_method"`
+	Outcome    string         `json:"outcome"`
+	IPHash     string         `json:"ip_hash"`
+	UserAgent  string         `json:"user_agent,omitempty"`
+	Detail     jsontext.Value `json:"detail,omitzero"`
+	CreatedAt  time.Time      `json:"created_at"`
 }
 
 // ActivityInput is the payload for recording an activity event.
@@ -14649,7 +14897,7 @@ type CSPReportInput struct {
 	ScriptSample       string
 	IPHash             string
 	UserAgent          string
-	Raw                json.RawMessage
+	Raw                jsontext.Value
 }
 
 // CaptchaStats is a user's aggregate CAPTCHA game record. One row per user;
@@ -14836,7 +15084,7 @@ type execer interface {
 // source of truth for later reconstruction) alongside broken-out columns used
 // for indexing and uniqueness.
 func insertWebAuthnCredential(ctx context.Context, db execer, userID string, cred *webauthn.Credential) error {
-	blob, err := json.Marshal(cred)
+	blob, err := marshalCredential(cred)
 	if err != nil {
 		return err
 	}
@@ -14876,8 +15124,8 @@ func (s *Store) GetWebAuthnCredentials(ctx context.Context, userID string) ([]we
 		if err := rows.Scan(&blob); err != nil {
 			return nil, err
 		}
-		var c webauthn.Credential
-		if err := json.Unmarshal(blob, &c); err != nil {
+		c, err := unmarshalCredential(blob)
+		if err != nil {
 			return nil, err
 		}
 		creds = append(creds, c)
@@ -14895,7 +15143,7 @@ func (s *Store) CountWebAuthnCredentials(ctx context.Context, userID string) (in
 
 // UpdateWebAuthnCredential persists post-login changes (sign count, flags).
 func (s *Store) UpdateWebAuthnCredential(ctx context.Context, userID string, cred *webauthn.Credential) error {
-	blob, err := json.Marshal(cred)
+	blob, err := marshalCredential(cred)
 	if err != nil {
 		return err
 	}
@@ -14910,6 +15158,18 @@ func (s *Store) UpdateWebAuthnCredential(ctx context.Context, userID string, cre
 		cred.ID,
 	)
 	return err
+}
+
+// marshalCredential encodes a credential for the credential jsonb column.
+func marshalCredential(cred *webauthn.Credential) ([]byte, error) {
+	return json.Marshal(cred, json.Deterministic(true))
+}
+
+// unmarshalCredential decodes a credential written by marshalCredential.
+func unmarshalCredential(blob []byte) (webauthn.Credential, error) {
+	var c webauthn.Credential
+	err := json.Unmarshal(blob, &c)
+	return c, err
 }
 
 // ---------------------------------------------------------------------------
@@ -15128,11 +15388,7 @@ func (s *Store) RevokeAllSessionsForUser(ctx context.Context, userID string) (in
 
 // InsertActivity records an audit event.
 func (s *Store) InsertActivity(ctx context.Context, in ActivityInput) error {
-	detail := in.Detail
-	if detail == nil {
-		detail = map[string]any{}
-	}
-	blob, err := json.Marshal(detail)
+	blob, err := marshalActivityDetail(in.Detail)
 	if err != nil {
 		return err
 	}
@@ -15150,6 +15406,14 @@ func (s *Store) InsertActivity(ctx context.Context, in ActivityInput) error {
 		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8)`,
 		uid, in.Username, in.EventType, in.AuthMethod, outcome, in.IPHash, in.UserAgent, blob)
 	return err
+}
+
+// marshalActivityDetail encodes an audit event's detail map. A nil map
+// encodes as {} (the v2 default). Invalid UTF-8 — possible in error text
+// derived from client input — is replaced with U+FFFD rather than failing,
+// so an odd byte can never cost the audit trail an event.
+func marshalActivityDetail(detail map[string]any) ([]byte, error) {
+	return json.Marshal(detail, json.Deterministic(true), jsontext.AllowInvalidUTF8(true))
 }
 
 // ListActivityForUser returns a user's most recent audit events.
@@ -15210,7 +15474,7 @@ func (s *Store) PruneHealthChecks(ctx context.Context, before time.Time) (int64,
 func (s *Store) InsertCSPReport(ctx context.Context, in CSPReportInput) error {
 	raw := in.Raw
 	if len(raw) == 0 {
-		raw = json.RawMessage("{}")
+		raw = jsontext.Value("{}")
 	}
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO csp_reports
@@ -15529,8 +15793,8 @@ func mapErr(err error) error {
 // into a friendly 409 — the authoritative "already taken" signal that closes
 // any check-then-insert race.
 func IsUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+	pgErr, ok := errors.AsType[*pgconn.PgError](err)
+	return ok && pgErr.Code == "23505"
 }
 
 // normalizeUsername lowercases and trims a username for case-insensitive
@@ -15549,6 +15813,106 @@ func (s *Store) inTx(ctx context.Context, fn func(pgx.Tx) error) error {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+
+################################################################################
+# FILE: internal/store/store_test.go
+################################################################################
+
+--- METADATA ---
+  File name:             store_test.go
+  Relative path:         internal/store/store_test.go
+  Absolute path:         /home/kushal/src/golang/GoTunnels/internal/store/store_test.go
+  Size:                  2.6 KiB (2706 bytes)
+  Last modified:         2026-11-06 07:19:02.000000000 -0500
+  Permissions:           -rw-r--r--
+  Owner:                 kushal:kushal
+  Inode:                 69650537
+  Hard links:            1
+  MIME type:             text/plain
+  SHA-256:               093a53773de5f55735f15d1e65d37dc714a0a0535d199727ec47b6d99ba6adbf
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
+
+--- CONTENT ---
+package store
+
+import (
+	"bytes"
+	"encoding/json/v2"
+	"testing"
+
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
+)
+
+func TestCredentialRoundTrip(t *testing.T) {
+	in := webauthn.Credential{
+		ID:                []byte{1, 2, 3, 4},
+		PublicKey:         []byte{5, 6, 7, 8},
+		AttestationType:   "basic_self",
+		AttestationFormat: "packed",
+		Transport:         []protocol.AuthenticatorTransport{protocol.Internal, protocol.Hybrid},
+		Flags:             webauthn.CredentialFlags{UserPresent: true, UserVerified: true, BackupEligible: true},
+		Authenticator: webauthn.Authenticator{
+			AAGUID:       bytes.Repeat([]byte{9}, 16),
+			SignCount:    42,
+			CloneWarning: true,
+		},
+	}
+	blob, err := marshalCredential(&in)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	out, err := unmarshalCredential(blob)
+	if err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	switch {
+	case !bytes.Equal(out.ID, in.ID), !bytes.Equal(out.PublicKey, in.PublicKey):
+		t.Fatalf("key material changed: %+v", out)
+	case out.AttestationType != in.AttestationType, out.AttestationFormat != in.AttestationFormat,
+		len(out.Transport) != 2, out.Transport[1] != protocol.Hybrid:
+		t.Fatalf("metadata changed: %+v", out)
+	case out.Flags != in.Flags:
+		t.Fatalf("flags changed: %+v", out.Flags)
+	case !bytes.Equal(out.Authenticator.AAGUID, in.Authenticator.AAGUID),
+		out.Authenticator.SignCount != 42, !out.Authenticator.CloneWarning:
+		t.Fatalf("authenticator changed: %+v", out.Authenticator)
+	}
+	again, err := marshalCredential(&out)
+	if err != nil || !bytes.Equal(again, blob) {
+		t.Fatalf("re-encoding is not stable:\n%s\n%s", blob, again)
+	}
+}
+
+func TestActivityDetailEncoding(t *testing.T) {
+	blob, err := marshalActivityDetail(nil)
+	if err != nil || string(blob) != "{}" {
+		t.Fatalf("nil detail = %q, %v; want {}", blob, err)
+	}
+	blob, err = marshalActivityDetail(map[string]any{"z": 1, "error": "bad \xff byte"})
+	if err != nil {
+		t.Fatalf("invalid UTF-8 must not fail the audit write: %v", err)
+	}
+	if want := "{\"error\":\"bad \ufffd byte\",\"z\":1}"; string(blob) != want {
+		t.Fatalf("detail = %s, want %s", blob, want)
+	}
+}
+
+func TestActivityJSONShape(t *testing.T) {
+	blob, err := json.Marshal(Activity{ID: 1, Username: "a"})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if bytes.Contains(blob, []byte(`"user_id"`)) || bytes.Contains(blob, []byte(`"detail"`)) {
+		t.Fatalf("zero user_id/detail must be omitted: %s", blob)
+	}
+	uid := "u"
+	blob, _ = json.Marshal(Activity{UserID: &uid, Detail: []byte(`{}`)})
+	if !bytes.Contains(blob, []byte(`"user_id":"u"`)) || !bytes.Contains(blob, []byte(`"detail":{}`)) {
+		t.Fatalf("present user_id/detail must be kept: %s", blob)
+	}
 }
 
 
@@ -15714,15 +16078,15 @@ func TestMultiHandler_Enabled(t *testing.T) {
   File name:             telemetry.go
   Relative path:         internal/telemetry/telemetry.go
   Absolute path:         /home/kushal/src/golang/GoTunnels/internal/telemetry/telemetry.go
-  Size:                  10.6 KiB (10916 bytes)
-  Last modified:         2026-10-16 10:59:05.000000000 -0400
+  Size:                  10.6 KiB (10920 bytes)
+  Last modified:         2026-11-06 07:15:57.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919131
+  Inode:                 69650539
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               d3b257e6a2dc783145ad27a70e9b73e6ce64be9c990ffe8cc03b4b575f0983db
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               f0ed42b8629490191627e226f919d24762fb3a302ceb460e14210422c5294d47
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 // Package telemetry wires the vendor-neutral OpenTelemetry Go SDK for all three
@@ -15743,6 +16107,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -15777,8 +16142,8 @@ type Providers struct {
 // Shutdown flushes and stops all providers. Safe to call once during teardown.
 func (p *Providers) Shutdown(ctx context.Context) error {
 	var errs []error
-	for i := len(p.shutdown) - 1; i >= 0; i-- {
-		if err := p.shutdown[i](ctx); err != nil {
+	for _, fn := range slices.Backward(p.shutdown) {
+		if err := fn(ctx); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -17058,15 +17423,15 @@ var FS embed.FS
   File name:             README.md
   Relative path:         README.md
   Absolute path:         /home/kushal/src/golang/GoTunnels/README.md
-  Size:                  12.9 KiB (13226 bytes)
-  Last modified:         2026-10-16 11:00:50.000000000 -0400
+  Size:                  13.2 KiB (13517 bytes)
+  Last modified:         2026-11-06 07:19:58.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919046
+  Inode:                 69650506
   Hard links:            1
   MIME type:             text/plain
-  SHA-256:               52ebbc9763eb4de5718c0236c4f6662d1baa6ab2c6211fba45e3ea81915bba65
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               d5a36c0f56b19e5a08931b8808a4c4a344e74d59f450bb29f777f946139aa945
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 # GoTunnels
@@ -17115,6 +17480,9 @@ ten independent instances side by side without configuring anything.
   reported back to the API, stored, and logged to telemetry.
 - **No exposed host ports**; everything talks over the internal Compose network
   by service name.
+- **Go 1.27 idioms throughout**: strict `encoding/json/v2` on the wire
+  (unknown fields, duplicate names, and invalid UTF-8 are rejected), the
+  standard-library `uuid` package, and `go fix` modernizers enforced in CI.
 
 ## Architecture
 
@@ -17251,7 +17619,7 @@ enforcing policy.
 Tests run through one script, locally and in CI:
 
 ```bash
-./scripts/test.sh all         # build + vet + unit tests
+./scripts/test.sh all         # build + gofmt/go fix/vet + unit tests
 ./scripts/test.sh unit        # just unit tests
 ./scripts/test.sh vuln        # govulncheck (reachability-aware)
 ./scripts/test.sh freshness   # bump deps, tidy, retest (drift check)
@@ -17261,7 +17629,8 @@ If you have Go installed it uses it directly; otherwise it runs the suite in a
 `golang` container. The GitHub Actions workflows are intentionally thin — they
 call these script functions rather than embedding logic:
 
-- `ci.yaml` — gofmt, build, vet, unit tests on every push/PR, plus a job that
+- `ci.yaml` — gofmt, `go fix -diff` (pending modernizations fail the build),
+  build, vet, unit tests on every push/PR, plus a job that
   builds both images and smoke-tests the real stack against PostgreSQL.
 - `govulncheck.yaml` — vulnerability scan on push/PR and weekly.
 - `dependency-freshness.yaml` — weekly update-and-retest drift check.
@@ -18277,15 +18646,15 @@ bash "$SCRIPT_DIR/up.sh" "$PROJECT"
   File name:             test.sh
   Relative path:         scripts/test.sh
   Absolute path:         /home/kushal/src/golang/GoTunnels/scripts/test.sh
-  Size:                  2.3 KiB (2443 bytes)
-  Last modified:         2026-10-16 11:00:14.000000000 -0400
+  Size:                  2.5 KiB (2580 bytes)
+  Last modified:         2026-11-06 07:19:35.000000000 -0500
   Permissions:           -rw-r--r--
   Owner:                 kushal:kushal
-  Inode:                 66919158
+  Inode:                 69650541
   Hard links:            1
   MIME type:             text/x-shellscript
-  SHA-256:               2ccaf24145916038ba747df3e525545e2e785fe190334f1600ddaf012c001a04
-  Last git commit:       440aae0 2026-10-16 12:11:10 -0400 add claude response
+  SHA-256:               c4be8b5f48734a1cf344de757a593e5c009f6d31ee997167558d62430ba64f55
+  Last git commit:       cb4bce9 2026-11-06 07:27:47 -0500 add claude response
 
 --- CONTENT ---
 #!/usr/bin/env bash
@@ -18335,9 +18704,9 @@ cmd_unit() {
 }
 
 cmd_vet() {
-  log "checking gofmt and running go vet…"
-  run_go "test -z \"\$(gofmt -l .)\" || { gofmt -l . >&2; echo 'gofmt needed on the files above' >&2; exit 1; }; go mod tidy && go vet ./..."
-  ok "gofmt + go vet clean"
+  log "checking gofmt, go fix modernizers, and running go vet…"
+  run_go "test -z \"\$(gofmt -l .)\" || { gofmt -l . >&2; echo 'gofmt needed on the files above' >&2; exit 1; }; go mod tidy && { go fix -diff ./... || { echo 'go fix has pending modernizations; run: go fix ./...' >&2; exit 1; }; } && go vet ./..."
+  ok "gofmt + go fix + go vet clean"
 }
 
 cmd_build() {
@@ -18822,10 +19191,10 @@ done
 ################################################################################
 # DUMP SUMMARY
 ################################################################################
-  Files dumped   : 104
-  Total size     : 588.3 KiB (602485 bytes)
+  Files dumped   : 105
+  Total size     : 605.3 KiB (619900 bytes)
   Output file    : /home/kushal/src/golang/GoTunnels/docs/llm/dump.txt
-  Completed at   : 2026-11-06T06:44:15-05:00
+  Completed at   : 2026-11-06T07:28:23-05:00
 ################################################################################
 # END OF DUMP
 ################################################################################
