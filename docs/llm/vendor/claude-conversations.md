@@ -2498,3 +2498,6 @@ Claude finished the response
 
 
 
+please continue 
+and yes please check all the things and fix any defects you find along the way 
+also please also give me full files for all the documentation that may need to change as well 
