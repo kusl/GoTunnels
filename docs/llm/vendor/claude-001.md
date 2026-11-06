@@ -1398,3 +1398,5 @@ strict-origin-when-cross-origin
 
 
 
+https://self-cosmetics-backup-basin.trycloudflare.com/healthz
+{"instance_id":"default","service":"gotunnels-api","status":"alive"}
