@@ -285,3 +285,116 @@ kushal@virginia:~/src/golang/GoTunnels$ exit
 logout
 Connection to virginia closed.
 kushal@fedora:~/src/golang/GoTunnels$ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+kushal@fedora:~/src/dotnet/MyImapDownloader$ ssh virginia
+Linux virginia 6.12.117+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.117-1 (2026-11-12) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Fri Nov 13 06:02:18 2026 from 100.105.139.82
+kushal@virginia:~$ cd ~/src/golang/GoTunnels/; time git status; time git fetch; time git status; time git remote show origin; time git pull; time git status; export UPTRACE_DSN="https://JhkQqxGHXMjQwCptK5Qpzr@api.uptrace.dev?grpc=4317"; time bash scripts/down.sh gotunnels-7czsig; podman ps -a;
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.069s
+user	0m0.020s
+sys	0m0.021s
+remote: Enumerating objects: 12, done.
+remote: Counting objects: 100% (12/12), done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 7 (delta 4), reused 7 (delta 4), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 5.32 KiB | 605.00 KiB/s, done.
+From https://github.com/kusl/GoTunnels
+   558b3f5..fa3384d  main       -> origin/main
+
+real	0m0.469s
+user	0m0.125s
+sys	0m0.061s
+On branch main
+Your branch is behind 'origin/main' by 1 commit, and can be fast-forwarded.
+  (use "git pull" to update your local branch)
+
+nothing to commit, working tree clean
+
+real	0m0.008s
+user	0m0.000s
+sys	0m0.008s
+* remote origin
+  Fetch URL: https://github.com/kusl/GoTunnels/
+  Push  URL: https://github.com/kusl/GoTunnels/
+  HEAD branch: main
+  Remote branches:
+    dependabot/docker_compose/cloudflare/cloudflared-2026.10.7 tracked
+    main                                                       tracked
+  Local branch configured for 'git pull':
+    main merges with remote main
+  Local ref configured for 'git push':
+    main pushes to main (local out of date)
+
+real	0m0.266s
+user	0m0.104s
+sys	0m0.027s
+Updating 558b3f5..fa3384d
+Fast-forward
+ docs/llm/vendor/claude-001.md    |   2 ++
+ docs/llm/vendor/virginia-003.txt | 287 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 289 insertions(+)
+ create mode 100644 docs/llm/vendor/virginia-003.txt
+
+real	0m0.322s
+user	0m0.093s
+sys	0m0.077s
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+real	0m0.007s
+user	0m0.000s
+sys	0m0.007s
+[gotunnels] using runtime: podman / compose: podman-compose
+[gotunnels] tearing down instance: gotunnels-7czsig
+gotunnels-7czsig_cloudflared-frontend_1
+gotunnels-7czsig_cloudflared-api_1
+gotunnels-7czsig_api_1
+gotunnels-7czsig_db_1
+gotunnels-7czsig_frontend_1
+gotunnels-7czsig_cloudflared-frontend_1
+gotunnels-7czsig_api_1
+gotunnels-7czsig_cloudflared-api_1
+gotunnels-7czsig_frontend_1
+gotunnels-7czsig_db_1
+gotunnels-7czsig_pgdata
+d8cc11f826523e3b299b82a9849faa0d1ec3059c6a21db00024f9f28cc024f42
+gotunnels-7czsig_default
+[gotunnels] instance 'gotunnels-7czsig' removed (containers + volumes).
+
+real	0m2.404s
+user	0m1.589s
+sys	0m0.972s
+CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
+kushal@virginia:~/src/golang/GoTunnels$ 
+
+
+
+
+
+
